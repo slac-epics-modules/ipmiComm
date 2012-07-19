@@ -22,7 +22,7 @@ IOCManager_LIBS += ipmiComm
 
 3. Add to Db/Makefile
 
-DB_INSTALLS += $(IPMICOMM)/db/carrier_utca.db
+DB_INSTALLS += $(IPMICOMM)/db/shelf.db
 DB_INSTALLS += $(IPMICOMM)/db/module.db
 DB_INSTALLS += $(IPMICOMM)/db/sensor_temp.db
 DB_INSTALLS += $(IPMICOMM)/db/sensor_fan.db
