@@ -1,0 +1,16 @@
+record(ai, "$(dev):$(code)$(inst)_FAN$(sensInst)SPEED") {
+  field(DESC, "$(desc)")
+  field(SCAN, "5 second")
+  field(DTYP, "MCHsensor")
+  field(INP,  "#C0 S$(sens) @$(link)+FAN")
+  field(PREC, "0")
+  field(EGU,  "RPM")
+}
+
+record(bi, "$(dev):$(code)$(inst)_FAN$(sensInst)SPEED_P") {
+  field(DESC, "Sensor presence")
+  field(ZNAM, "Not present")
+  field(ONAM, "Present")
+  field(VAL,  "1")
+  field(PINI, "YES")
+}

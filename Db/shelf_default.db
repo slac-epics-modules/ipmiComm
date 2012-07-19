@@ -1,0 +1,40 @@
+record(mbbi, "$(crat):STAT") {
+  field(DTYP, "MCHsensor")
+  field(SCAN, "I/O Intr")
+  field(INP, "#C0 S0 @$(node)+STAT")
+  field(ZRVL, "0")
+  field(ZRST, "Offline")
+  field(ONVL, "1")
+  field(ONST, "Online")
+  field(PINI, "YES")
+}
+
+# Sends Chassis Control IPMI command
+# Vadatech MCH results are unreliable
+# NAT MCH does not implement this command
+# So, this record is not very useful
+record(mbbo, "$(crat):POWERCTL") {
+  field(DTYP, "MCHsensor")
+  field(OMSL, "supervisory")
+  field(OUT, "#C0 S0 @$(node)+CHAS")
+  field(ZRVL, "0")
+  field(ZRST, "Power off")
+  field(ONVL, "1")
+  field(ONST, "Power on")
+  field(THVL, "3")
+  field(THST, "Hard reset")
+  field(VAL,  "1")
+}
+
+record(bo, "$(crat):MCHRESET") {
+  field(DTYP, "MCHsensor")
+  field(OMSL, "supervisory")
+  field(OUT, "#C0 S0 @$(node)+RESET")
+}
+
+# Not yet supported by Vadatech MCH
+#record(ai, "$(crat):POWERSTATE") {
+#  field(DTYP, "MCHsensor")
+#  field(INP, "#C0 S0 @$(node)+CHAS")
+#}
+

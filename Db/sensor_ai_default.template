@@ -1,0 +1,11 @@
+record(ai, "$(dev):$(code)$(inst)_$(signal)$(sensInst)") {
+  field(PINI, "YES")
+}
+
+record(bi, "$(dev):$(code)$(inst)_$(signal)$(sensInst)_P") {
+  field(DESC, "Sensor presence")
+  field(ZVAL, "Not present")
+  field(OVAL, "Present")
+  filed(VAL,  "0")
+  field(PINI, "YES")
+}

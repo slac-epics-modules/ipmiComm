@@ -1,0 +1,38 @@
+#==============================================================================
+#
+# Abs:  Default MCH module and sensor PVs, to be used by visibility rules 
+#       on EDM displays and potentially overloaded during ioc boot
+#
+# Name:  module_mch_default.substitutions
+#
+# Macros in:
+#	dev      Shelf name, for example CRAT:LI28:RF01
+#	code     String identifier, for example 'CU' for cooling unit
+#       inst     Instance of this type of module, for example 2 for the second MCH in a carrier
+#       attr	 Used in PV attribute, for example FAN1SPEED or TEMP2
+#
+# Macros out:
+#
+#       crat     Shelf Name, for example CRAT:LI28:RF01
+#	id       String identifier, for example 'CU' for cooling unit
+#       unit     Instance of this type of module, for example 2 for the second MCH in a carrier
+#
+#
+#==============================================================================
+#
+
+file module_default.db
+{
+   pattern { dev	,  code	,  unit	}
+           { $(crat)  	,  $(id),  1  	}
+}
+
+file sensor_default.db
+{
+   pattern { dev	,  code		,  inst		,  attr		}
+           { $(crat)    ,  $(id)	,  $(unit)  	,  TEMP1	}
+           { $(crat)    ,  $(id)	,  $(unit)  	,  TEMP2	}
+           { $(crat)    ,  $(id)	,  $(unit)  	,  TEMP3	}
+           { $(crat)    ,  $(id)	,  $(unit)  	,  TEMP4	}
+           { $(crat)    ,  $(id)	,  $(unit)  	,  TEMP5	}
+}

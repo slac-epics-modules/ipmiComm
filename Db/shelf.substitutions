@@ -1,0 +1,82 @@
+#==============================================================================
+#
+# Abs:  Populate shelf PVs
+#       module_*_default PVs are used by visibility rules on EDM displays
+#       and may be overloaded during ioc boot
+#
+# Name:  shelf_default.substitutions
+#
+# Macros in:
+#	crat    Shelf name, for example CRAT:LI28:RF01
+#       node    Name of shelf used in asynIPPortConfigure in st.cmd, for example crat-li28-rf01
+#	id      String identifier, for example 'CU' for cooling unit
+#       unit    Instance of this type of module, for example 2 for the second MCH in a shelf
+#
+#
+# Macros out:
+#
+#       dev     Shelf Name, for example CRAT:LI28:RF01
+#       link    Name of shelf used in asynIPPortConfigure in st.cmd, for example crat-li28-rf01
+#
+#
+#==============================================================================
+#
+
+file shelf_default.db
+{
+   pattern { crat	, node		}
+	   { $(dev)	, $(link)	}	
+}
+
+file module_mch_default.db
+{
+   pattern { crat	,  id	,  unit	}
+           { $(dev)     ,  MCH	,  1  	}
+           { $(dev)     ,  MCH	,  2  	}
+}
+
+file module_cu_default.db
+{
+   pattern { crat	,  id	,  unit	}
+           { $(dev)     ,  CU	,  1  	}
+           { $(dev)     ,  CU	,  2  	}
+}
+
+file module_pm_default.db
+{
+   pattern { crat	,  id	,  unit	}
+           { $(dev)     ,  PM	,  1  	}
+           { $(dev)     ,  PM	,  2  	}
+           { $(dev)     ,  PM	,  3  	}
+           { $(dev)     ,  PM	,  4  	}
+}
+
+file module_amc_rtm_default.db
+{
+   pattern { crat	,  id	,  unit	}
+           { $(dev)     ,  AMC	,  1  	}
+           { $(dev)     ,  AMC	,  2  	}
+           { $(dev)     ,  AMC	,  3  	}
+           { $(dev)     ,  AMC	,  4  	}
+           { $(dev)     ,  AMC	,  5  	}
+           { $(dev)     ,  AMC	,  6  	}
+           { $(dev)     ,  AMC	,  7  	}
+           { $(dev)     ,  AMC	,  8  	}
+           { $(dev)     ,  AMC	,  9  	}
+           { $(dev)     ,  AMC	,  10  	}
+           { $(dev)     ,  AMC	,  11  	}
+           { $(dev)     ,  AMC	,  12  	}
+           { $(dev)     ,  RTM	,  1  	}
+           { $(dev)     ,  RTM	,  2  	}
+           { $(dev)     ,  RTM	,  3  	}
+           { $(dev)     ,  RTM	,  4  	}
+           { $(dev)     ,  RTM	,  5  	}
+           { $(dev)     ,  RTM	,  6  	}
+           { $(dev)     ,  RTM	,  7  	}
+           { $(dev)     ,  RTM	,  8  	}
+           { $(dev)     ,  RTM	,  9  	}
+           { $(dev)     ,  RTM	,  10  	}
+           { $(dev)     ,  RTM	,  11  	}
+           { $(dev)     ,  RTM	,  12  	}
+}
+

@@ -1,0 +1,54 @@
+############################################################
+#
+#	IPMI module README 
+#
+#	Auth: Sonya Hoobler
+#
+#	Last updated: 16 July 2012
+#
+############################################################
+
+To add MicroTCA IPMI support to your application:
+
+1. Add to configure/RELEASE:
+
+IPMICOMM_MODULE_VERSION=working
+IPMICOMM=$(EPICS_MODULES)/ipmiComm/$(IPMICOMM_MODULE_VERSION)
+
+2. Add to src/Makefile
+
+IOCManager_DBD  += ipmiComm.dbd
+IOCManager_LIBS += ipmiComm
+
+3. Add to Db/Makefile
+
+DB_INSTALLS += $(IPMICOMM)/db/carrier_utca.db
+DB_INSTALLS += $(IPMICOMM)/db/module.db
+DB_INSTALLS += $(IPMICOMM)/db/sensor_temp.db
+DB_INSTALLS += $(IPMICOMM)/db/sensor_fan.db
+DB_INSTALLS += $(IPMICOMM)/db/sensor_hotswap.db
+DB_INSTALLS += $(IPMICOMM)/db/sensor_voltage.db
+DB_INSTALLS += $(IPMICOMM)/db/sensor_current.db
+
+4. Add these lines to st.cmd for each MCH/shelf - *order is important*
+
+Example for crat-b34-cd38, whose DNS node name is actually mch-b34-cd38:
+
+drvAsynIPPortConfigure ("crat-b34-cd38","mch-b34-cd38:623 udp",0,0,0)
+mchCreateFile("st.crat-b34-cd38.cmd")
+mchInit("crat-b34-cd38")
+< st.crat-b34-cd38.cmd
+
+
+NOTES ON FIRST RELEASE
+---------------------------
+
+-During ioc boot, the ioc will discover which modules/sensors exist
+ for each carrier defined in st.cmd. It will then build a script to 
+ load EPICS records for what has been discovered. The script is saved
+ to the ioc's boot directory. The script is not in CVS. Any carriers
+ that are offline during ioc boot will not have scripts created for them
+ and thus, no PVs will be loaded for them.
+
+-No alarm limits or severities have been implemented.
+

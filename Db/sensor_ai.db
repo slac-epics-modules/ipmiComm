@@ -1,0 +1,18 @@
+# These records overload dummy default sensor PVs
+
+record(ai, "$(dev):$(code)$(inst)_$(signal)$(sensInst)") {
+  field(DESC, "$(desc)")
+  field(SCAN, "$(scan)")
+  field(DTYP, "MCHsensor")
+  field(INP, "#C0 S$(sens) @$(link)+$(task)")
+  field(PREC, "0")
+  field(EGU, "$(egu)")
+}
+
+record(bi, "$(dev):$(code)$(inst)_$(signal)$(sensInst)P") {
+  field(DESC, "Sensor presence")
+  field(ZVAL, "Not present")
+  field(OVAL, "Present")
+  field(VAL,  "1")
+  field(PINI, "YES")
+}

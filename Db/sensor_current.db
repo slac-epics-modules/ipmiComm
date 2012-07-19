@@ -1,0 +1,17 @@
+record(ai, "$(dev):$(code)$(inst)_I$(sensInst)") {
+  field(DESC, "$(desc)")
+  field(SCAN, "5 second")
+  field(DTYP, "MCHsensor")
+  field(INP,  "#C0 S$(sens) @$(link)+I")
+  field(PREC, "1")
+  field(EGU,  "Amps")
+}
+
+record(bi, "$(dev):$(code)$(inst)_I$(sensInst)_P") {
+  field(DESC, "Sensor presence")
+  field(ZNAM, "Not present")
+  field(ONAM, "Present")
+  field(VAL,  "1")
+  field(PINI, "YES")
+}
+

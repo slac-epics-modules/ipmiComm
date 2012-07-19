@@ -1,0 +1,8 @@
+driver(drvMch)
+device(ai,VME_IO,devAiMch,"MCHsensor")
+device(bo,VME_IO,devBoMch,"MCHsensor")
+device(mbbi,VME_IO,devMbbiMch,"MCHsensor")
+device(mbbo,VME_IO,devMbboMch,"MCHsensor")
+device(ai,VME_IO,devAiFru,"FRUinfo")
+device(stringin,VME_IO,devStringinFru,"FRUinfo")
+registrar(drvMchRegisterCommands)
