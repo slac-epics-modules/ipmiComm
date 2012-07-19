@@ -19,13 +19,11 @@ BASE_MODULE_VERSION=base-R3-14-12
 # IOC apps or other Support apps
 # =============================================================
 ASYN_MODULE_VERSION=asyn-R4-18-lcls1
-AUTOSAVE_MODULE_VERSION=autosave-R4-8-lcls1
 
 # ============================================================
 # Support module locations
 # ============================================================
 ASYN=$(EPICS_MODULES)/asyn/$(ASYN_MODULE_VERSION)
-AUTOSAVE=$(EPICS_MODULES)/autosave/$(AUTOSAVE_MODULE_VERSION)
 
 # =================================================================
 # Define EPICS_BASE
