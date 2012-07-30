@@ -1,1 +1,6 @@
 ipmiComm-R1-0-0:  Initial release. Built against EPICS base-R3-14-12
+
+ipmiComm-R1-1-0:  Add support for fan level readback, control, and to read fan properties
+                  Additional minor cleanup/changes
+                  
+                  
