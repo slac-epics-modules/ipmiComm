@@ -20,7 +20,7 @@ extern int mchInitDone[MAX_MCH];
 typedef struct FruFieldRec_ {
 	uint8_t     type;         /* Type of data */
 	uint8_t     length;       /* Length of data (bytes) */
-	uint8_t     *data;         
+	uint8_t    *data;
 } FruFieldRec, *FruField;
 
 typedef struct FruBoardRec_ {
@@ -54,7 +54,6 @@ typedef struct FruProdRec_ {
  * In this implementation, we don't support all of the Full SDR fields
  */
 typedef struct SdrFullRec_ {
-	uint8_t      raw[SDR_MAX_LENGTH]; /* Raw SDR */
 	uint8_t      id[2];         /* Sensor ID (can change, so key bytes must also be used to identify a sensor) */
 	uint8_t      ver;           /* SDR version (0x51) */
 	uint8_t      recType;       /* Record type, 0x01 for Full Sensor Record */
@@ -92,7 +91,6 @@ typedef struct SdrFullRec_ {
  * Handle for FRU Device Locator Record, IPMI Table 43-7
  */
 typedef struct SdrFruRec_ {
-	uint8_t      raw[SDR_FRU_MAX_LENGTH]; /* Raw SDR */
 	uint8_t      id[2];         /* Sensor ID (can change, so key bytes must also be used to identify a sensor */
 	uint8_t      ver;           /* SDR version (0x51) */
 	uint8_t      recType;       /* Record type, 0x01 for Full Sensor Record */
@@ -138,13 +136,17 @@ typedef struct FruRec_ {
 	uint16_t     read;          /* Read number */
 	FruBoardRec  board;
 	FruProdRec   prod;
-	uint8_t     *raw;           /* Raw FRU data */
 	SdrFruRec    sdr;
 	char         parm[10];      /* Describes FRU type, used to load EPICS records */
 	int          hotswap;       /* Index into sensor array for FRU's hotswap sensor */
 	int          tempCnt;       /* Number of temperature sensors associated with this FRU */         
 	int          fanCnt;        /* Number of fan sensors associated with this FRU */         
-	int          vCnt;          /* Number of v sensors associated with this FRU */         
+	int          vCnt;          /* Number of v sensors associated with this FRU */ 
+/* Following used only by cooling unit FRUs */
+        uint8_t      fanMin;        /* Fan minimum level */          
+        uint8_t      fanMax;        /* Fan maximum level */          
+        uint8_t      fanNom;        /* Fan nominal level */   
+        uint8_t      fanProp;       /* [7] 1 if fan try supports automatic fan speed adjustment */
 } FruRec, *Fru;
 
 /* Handle for each SDR */
@@ -163,16 +165,14 @@ typedef struct MchDataRec_ {
 	epicsThreadId pingThreadId;  /* Thread ID for task that periodically pings MCH */
 	uint8_t       id[4];         /* Session ID */
 	uint8_t       str[16];       /* Session challenge string; used in establishing a session */
-	uint8_t       regCache[32];  /* Cached AFE register contents */
-        uint8_t       seq_send[4];   /* Message sequence number for messages to MCH, null until session activated; chosen by MCH; rolls over at 0xFFFFFFFF */
-        uint8_t       seq_rply[4];   /* Message sequence number for messages from MCH; rolls over at 0xFFFFFFFF */
+        uint8_t       seqSend[4];    /* Message sequence number for messages to MCH, null until session activated; chosen by MCH; rolls over at 0xFFFFFFFF */
+        uint8_t       seqRply[4];    /* Message sequence number for messages from MCH; rolls over at 0xFFFFFFFF */
 	asynUser     *pasynUser;
 	SdrRepRec     sdrRep;
-	uint8_t      *sdrRaw;
 	uint8_t       sensCount;     /* Sensor count */
-	SensorRec    *sens;          /* Array of sensors */	
+	SensorRec    *sens;          /* Array of sensors (size of senscount) */	
 	uint8_t       fruCount;      /* FRU count */
-	FruRec       *fru;           /* Array of FRUs */
+	FruRec       *fru;           /* Array of FRUs (size of MAX_FRU) */
 } MchDataRec, *MchData;
 
 
