@@ -27,6 +27,8 @@
 
 #define MAX_MCH      255
 
+#define PING_PERIOD  5
+
 #undef DEBUG
 
 int mchCounter = 0;
@@ -68,7 +70,7 @@ int     i;
 
         /* Extract initial sequence number for messages from MCH */
         for ( i = 0; i < IPMI_RPLY_INIT_SEND_SEQ_LENGTH ; i++)
-                mchData->seq_send[i] = response[IPMI_RPLY_INIT_SEND_SEQ_OFFSET + i];
+                mchData->seqSend[i] = response[IPMI_RPLY_INIT_SEND_SEQ_OFFSET + i];
 
 	ipmiMsgSetPriv( mchData, response, IPMI_MSG_PRIV_LEVEL_ADMIN );
 
@@ -89,7 +91,7 @@ mchNewSession(MchData mchData)
 int i, rval = -1;
 
 	for ( i = 0; i < IPMI_MSG_HDR_SEQ_LENGTH ; i++)
-	        mchData->seq_send[i] = 0;
+	        mchData->seqSend[i] = 0;
 
 	for ( i = 0; i < IPMI_MSG_HDR_ID_LENGTH ; i++)
 		mchData->id[i] = 0;
@@ -110,23 +112,23 @@ int
 mchFruFieldGet(FruField field, uint8_t *raw, unsigned *offset)
 {
 int i;
-	if ( ( field->length = IPMI_DATA_LENGTH( raw[*offset] ) ) ) {
+        if ( ( field->length = IPMI_DATA_LENGTH( raw[*offset] ) ) ) {
 
-		field->type = IPMI_DATA_TYPE( raw[*offset] );
-		(*offset)++;
+                field->type = IPMI_DATA_TYPE( raw[*offset] );
+                (*offset)++;
 
-		if ( !( field->data = calloc( field->length, 1 ) ) )
-			errlogPrintf("No memory for FRU field data\n");
-		else {
-			for ( i = 0; i < field->length; i++ )
-				field->data[i] = raw[*offset + i];
+                if ( !( field->data = calloc( field->length, 1 ) ) )
+                        errlogPrintf("No memory for FRU field data\n");
+                else {
+                        for ( i = 0; i < field->length; i++ )
+                                field->data[i] = raw[*offset + i];
 
-			*offset += field->length;
+                        *offset += field->length;
 
-			return 0;
-		}
-	}
-	return -1;
+                        return 0;
+                }
+        }
+        return -1;
 }
 
 /* 
@@ -237,26 +239,39 @@ printf("\n");
 	mchFruBoardDataGet( &(fru->board), raw, &offset );
 	mchFruProdDataGet(  &(fru->prod) , raw, &offset );
 
-	if ( ( fru->raw = malloc( sizeInt ) ) )
-		memcpy( fru->raw, raw, sizeInt );
-	else
-		errlogPrintf("mchFruDataGet: No memory for FRU %i data\n",id);
+	free( raw );
 }
 
 /* 
- * Get data for all FRUs
+ * Get data for all FRUs. Must be done after SDR data stored in fru struct.
  * FRUs are indexed by FRU number
  * Later, change this to also discover FRUs that do not have SDRs (like our SLAC board)
  */
 void
 mchFruGetDataAll(MchData mchData)
 {
-uint8_t i;
-
+uint8_t *response  = malloc(MSG_MAX_LENGTH);
+uint8_t  i;
+Fru fru;
 	for ( i = 0; i < MAX_FRU ; i++) {
-		if ( mchData->fru[i].sdr.entityInst )
-			mchFruDataGet( mchData, &(mchData->fru[i]) , i);
+
+		fru = &mchData->fru[i];
+
+		if ( fru->sdr.entityInst ) {
+
+			mchFruDataGet( mchData, fru , i);
+
+			if ( (i >= UTCA_FRU_TYPE_CU_MIN) && (i <= UTCA_FRU_TYPE_CU_MAX) ) {
+				ipmiMsgGetFanProp( mchData, response, fru->sdr.fruId );
+				fru->fanMin  = response[IPMI_RPLY_GET_FAN_PROP_MIN_OFFSET];
+				fru->fanMax  = response[IPMI_RPLY_GET_FAN_PROP_MAX_OFFSET];
+				fru->fanNom  = response[IPMI_RPLY_GET_FAN_PROP_NOM_OFFSET];
+				fru->fanProp = response[IPMI_RPLY_GET_FAN_PROP_PROP_OFFSET];
+			}
+		}			
 	}
+
+	free( response );
 
 #ifdef DEBUG
 printf("mchFruGetDataAll: FRU Summary:\n");
@@ -266,6 +281,7 @@ for ( i = 0; i < MAX_FRU  ; i++) {
 		printf("FRU %i %s was found, id %02x instance %02x\n", fru->sdr.fruId, fru->board.prod.data, fru->sdr.entityId, fru->sdr.entityInst);
 }
 #endif
+
 }
 
 /* 
@@ -342,6 +358,8 @@ uint8_t  flags;
        	mchData->sdrRep.lun1       = DEV_SENSOR_LUN1(flags);
        	mchData->sdrRep.lun2       = DEV_SENSOR_LUN2(flags);
        	mchData->sdrRep.lun3       = DEV_SENSOR_LUN3(flags);
+
+	free( response );
 }
 
 /* 
@@ -352,7 +370,6 @@ mchSdrFruDev(SdrFru sdr, uint8_t *raw)
 {
 int n, l, i;
 	n = SDR_HEADER_LENGTH + raw[SDR_LENGTH_OFFSET];
-	memcpy( sdr->raw, raw, n );
 
 	sdr->id[0]      = raw[SDR_ID_LSB_OFFSET];
 	sdr->id[1]      = raw[SDR_ID_MSB_OFFSET];
@@ -388,7 +405,6 @@ mchSdrFullSens(SdrFull sdr, uint8_t *raw, int type)
 {
 int n, l, i;
 	n = SDR_HEADER_LENGTH + raw[SDR_LENGTH_OFFSET];
-	memcpy( sdr->raw, raw, n );
 
 	sdr->id[0]      = raw[SDR_ID_LSB_OFFSET];
 	sdr->id[1]      = raw[SDR_ID_MSB_OFFSET];
@@ -497,7 +513,6 @@ int      i, iFull = 0, iFru = 0, fruId;
 		errlogPrintf("mchSdrGetDataAll: No memory for FRU data for %s\n", mchData->name);
 		goto bail;
 	}
-   
 	/* Store SDR data; for now we only support Compact/Full Sensor Records and FRU Device Locator Records */
 	for ( i = 0; i < sdrCount; i++) {
 		type = raw[i*SDR_MAX_LENGTH + SDR_REC_TYPE_OFFSET];
@@ -529,7 +544,7 @@ for ( i = 0; i < MAX_FRU; i++ ) {
 #endif
 
 bail:
-	free( mchData->sdrRaw );
+	free( raw );
 }
 
 /* 
@@ -583,7 +598,8 @@ int    *alive = &(mchIsAlive[mchData->instance]);
 					scanIoRequest( drvMchStatScan );
 			}
 		}
-		epicsThreadSleep(5);
+
+		epicsThreadSleep( PING_PERIOD );
 	}
 }
 
@@ -607,24 +623,23 @@ char    taskName[50];
 	if ( ! (mchData = calloc( 1, sizeof( *mchData ))) )
 		cantProceed("FATAL ERROR: No memory for MchData structure\n");
 
-	/* Allocate memory for MCH device support structure */
-	if ( ! (mch = calloc( 1, sizeof( *mch ) )) ) {
-		cantProceed("FATAL ERROR: No memory for MchDev structure\n");
-	}
+       	/* Allocate memory for MCH device support structure */
+       	if ( ! (mch = calloc( 1, sizeof( *mch ) )) )
+       		cantProceed("FATAL ERROR: No memory for MchDev structure\n");
 
-        if ( ! (mch = devMchRegister( name )) )
-                errlogPrintf("FATAL ERROR: Unable to register MCH %s with device support\n", name);
+       	if ( ! (mch = devMchRegister( name )) )
+       		errlogPrintf("FATAL ERROR: Unable to register MCH %s with device support\n", name);
 
-	/* No need to lock; performed in single thread at init */
-	mchData->name = mch->name;
-	mch->udata    = mchData;
+       	mchData->name = mch->name;
+       	mch->udata = mchData;
 
 	/* Start task to periodically ping MCH */
 	mchData->instance = mchCounter++;
 	sprintf( taskName, "%s-PING", mch->name ); 
 	mchData->pingThreadId = epicsThreadMustCreate( taskName, epicsThreadPriorityMedium, epicsThreadGetStackSize(epicsThreadStackMedium), mchPing, mch );
 
-	epicsThreadSleep(5); /* Wait for one ping cycle */
+	/* Wait for one ping cycle */ 
+	epicsThreadSleep( PING_PERIOD ); 
 
 	if ( mchIsAlive[mchData->instance] ) {
 
