@@ -185,9 +185,15 @@ int      found, inst;
 			fru = &mchData->fru[i];
 
 			/* If we identified this FRU */
-			if ( fru->sdr.entityInst )
+			if ( fru->sdr.entityInst ) {
 				fprintf( file, "dbLoadRecords(\"${TOP}/db/module.db\",\"dev=%s,link=%s,code=%s,fruid=%i,inst=%i,index=%i,temp=%i,fan=%i,v=%i\")\n", /* continue next line */
 				dev, mchData->name, fru->parm, fru->sdr.fruId, fru->instance, i, fru->tempCnt, fru->fanCnt, fru->vCnt );
+
+				if ( (i >= UTCA_FRU_TYPE_CU_MIN) && (i <= UTCA_FRU_TYPE_CU_MAX) )
+					fprintf( file, "dbLoadRecords(\"${TOP}/db/module_cu.db\",\"dev=%s,link=%s,code=%s,fruid=%i,inst=%i\")\n", /* continue next line */
+					dev, mchData->name, fru->parm, fru->sdr.fruId, fru->instance );
+			}
+
 		}	
 			
 		for ( i = 0; i < mchData->sensCount; i++ ) {

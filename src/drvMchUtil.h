@@ -32,7 +32,7 @@ void
 mchSensorFruGetInstance(MchData mchData);
 
 void
-sensorFruRecordScript( MchData mchData );
+sensorFruRecordScript(MchData mchData);
 
 #ifdef __cplusplus
 };
