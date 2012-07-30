@@ -1,3 +1,120 @@
+/*
+=============================================================
+
+  Abs:  EPICS Device Support for MicroTCA MCH/shelf 
+
+  Name: devMch.c
+
+         Utilities:
+         -------------------------------------------------------
+	 *   devMchRegister           - Register device
+	 *   devMchFind               - Find registered device
+         *   sensorConversion         - Convert sensor raw reading, according to sensor SDR info
+
+         Analog Input Device Support:
+         -------------------------------------------------------
+
+	 devAiMch
+         --------
+         *   init_ai_record           - Record initialization
+         *   read_ai                  - Read analog input
+
+	   Supported operations:
+
+             * "TEMP": read temperature sensor
+             * "FAN" : read fan speed sensor
+             * "V"   : read voltage sensor
+             * "I"   : read current sensor
+	   
+	 devAiFru
+         --------
+         *   init_fru_ai_record           - Record initialization
+         *   read_fru_ai                  - Read analog input
+
+	   Supported operations:
+
+             * "FAN" : read fan level
+             * "BSN" : FRU board serial number
+             * "PSN" : FRU product serial number	   
+
+         Binary Output Device Support:
+         -------------------------------------------------------
+
+	 devBoMch
+         --------
+
+         *   init_bo_record           - Record initialization
+         *   read_bo                  - Write binary output
+
+	   Supported operations:
+
+             * "RESET": perform cold reset (reboots MCH)
+
+         Multibit-Binary Input Device Support:
+         -------------------------------------------------------
+
+	 devMbbiMch
+         ----------
+
+	 *   init_mbbi                 - mbbi initialization     
+         *   mbbi_ioint_info           - Add to i/o scan list   
+         *   init_mbbi_record          - Record initialization
+         *   read_mbbi                 - Read multi-bit binary input
+
+	   Supported operations:
+
+             * "STAT": read crate online/offline status
+             * "FAN":  read fan auto-adjustment
+             * "HS":   read FRU hot-swap sensor 
+
+
+         Multibit-Binary Output Device Support:
+         -------------------------------------------------------
+
+	 devMbboMch
+         ----------
+
+         *   init_mbbo_record          - Record initialization
+         *   write_mbbo                - Write multi-bit binary output
+
+	   Supported operations:
+
+             * "CHAS": chassis control on/off/reset
+             * "FRU":  FRU on/off
+
+         String Input Device Support:
+         -------------------------------------------------------
+
+	 devStringinFru
+         --------------
+
+         *   init_fru_stringin_record     - Record initialization
+         *   read_fru_stringin            - Read string input
+
+	   Supported operations:
+
+             * "BMF":  FRU board manufacturer
+             * "BP":   FRU board product name
+             * "BPN":  FRU board part number
+             * "PMF":  FRU product manufacturer
+             * "PP":   FRU product product name
+             * "PPN":  FRU product part number
+
+         Long Integer Output Device Support:
+         -------------------------------------------------------
+
+	 devLongoutFru
+         -------------
+
+         *   init_fru_longout_record      - Record initialization
+         *   write_longout                - Write long integer output
+
+	   Supported operations:
+
+             * "FAN":  fan level control
+
+=============================================================
+*/
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -16,6 +133,7 @@
 #include <recSup.h>
 #include <devSup.h>
 #include <aiRecord.h>
+#include <longoutRecord.h>
 #include <stringinRecord.h>
 #include <mbboRecord.h>
 #include <mbbiRecord.h>
@@ -34,7 +152,6 @@
 /* Device support prototypes */
 static long init_ai_record(struct aiRecord *pai);
 static long read_ai(struct aiRecord *pai);
-/*static long ai_fru_ioint_info(int cmd, struct aiRecord *pai, IOSCANPVT *iopvt);*/
 
 static long init_bo_record(struct  boRecord *pbo);
 static long write_bo(struct boRecord *pbo);
@@ -49,6 +166,10 @@ static long write_mbbo(struct mbboRecord *pmbbo);
 
 static long init_fru_ai_record(struct aiRecord *pai);
 static long read_fru_ai(struct aiRecord *pai);
+/*static long ai_fru_ioint_info(int cmd, struct aiRecord *pai, IOSCANPVT *iopvt);*/
+
+static long init_fru_longout_record(struct longoutRecord *plongout);
+static long write_fru_longout(struct longoutRecord *plongout);
 
 static long init_fru_stringin_record(struct stringinRecord *pstringin);
 static long read_fru_stringin(struct stringinRecord *pstringin);
@@ -71,6 +192,7 @@ MCH_DEV_SUP_SET devBoMch         = {6, NULL, NULL, init_bo_record,           NUL
 MCH_DEV_SUP_SET devMbboMch       = {6, NULL, NULL, init_mbbo_record,         NULL,                    write_mbbo,        NULL};
 MCH_DEV_SUP_SET devMbbiMch       = {6, NULL, init_mbbi, init_mbbi_record,    mbbi_ioint_info,         read_mbbi,         NULL};
 MCH_DEV_SUP_SET devAiFru         = {6, NULL, NULL, init_fru_ai_record,       NULL,                    read_fru_ai,       NULL};
+MCH_DEV_SUP_SET devLongoutFru    = {6, NULL, NULL, init_fru_longout_record,  NULL,                    write_fru_longout, NULL};
 MCH_DEV_SUP_SET devStringinFru   = {6, NULL, NULL, init_fru_stringin_record, NULL,                    read_fru_stringin, NULL};
 
 epicsExportAddress(dset, devAiMch);
@@ -78,6 +200,7 @@ epicsExportAddress(dset, devBoMch);
 epicsExportAddress(dset, devMbbiMch);
 epicsExportAddress(dset, devMbboMch);
 epicsExportAddress(dset, devAiFru);
+epicsExportAddress(dset, devLongoutFru);
 epicsExportAddress(dset, devStringinFru);
 
 
@@ -292,7 +415,7 @@ MchRec   recPvt  = pai->dpvt;
 MchDev   mch;
 MchData  mchData;
 char    *task;
-uint8_t *data    = malloc(MSG_MAX_LENGTH);
+uint8_t *data;
 uint8_t  raw, sensor;
 uint16_t addr    = 0; /* get addr */
 short    index   = pai->inp.value.vmeio.signal; /* Sensor index */
@@ -312,14 +435,21 @@ float    value = 0;
 
 		sensor = mchData->sens[index].sdr.number;
 
+		if ( !(data = malloc(MSG_MAX_LENGTH)) ) {
+			errlogPrintf("read_ai: No memory for message\n");
+			return ERROR;
+		}
+
 		epicsMutexLock( mch->mutex );
 
 		ipmiMsgReadSensor( mchData, data, sensor, addr );
-		mchData->sens[index].val = value;
 	
 		epicsMutexUnlock( mch->mutex );
 
+		free( data );
+
        		raw = data[IPMI_RPLY_SENSOR_READING_OFFSET];
+		mchData->sens[index].val = value;
 
 		sdr = &mchData->sens[index].sdr;
 
@@ -428,9 +558,10 @@ bail:
 
 }
 
-static long write_bo(struct boRecord *pbo)
+static long 
+write_bo(struct boRecord *pbo)
 {
-uint8_t *data   = malloc(MSG_MAX_LENGTH);
+uint8_t *data;
 MchRec   recPvt = pbo->dpvt;
 MchDev   mch;
 MchData  mchData;
@@ -447,9 +578,17 @@ long     status = NO_CONVERT;
 	if ( mchIsAlive[mchData->instance] ) {
 
 		if ( !strcmp( task, "RESET" ) ) {
+
+			if ( !(data = malloc(MSG_MAX_LENGTH)) ) {
+				errlogPrintf("write_bo: No memory for message\n");
+				return ERROR;
+			}
+
 			epicsMutexLock( mch->mutex );
 		       	ipmiMsgColdReset( mchData, data );
 			epicsMutexUnlock( mch->mutex );
+
+			free( data );
 		}
 
 		pbo->udf = FALSE;
@@ -514,7 +653,7 @@ char     str[40];
         node = strtok( pmbbi->inp.value.vmeio.parm, "+" );
         if ( (p = strtok( NULL, "+")) ) {
                 task = p;
-                if ( strcmp( task, "STAT" ) && strcmp( task, "HS") ) {
+                if ( strcmp( task, "STAT" ) && strcmp( task, "HS")&& strcmp( task, "FAN") ) {
 			sprintf( str, "Unknown task parameter %s", task);
 			status = S_dev_badSignal;
 		}
@@ -544,14 +683,14 @@ bail:
 static long 
 read_mbbi(struct mbbiRecord *pmbbi)
 {
-uint8_t *data   = malloc(MSG_MAX_LENGTH);
+uint8_t *data;
 MchRec   recPvt = pmbbi->dpvt;
 MchDev   mch;
 MchData  mchData;
 char    *task;
 uint8_t  value = 0, sensor;
 uint16_t addr = 0; /* get addr */
-short    index  = pmbbi->inp.value.vmeio.signal; /* Sensor index */
+short    index  = pmbbi->inp.value.vmeio.signal; /* Sensor index or FRU id */
 long     status = NO_CONVERT;
 
 	if ( !recPvt )
@@ -565,21 +704,34 @@ long     status = NO_CONVERT;
 		if ( !strcmp( task, "STAT" ) )
 			pmbbi->val = mchIsAlive[mchData->instance];
 
+		else if ( !strcmp( task, "FAN" ) ) {
+
+			value = ( mchData->fru[index].fanProp & (1<<7) ) ? 1 : 0;
+
+			pmbbi->val = pmbbi->rval = value;
+		}
 		else if ( !strcmp( task, "HS") ) {
 
 			if ( mchIsAlive[mchData->instance] ) {
 				sensor = mchData->sens[index].sdr.number;
 
+				if ( !(data = malloc(MSG_MAX_LENGTH)) ) {
+					errlogPrintf("read_mbbi: No memory for message\n");
+					return ERROR;
+				}
+
 				epicsMutexLock( mch->mutex );
 
 				ipmiMsgReadSensor( mchData, data, sensor, addr );
-	
+
 				/* Store raw sensor reading */
 				mchData->sens[index].val = value;
+				value = data[IPMI_RPLY_HS_SENSOR_READING_OFFSET];
 
 				epicsMutexUnlock( mch->mutex );
 
-				value = data[IPMI_RPLY_HS_SENSOR_READING_OFFSET];
+				free( data );
+
 				pmbbi->rval = value;
 				pmbbi->val  = value;
 			}
@@ -654,11 +806,10 @@ bail:
 	return status;
 }
 
-/* if no task, set error */
 static long 
 write_mbbo(struct mbboRecord *pmbbo)
 {
-uint8_t *data   = malloc(MSG_MAX_LENGTH);
+uint8_t *data;
 MchRec   recPvt = pmbbo->dpvt;
 MchDev   mch;
 MchData  mchData;
@@ -678,49 +829,58 @@ volatile uint8_t val;
 
 	if ( mchIsAlive[mchData->instance] ) {
 
-		if ( task ) {
-			if ( !strcmp( task, "CHAS" ) ) {
-				epicsMutexLock( mch->mutex );
-				ipmiMsgChassisControl( mchData, data, pmbbo->val );
-				epicsMutexUnlock( mch->mutex );
-			}
-			else if ( !strcmp( task, "FRU" ) ) {
 
-				if ( pmbbo->val > 1 ) { /* reset not supported yet */
-					recGblSetSevr( pmbbo, STATE_ALARM, MAJOR_ALARM );
-					return ERROR;
+		if ( !(data = malloc(MSG_MAX_LENGTH)) ) {
+			errlogPrintf("write_mbbo: No memory for message\n");
+			return ERROR;
+		}
+
+		if ( !strcmp( task, "CHAS" ) ) {
+			epicsMutexLock( mch->mutex );
+			ipmiMsgChassisControl( mchData, data, pmbbo->val );
+			epicsMutexUnlock( mch->mutex );
+		}
+		else if ( !strcmp( task, "FRU" ) ) {
+
+			if ( pmbbo->val > 1 ) { /* reset not supported yet */
+				recGblSetSevr( pmbbo, STATE_ALARM, MAJOR_ALARM );
+				free( data );
+				return ERROR;
+			}
+
+			cmd = ( pmbbo->val == 2 ) ? 0 : pmbbo->val; 
+
+			epicsMutexLock( mch->mutex );
+
+			ipmiMsgSetFruActPolicyHelper( mchData, data, id, cmd );
+
+			epicsMutexUnlock( mch->mutex );
+	      
+			if ( pmbbo->val == 2 ) {
+
+				index = mchData->fru[id].hotswap;
+				val   = (volatile uint8_t)mchData->sens[index].val;
+
+				while( val != 2 ) {
+					epicsThreadSleep(1);
+					i++;
+					if (i > RESET_TIMEOUT ) {
+						recGblSetSevr( pmbbo, TIMEOUT_ALARM, MAJOR_ALARM );
+						free( data );
+						return ERROR; /* also set FRU status */
+					}
 				}
 
-				cmd = ( pmbbo->val == 2 ) ? 0 : pmbbo->val; 
-
 				epicsMutexLock( mch->mutex );
 
-				ipmiMsgSetFruActPolicyHelper( mchData, data, id, cmd );
+				ipmiMsgSetFruActPolicyHelper( mchData, data, id, 1 );
 
 				epicsMutexUnlock( mch->mutex );
-		      
-				if ( pmbbo->val == 2 ) {
-
-					index = mchData->fru[id].hotswap;
-					val   = (volatile uint8_t)mchData->sens[index].val;
-
-					while( val != 2 ) {
-						epicsThreadSleep(1);
-						i++;
-						if (i > RESET_TIMEOUT ) {
-							recGblSetSevr( pmbbo, TIMEOUT_ALARM, MAJOR_ALARM );
-							return ERROR; /* also set FRU status */
-						}
-					}
-
-					epicsMutexLock( mch->mutex );
-    
-					ipmiMsgSetFruActPolicyHelper( mchData, data, id, 1 );
-
-					epicsMutexUnlock( mch->mutex );
-				 }	    
-			}
+			 }	    
 		}
+
+       		free( data );
+
 		pmbbo->udf = FALSE;
 		return status;
 	}
@@ -770,7 +930,7 @@ char    str[40];
 	node = strtok( pai->inp.value.vmeio.parm, "+" );
 	if ( (p = strtok( NULL, "+" )) ) {
 		task = p;
-		if ( strcmp( task, "TYPE" ) && strcmp( task, "BSN" ) && strcmp( task, "PSN" ) ) {
+		if ( strcmp( task, "TYPE" ) && strcmp( task, "BSN" ) && strcmp( task, "PSN" ) && strcmp( task, "FAN")  ) {
 			sprintf( str, "Unknown task parameter %s", task);
 			status = S_dev_badSignal;
 		}
@@ -785,6 +945,7 @@ char    str[40];
 	else {
 		sprintf( str, "Failed to locate data structure" );
 		status = S_dev_noDeviceFound;
+		goto bail;
         }
 
 bail:
@@ -796,13 +957,15 @@ bail:
 	return status;
 }
 
-static long read_fru_ai(struct aiRecord *pai)
+static long 
+read_fru_ai(struct aiRecord *pai)
 {
+uint8_t *data;
 MchRec   recPvt  = pai->dpvt;
 MchDev   mch;
 MchData  mchData;
 char    *task;
-int      id   = pai->inp.value.vmeio.signal; /* FRU ID */
+int      id   = pai->inp.value.vmeio.signal;
 long     status = NO_CONVERT;
 Fru      fru;
 
@@ -819,10 +982,33 @@ Fru      fru;
 		if ( !strcmp( task, "BSN" ) && fru->board.sn.data )
        			pai->val = (epicsFloat64)(*fru->board.sn.data);
 
-		if ( !strcmp( task, "PSN" ) && fru->prod.sn.data )
+		else if ( !strcmp( task, "PSN" ) && fru->prod.sn.data )
        			pai->val = (epicsFloat64)(*fru->prod.sn.data);
 
+		else if ( !strcmp( task, "FAN") ) {
+
+			if ( mchIsAlive[mchData->instance] ) {
+
+				if ( !(data = malloc(MSG_MAX_LENGTH)) ) {
+					errlogPrintf("read_fru_ai: No memory for message\n");
+					return ERROR;
+				}
+
+				epicsMutexLock( mch->mutex );
+
+				ipmiMsgGetFanLevel( mchData, data, id );
+
+				pai->rval = data[IPMI_RPLY_GET_FAN_LEVEL_OFFSET];
+
+				epicsMutexUnlock( mch->mutex );
+
+				free( data );
+
+				pai->val  = pai->rval;
+			}
+
 			pai->udf = FALSE;
+		}
 
 #ifdef DEBUG
 printf("read_fru_ai: %s FRU id is %i, value is %.0f\n",pai->name, id, pai->val);
@@ -911,7 +1097,8 @@ bail:
 	return status;
 }
 
-static long read_fru_stringin(struct stringinRecord *pstringin)
+static long 
+read_fru_stringin(struct stringinRecord *pstringin)
 {
 MchRec   recPvt  = pstringin->dpvt;
 MchDev   mch;
@@ -973,6 +1160,132 @@ errlogPrintf("\nread_fru_stringin: %s, task is %s, card is %i, id into FRU array
 
 static long 
 stringin_fru_ioint_info(int cmd, struct stringinRecord *pstringin, IOSCANPVT *iopvt)
+{
+       *iopvt = drvMchFruScan;
+       return 0;
+} 
+*/
+
+
+static long
+init_fru_longout_record(struct longoutRecord *plongout)
+{
+MchRec  recPvt  = 0; /* Info stored with record */
+MchDev  mch     = 0; /* MCH device data structures */
+MchData mchData = 0;
+char   *node;        /* Network node name, stored in parm */
+char   *task    = 0; /* Optional additional parameter appended to parm */
+char   *p;
+short   c, s;
+long    status = 0;
+char    str[40];
+
+        if ( VME_IO != plongout->out.type ) {
+		status = S_dev_badBus;
+		goto bail;
+	}
+
+        c = plongout->out.value.vmeio.card;
+        s = plongout->out.value.vmeio.signal; /* FRU ID */
+
+        if ( c < 0 )
+		status = S_dev_badCard;
+
+        if ( s < 0 )
+		status = S_dev_badSignal;
+
+	if ( ! (recPvt = calloc( 1, sizeof( *recPvt ) )) ) {
+		sprintf( str, "No memory for recPvt structure");
+		status = S_rec_outMem;
+		goto bail;
+	}
+
+	/* Break parm into node name and optional parameter */
+	node = strtok( plongout->out.value.vmeio.parm, "+" );
+	if ( (p = strtok( NULL, "+" )) ) {
+		task = p;
+		if ( strcmp( task, "FAN" ) ) {
+			sprintf( str, "Unknown task parameter %s", task);
+			status = S_dev_badSignal;
+		}
+	}
+
+	/* Find data structure in registry by MCH name */
+	if ( (mch = devMchFind(node)) ) {
+		recPvt->mch  = mch;
+                recPvt->task = task;
+		plongout->dpvt    = recPvt;                
+	}
+	else {
+		sprintf( str, "Failed to locate data structure" );
+		status = S_dev_noDeviceFound;
+		goto bail;
+        }
+
+	if ( !(strcmp( task, "FAN" )) ) {
+		mchData = mch->udata;
+       		plongout->drvl = plongout->lopr = mchData->fru[s].fanMin;
+	       	plongout->drvh = plongout->hopr = mchData->fru[s].fanMax;
+	}
+
+bail:
+	if ( status ) {
+	       recGblRecordError( status, (void *)plongout , (const char *)str );
+	       plongout->pact=TRUE;
+	}
+
+	return status;
+}
+
+static long 
+write_fru_longout(struct longoutRecord *plongout)
+{
+MchRec   recPvt  = plongout->dpvt;
+MchDev   mch;
+MchData  mchData;
+char    *task;
+int      id      = plongout->out.value.vmeio.signal; /* FRU ID */
+long     status  = NO_CONVERT;
+Fru      fru;
+uint8_t *data;
+
+	if ( !recPvt )
+		return status;
+
+	mch     = recPvt->mch;
+	mchData = mch->udata;
+	task    = recPvt->task;
+	fru     = &mchData->fru[id];
+
+	if ( !strcmp( task, "FAN" ) ) {
+
+		if ( !(data = malloc(MSG_MAX_LENGTH)) ) {
+			errlogPrintf("write_fru_longout: No memory for message\n");
+			return ERROR;
+		}
+
+		epicsMutexLock( mch->mutex );
+
+		ipmiMsgSetFanLevel( mchData, data, id, plongout->val );
+
+		epicsMutexUnlock( mch->mutex );
+
+		free( data );
+	}
+
+#ifdef DEBUG
+printf("write_fru_longout: %s FRU id is %i, value is %.0f\n",plongout->name, id, plongout->val);
+#endif
+
+       	plongout->udf = FALSE;
+       	return status;
+}
+
+/*
+** Add this record to our IOSCANPVT list.
+
+static long 
+longout_fru_ioint_info(int cmd, struct longoutRecord *plongout, IOSCANPVT *iopvt)
 {
        *iopvt = drvMchFruScan;
        return 0;
