@@ -106,7 +106,7 @@ ipmiMsgSetSeqId(MchData mchData, uint8_t *message, uint8_t cmd)
 int i;
 	/* Session sequence number is not incremented (or used) for messages outside of a session */
 	if ( cmd != IPMI_MSG_CMD_GET_CHAN_AUTH && cmd != IPMI_MSG_CMD_GET_SESSION_CHALLENGE && cmd != IPMI_MSG_CMD_ACTIVATE_SESSION && cmd != IPMI_MSG_CMD_SET_PRIV_LEVEL && cmd )
-		incr4Uint8Array( mchData->seq_send , 1 );
+		incr4Uint8Array( mchData->seqSend , 1 );
 
 	/* Close Session command contains the session ID */
 	if ( cmd == IPMI_MSG_CMD_CLOSE_SESSION ) {
@@ -116,7 +116,7 @@ int i;
 
 	/* Copy data to IPMI header */
 	for ( i = 0; i < IPMI_MSG_HDR_SEQ_LENGTH ; i++)
-		message[IPMI_MSG_HDR_SEQ_OFFSET + i] = mchData->seq_send[i];
+		message[IPMI_MSG_HDR_SEQ_OFFSET + i] = mchData->seqSend[i];
 
 	for ( i = 0; i < IPMI_MSG_HDR_ID_LENGTH ; i++)
 		message[IPMI_MSG_HDR_ID_OFFSET + i]  = mchData->id[i];
@@ -720,4 +720,92 @@ size_t   messageSize;
 	messageSize = ipmiMsgBuild( mchData, message, IPMI_MSG_CMD_GET_DEVICE_ID, imsg2, imsg2Size, bmsg1, bmsg1Size, bmsg2, bmsg2Size );
 
 	ipmiMsgWriteReadHelper( mchData, message, messageSize, data, MSG_RESEND, IPMI_MSG_CMD_GET_DEVICE_ID );
+}
+
+/* Get Fan Speed Properties */
+void
+ipmiMsgGetFanProp(MchData mchData, uint8_t *data, uint8_t fru)
+{
+uint8_t  message[MSG_MAX_LENGTH];
+size_t   imsg2Size   = sizeof( SEND_MSG_MSG );
+size_t   bmsg1Size   = sizeof( IPMI_MSG1 );
+size_t   bmsg2Size   = sizeof( GET_FAN_PROP_MSG );
+uint8_t  imsg2[imsg2Size];
+uint8_t  bmsg1[bmsg1Size];
+uint8_t  bmsg2[bmsg2Size];
+size_t   messageSize;
+
+	memcpy( imsg2, SEND_MSG_MSG    , imsg2Size );
+	memcpy( bmsg1, IPMI_MSG1       , bmsg1Size );
+	memcpy( bmsg2, GET_FAN_PROP_MSG, bmsg2Size );
+
+	imsg2[IPMI_MSG2_CHAN_OFFSET] = 0x40/*channel*/;
+
+	bmsg1[IPMI_MSG1_RSADDR_OFFSET] = IPMI_MSG_ADDR_CM;
+	bmsg1[IPMI_MSG1_NETFN_OFFSET]  = IPMI_MSG_NETFN_PICMG;
+
+	bmsg2[IPMI_MSG2_SET_FRU_ACT_FRU_OFFSET] = fru;
+
+	messageSize = ipmiMsgBuild( mchData, message, IPMI_MSG_CMD_GET_FAN_PROP, imsg2, imsg2Size, bmsg1, bmsg1Size, bmsg2, bmsg2Size );
+
+	ipmiMsgWriteReadHelper( mchData, message, messageSize, data, MSG_RESEND, IPMI_MSG_CMD_GET_FAN_PROP );
+}
+
+/* Get Fan Level */
+void
+ipmiMsgGetFanLevel(MchData mchData, uint8_t *data, uint8_t fru)
+{
+uint8_t  message[MSG_MAX_LENGTH];
+size_t   imsg2Size   = sizeof( SEND_MSG_MSG );
+size_t   bmsg1Size   = sizeof( IPMI_MSG1 );
+size_t   bmsg2Size   = sizeof( GET_FAN_LEVEL_MSG );
+uint8_t  imsg2[imsg2Size];
+uint8_t  bmsg1[bmsg1Size];
+uint8_t  bmsg2[bmsg2Size];
+size_t   messageSize;
+
+	memcpy( imsg2, SEND_MSG_MSG     , imsg2Size );
+	memcpy( bmsg1, IPMI_MSG1        , bmsg1Size );
+	memcpy( bmsg2, GET_FAN_LEVEL_MSG, bmsg2Size );
+
+	imsg2[IPMI_MSG2_CHAN_OFFSET] = 0x40/*channel*/;
+
+	bmsg1[IPMI_MSG1_RSADDR_OFFSET] = IPMI_MSG_ADDR_CM;
+	bmsg1[IPMI_MSG1_NETFN_OFFSET]  = IPMI_MSG_NETFN_PICMG;
+
+	bmsg2[IPMI_MSG2_SET_FRU_ACT_FRU_OFFSET] = fru;
+
+	messageSize = ipmiMsgBuild( mchData, message, IPMI_MSG_CMD_GET_FAN_LEVEL, imsg2, imsg2Size, bmsg1, bmsg1Size, bmsg2, bmsg2Size );
+
+	ipmiMsgWriteReadHelper( mchData, message, messageSize, data, MSG_RESEND, IPMI_MSG_CMD_GET_FAN_LEVEL );
+}
+
+/* Set Fan Level */
+void
+ipmiMsgSetFanLevel(MchData mchData, uint8_t *data, uint8_t fru, uint8_t level)
+{
+uint8_t  message[MSG_MAX_LENGTH];
+size_t   imsg2Size   = sizeof( SEND_MSG_MSG );
+size_t   bmsg1Size   = sizeof( IPMI_MSG1 );
+size_t   bmsg2Size   = sizeof( SET_FAN_LEVEL_MSG );
+uint8_t  imsg2[imsg2Size];
+uint8_t  bmsg1[bmsg1Size];
+uint8_t  bmsg2[bmsg2Size];
+size_t   messageSize;
+
+	memcpy( imsg2, SEND_MSG_MSG     , imsg2Size );
+	memcpy( bmsg1, IPMI_MSG1        , bmsg1Size );
+	memcpy( bmsg2, SET_FAN_LEVEL_MSG, bmsg2Size );
+
+	imsg2[IPMI_MSG2_CHAN_OFFSET] = 0x40/*channel*/;
+
+	bmsg1[IPMI_MSG1_RSADDR_OFFSET] = IPMI_MSG_ADDR_CM;
+	bmsg1[IPMI_MSG1_NETFN_OFFSET]  = IPMI_MSG_NETFN_PICMG;
+
+	bmsg2[IPMI_MSG2_SET_FRU_ACT_FRU_OFFSET] = fru;
+	bmsg2[IPMI_MSG2_SET_FAN_LEVEL_LEVEL_OFFSET] = level;
+
+	messageSize = ipmiMsgBuild( mchData, message, IPMI_MSG_CMD_SET_FAN_LEVEL, imsg2, imsg2Size, bmsg1, bmsg1Size, bmsg2, bmsg2Size );
+
+	ipmiMsgWriteReadHelper( mchData, message, messageSize, data, MSG_RESEND, IPMI_MSG_CMD_SET_FAN_LEVEL );
 }

@@ -75,10 +75,13 @@ extern uint8_t FRU_READ_MSG[8];
 extern uint8_t GET_SDR_MSG[10];
 extern uint8_t CLOSE_SESS_MSG[8];
 extern uint8_t CHAS_CTRL_MSG[5];
-extern uint8_t SET_FRU_ACT_MSG[7];
-extern uint8_t SET_FRU_POLICY_MSG[8];
 extern uint8_t GET_DEV_SDR_INFO_MSG[5];            
 extern uint8_t BASIC_MSG[4];
+extern uint8_t SET_FRU_ACT_MSG[7];
+extern uint8_t SET_FRU_POLICY_MSG[8];
+extern uint8_t GET_FAN_PROP_MSG[6];
+extern uint8_t GET_FAN_LEVEL_MSG[6];
+extern uint8_t SET_FAN_LEVEL_MSG[8];
 
 /* Convert 2-element array (which stores LS byte first) to integer */
 uint16_t arrayToUint16(uint8_t *data );
@@ -121,6 +124,12 @@ void ipmiMsgGetSdr(MchData mchData, uint8_t *data, uint8_t *id, uint8_t *res, ui
 void ipmiMsgReadSensor(MchData mchData, uint8_t *data, uint8_t sens, uint16_t addr);
 
 int ipmiMsgSetFruActPolicyHelper(MchData mchData, uint8_t *data, uint8_t fru, int parm);
+
+void ipmiMsgGetFanProp(MchData mchData, uint8_t *data, uint8_t fru);
+
+void ipmiMsgGetFanLevel(MchData mchData, uint8_t *data, uint8_t fru);
+
+void ipmiMsgSetFanLevel(MchData mchData, uint8_t *data, uint8_t fru, uint8_t level);
 
 #ifdef __cplusplus
 };
