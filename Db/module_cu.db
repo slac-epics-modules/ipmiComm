@@ -1,0 +1,24 @@
+record(mbbi, "$(dev):$(code)$(inst)_FANAUTO") {
+  field(DESC, "Fan supports auto adjustment")
+  field(DTYP, "MCHsensor")
+  field(INP,  "#C0 S$(fruid) @$(link)+FAN")
+  field(ZRST, "No")
+  field(ZRVL, "0")
+  field(ONST, "Yes")
+  field(ONVL, "1")
+  field(PINI, "YES")
+}
+
+record(longout, "$(dev):$(code)$(inst)_FANSPEEDSET") {
+  field(DESC, "Set fan level")
+  field(DTYP, "FRUinfo")
+  field(OUT,  "#C0 S$(fruid) @$(link)+FAN")
+  field(OMSL, "supervisory")
+}
+
+record(ai, "$(dev):$(code)$(inst)_FANLEVEL") {
+  field(SCAN, "2 second")
+  field(DESC, "Fan level")
+  field(DTYP, "FRUinfo")
+  field(INP,  "#C0 S$(fruid) @$(link)+FAN")
+}
