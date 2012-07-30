@@ -66,10 +66,11 @@
 #define IPMI_MSG2_GET_DEV_SDR_INFO_OP_OFFSET 3    /* 1 get SDR count, 0 get sensor count */
 #define IPMI_MSG2_SET_FRU_ACT_DEACTIVATE     0    /* Command value in Set FRU Activate command */
 #define IPMI_MSG2_SET_FRU_ACT_ACTIVATE       1
-#define IPMI_MSG2_SET_FRU_ACT_FRU_OFFSET     4
+#define IPMI_MSG2_SET_FRU_ACT_FRU_OFFSET     4    /* FRU ID, used in many commands */
 #define IPMI_MSG2_SET_FRU_ACT_CMD_OFFSET     5
 #define IPMI_MSG2_SET_FRU_POLICY_MASK_OFFSET 5
 #define IPMI_MSG2_SET_FRU_POLICY_BITS_OFFSET 6
+#define IPMI_MSG2_SET_FAN_LEVEL_LEVEL_OFFSET 5    /* New fan level to set */
 
 /* IPMI message command codes (cmd) */
 #define IPMI_MSG_CMD_GET_CHAN_AUTH           0x38
@@ -93,6 +94,9 @@
 #define IPMI_MSG_CMD_SET_FRU_POLICY          0x0A
 #define IPMI_MSG_CMD_SET_FRU_ACT             0x0C
 #define IPMI_MSG_CMD_GET_DEVICE_ID           0x01
+#define IPMI_MSG_CMD_GET_FAN_PROP            0x14
+#define IPMI_MSG_CMD_GET_FAN_LEVEL           0x16
+#define IPMI_MSG_CMD_SET_FAN_LEVEL           0x15
 
 /* IPMI message request network function codes combined with LUN */
 #define IPMI_MSG_NETFN_CHASSIS                0x00  /* 0x00 << 2 combined with 2-bit LUN */
@@ -129,6 +133,11 @@
 #define IPMI_RPLY_GET_SDR_NEXT_ID_LSB_OFFSET 43     /* ID of next sensor in repository, LSB */
 #define IPMI_RPLY_GET_SDR_NEXT_ID_MSB_OFFSET 44     /* ID of next sensor in repository, MSB */
 #define IPMI_RPLY_GET_SDR_DATA_OFFSET        45     /* ID of next sensor in repository, MSB */
+#define IPMI_RPLY_GET_FAN_PROP_MIN_OFFSET    44     /* Fan tray minimum fan level */
+#define IPMI_RPLY_GET_FAN_PROP_MAX_OFFSET    45     /* Fan tray maximum fan level */
+#define IPMI_RPLY_GET_FAN_PROP_NOM_OFFSET    46     /* Fan tray nominal fan level */
+#define IPMI_RPLY_GET_FAN_PROP_PROP_OFFSET   47     /* Fan tray properties */
+#define IPMI_RPLY_GET_FAN_LEVEL_OFFSET       44     /* Current fan level */
 
 #define IPMI_DATA_TYPE(x)          x & 3<<6
 #define IPMI_DATA_LENGTH(x)        x & 0x3F
