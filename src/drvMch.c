@@ -619,6 +619,7 @@ MchData mchData = 0; /* MCH-specific info */
 uint8_t i;
 char    taskName[50];
 FILE    file;
+char    filename[60];
 
 	/* Allocate memory for MCH data structure */
 	if ( ! (mchData = calloc( 1, sizeof( *mchData ))) )
@@ -635,8 +636,8 @@ FILE    file;
        	mch->udata = mchData;
 
 	/* Create empty file to load DB records */
-	sprintf( stFile, "st.%s.cmd", mchData->name );
-	file = fopen( stFile, "w" ); 
+	sprintf( filename, "st.%s.cmd", mchData->name );
+	file = fopen( filename, "w" ); 
 	if ( !file )
 		errlogPrintf("Failed to create file %s.\n");
 
