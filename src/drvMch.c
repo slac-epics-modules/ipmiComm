@@ -618,7 +618,7 @@ MchDev  mch     = 0; /* Device support data structure */
 MchData mchData = 0; /* MCH-specific info */
 uint8_t i;
 char    taskName[50];
-FILE    file;
+FILE   *file;
 char    filename[60];
 
 	/* Allocate memory for MCH data structure */
@@ -640,6 +640,8 @@ char    filename[60];
 	file = fopen( filename, "w" ); 
 	if ( !file )
 		errlogPrintf("Failed to create file %s.\n");
+	else
+		fclose( file );
 
 	/* Start task to periodically ping MCH */
 	mchData->instance = mchCounter++;
