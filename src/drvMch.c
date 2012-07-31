@@ -618,6 +618,7 @@ MchDev  mch     = 0; /* Device support data structure */
 MchData mchData = 0; /* MCH-specific info */
 uint8_t i;
 char    taskName[50];
+FILE    file;
 
 	/* Allocate memory for MCH data structure */
 	if ( ! (mchData = calloc( 1, sizeof( *mchData ))) )
@@ -632,6 +633,12 @@ char    taskName[50];
 
        	mchData->name = mch->name;
        	mch->udata = mchData;
+
+	/* Create empty file to load DB records */
+	sprintf( stFile, "st.%s.cmd", mchData->name );
+	file = fopen( stFile, "w" ); 
+	if ( !file )
+		errlogPrintf("Failed to create file %s.\n");
 
 	/* Start task to periodically ping MCH */
 	mchData->instance = mchCounter++;
