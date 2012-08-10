@@ -97,7 +97,7 @@ void incr2Uint8Array(uint8_t *data, int incr);
 
 void ipmiMsgSetSeqId(MchData mchData, uint8_t *message, uint8_t cmd);
 
-int ipmiMsgWriteRead(const char *name, asynUser *pasynUser, uint8_t *message, size_t messageSize, uint8_t *response, size_t *responseSize, double timeout);
+int ipmiMsgWriteRead(const char *name, uint8_t *message, size_t messageSize, uint8_t *response, size_t *responseSize, double timeout);
 
 int ipmiMsgWriteReadHelper(MchData mchData, uint8_t *message, size_t messageSize, uint8_t *response, size_t *responseSize);
 
