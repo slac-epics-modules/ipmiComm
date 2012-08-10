@@ -37,7 +37,7 @@ uint8_t GET_AUTH_MSG[] = { IPMI_MSG_ADDR_SW,	       /* Requester's address */
 
 /* Get Session Challenge */
 uint8_t GET_SESS_MSG[] = { IPMI_MSG_ADDR_SW,	               /* Requester's address */		   
-			   4,			               /* Message sequence number */	    
+			   0,			               /* Message sequence number */	    
 			   IPMI_MSG_CMD_GET_SESSION_CHALLENGE, /* Command code */	   
 			   IPMI_MSG_AUTH_TYPE_NONE,            /* Authentication type */   
 			   'a', 'd', 'm', 'i', 'n', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, /* User name */
@@ -45,7 +45,7 @@ uint8_t GET_SESS_MSG[] = { IPMI_MSG_ADDR_SW,	               /* Requester's addre
 
 /* Activate Session */
 uint8_t ACT_SESS_MSG[] = { IPMI_MSG_ADDR_SW,	         /* Requester's address */		   
-			   8,			         /* Message sequence number */	    
+			   0,			         /* Message sequence number */	    
 			   IPMI_MSG_CMD_ACTIVATE_SESSION,/* Command code */
 		           IPMI_MSG_AUTH_TYPE_NONE,      /* Authentication type  */
 			   IPMI_MSG_PRIV_LEVEL_ADMIN,    /* Max priv level for session */   
