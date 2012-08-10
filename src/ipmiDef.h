@@ -105,6 +105,32 @@
 #define IPMI_MSG_NETFN_STORAGE                0x28  /* 0x0A << 2 combined with 2-bit LUN */
 #define IPMI_MSG_NETFN_PICMG                  0xB0  /* 0x2C << 2 combined with 2-bit LUN */
 
+/* Response message lengths (0s for those we haven't figured out yet) */
+#define IPMI_RPLY_PONG_LENGTH                    28
+#define IPMI_RPLY_GET_CHAN_AUTH_LENGTH           30
+#define IPMI_RPLY_GET_SESSION_CHALLENGE_LENGTH   42
+#define IPMI_RPLY_ACTIVATE_SESSION_LENGTH        32
+#define IPMI_RPLY_SET_PRIV_LEVEL_LENGTH          23
+#define IPMI_RPLY_CLOSE_SESSION_LENGTH           22
+#define IPMI_RPLY_SENSOR_READ_LENGTH             0  /* varies */
+#define IPMI_RPLY_GET_CHAS_STATUS_LENGTH         47 /* does NOT include optional byte */
+#define IPMI_RPLY_CHAS_CTRL_LENGTH               44
+#define IPMI_RPLY_GET_FRU_INFO_LENGTH            47
+#define IPMI_RPLY_READ_FRU_DATA_BASE_LENGTH      45
+#define IPMI_RPLY_WRITE_FRU_DATA_LENGTH          45
+#define IPMI_RPLY_GET_SDRREP_INFO_LENGTH         58
+#define IPMI_RPLY_RESERVE_SDRREP_LENGTH          46
+#define IPMI_RPLY_GET_SDR_LENGTH                 0  /* varies */
+#define IPMI_RPLY_GET_DEV_SDR_INFO_LENGTH        50
+#define IPMI_RPLY_GET_DEV_SDR_LENGTH             0  /* varies */
+#define IPMI_RPLY_COLD_RESET_LENGTH              44
+#define IPMI_RPLY_SET_FRU_POLICY_LENGTH          44
+#define IPMI_RPLY_SET_FRU_ACT_LENGTH             45
+#define IPMI_RPLY_GET_DEVICE_ID_LENGTH           59 /* includes optional bytes */
+#define IPMI_RPLY_GET_FAN_PROP_LENGTH            49
+#define IPMI_RPLY_GET_FAN_LEVEL_LENGTH           48
+#define IPMI_RPLY_SET_FAN_LEVEL_LENGTH           45
+
 /* Response message data; offsets from beginning of message */
 #define IPMI_RPLY_TEMP_ID_OFFSET             21     /* Temporary session ID */
 #define IPMI_RPLY_TEMP_ID_LENGTH             4
@@ -118,6 +144,8 @@
 #define IPMI_RPLY_INIT_SEND_SEQ_LENGTH       4
 #define IPMI_RPLY_MAX_PRIV_OFFSET            30     /* Maximum privilege level allowed for session */
 #define IPMI_RPLY_MAX_PRIV_LENGTH            1
+#define IPMI_RPLY_SEQ_OFFSET                 18     /* From-MCH sequence number (in reply to non-bridged message) */
+#define IPMI_RPLY_SEQ_LENGTH                 4
 #define IPMI_RPLY_COMPLETION_CODE_OFFSET     42
 #define IPMI_RPLY_SENSOR_READING_OFFSET      43     /* Sensor reading (1 byte) */
 #define IPMI_RPLY_HS_SENSOR_READING_OFFSET   45     /* Hot swap sensor reading (1 byte) */
@@ -138,6 +166,9 @@
 #define IPMI_RPLY_GET_FAN_PROP_NOM_OFFSET    46     /* Fan tray nominal fan level */
 #define IPMI_RPLY_GET_FAN_PROP_PROP_OFFSET   47     /* Fan tray properties */
 #define IPMI_RPLY_GET_FAN_LEVEL_OFFSET       44     /* Current fan level */
+
+/* For responses to bridged messages (returns 2 messages which we read as 1); offset from beginning of first message */
+#define IPMI_RPLY_BRIDGED_SEQ_OFFSET         27     /* From-MCH sequence number */
 
 #define IPMI_DATA_TYPE(x)          x & 3<<6
 #define IPMI_DATA_LENGTH(x)        x & 0x3F
