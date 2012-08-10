@@ -1,6 +1,6 @@
 record(ai, "$(dev):$(code)$(inst)_I$(sensInst)") {
   field(DESC, "$(desc)")
-  field(SCAN, "5 second")
+  field(SCAN, "10 second")
   field(DTYP, "MCHsensor")
   field(INP,  "#C0 S$(sens) @$(link)+I")
   field(PREC, "1")

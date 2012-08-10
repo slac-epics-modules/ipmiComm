@@ -40,6 +40,7 @@ file sensor_default.db
            { $(crat)    ,  $(id)	,  $(unit)  	,  FAN3SPEED	}
            { $(crat)    ,  $(id)	,  $(unit)  	,  FAN4SPEED	}
            { $(crat)    ,  $(id)	,  $(unit)  	,  FAN5SPEED	}
+           { $(crat)    ,  $(id)	,  $(unit)  	,  FAN6SPEED	}
            { $(crat)    ,  $(id)	,  $(unit)  	,  V1		}
            { $(crat)    ,  $(id)	,  $(unit)  	,  V2		}
            { $(crat)    ,  $(id)	,  $(unit)  	,  V3		}
