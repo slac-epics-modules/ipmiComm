@@ -149,6 +149,12 @@
 
 #undef DEBUG
 
+extern volatile int IPMICOMM_DEBUG;
+
+#define MAX_STRING_LENGTH 39
+
+int initTrap = 0;
+
 /* Device support prototypes */
 static long init_ai_record(struct aiRecord *pai);
 static long read_ai(struct aiRecord *pai);
@@ -415,14 +421,15 @@ MchRec   recPvt  = pai->dpvt;
 MchDev   mch;
 MchData  mchData;
 char    *task;
-uint8_t *data;
+uint8_t  data[MSG_MAX_LENGTH] = { 0 };
 uint8_t  raw, sensor;
 uint16_t addr    = 0; /* get addr */
 short    index   = pai->inp.value.vmeio.signal; /* Sensor index */
 long     status  = NO_CONVERT;
 SdrFull  sdr;
-int      units;
+int      units, s = 0;
 float    value = 0;
+size_t   responseSize;
 
 	if ( !recPvt )
 		return status;
@@ -433,23 +440,24 @@ float    value = 0;
 
 	if ( mchIsAlive[mchData->instance] ) {
 
+		responseSize = mchData->sens[index].readMsgLength;
 		sensor = mchData->sens[index].sdr.number;
-
-		if ( !(data = malloc(MSG_MAX_LENGTH)) ) {
-			errlogPrintf("read_ai: No memory for message\n");
-			return ERROR;
-		}
 
 		epicsMutexLock( mch->mutex );
 
-		ipmiMsgReadSensor( mchData, data, sensor, addr );
+		if ( !(s = ipmiMsgReadSensor( mchData, data, sensor, addr, &responseSize )) ) {
+			raw = data[IPMI_RPLY_SENSOR_READING_OFFSET];
+			mchData->sens[index].val = raw;
+		}
 	
 		epicsMutexUnlock( mch->mutex );
 
-		free( data );
-
-       		raw = data[IPMI_RPLY_SENSOR_READING_OFFSET];
-		mchData->sens[index].val = value;
+		if ( s ) {
+			if ( IPMICOMM_DEBUG )
+				printf("%s writeread error sensor %02x index %i\n",pai->name, sensor, index);
+			recGblSetSevr( pai, READ_ALARM, INVALID_ALARM );
+			return ERROR;
+		}
 
 		sdr = &mchData->sens[index].sdr;
 
@@ -463,29 +471,33 @@ float    value = 0;
 		pai->rval = value;
 
 		/* Perform appropriate conversion - check units */
-		if ( !strcmp( task, "TEMP") ) {
+		if ( !(strcmp( task, "TEMP")) ) {
 			if ( units == SENSOR_UNITS_DEGC)
 				pai->val = value*9/5 + 32;
 			else if ( units == SENSOR_UNITS_DEGF)
 				pai->val = value;
 		}
-		else if ( !strcmp( task, "FAN") ) {
+		else if ( !(strcmp( task, "FAN")) ) {
 			if ( units == SENSOR_UNITS_RPM )
 				pai->val  = value;
 		}
-		else if ( !strcmp( task, "V") ) {
+		else if ( !(strcmp( task, "V")) ) {
 			if ( units == SENSOR_UNITS_VOLTS )
 				pai->val  = value;
 		}
-		else if ( !strcmp( task, "I") ) {
+		else if ( !(strcmp( task, "I")) ) {
 			if ( units == SENSOR_UNITS_AMPS )
 				pai->val  = value;
 		}
+
+       		if ( IPMICOMM_DEBUG )
+			printf("%s: raw %02x, sensor %02x, owner %i, lun %i, index %i, value %.1f\n",pai->name, raw, sensor, mchData->sens[index].sdr.owner, mchData->sens[index].sdr.lun, index, pai->val);
 
 #ifdef DEBUG
 printf("read_ai: %s sensor index is %i, task is %s, sensor number is %i, value is %.0f, rval is %i\n",
     pai->name, index, task, mchData->sens[index].sdr.number, pai->val, pai->rval);
 #endif
+
 		pai->udf = FALSE;
 		return status;
 	}
@@ -493,6 +505,8 @@ printf("read_ai: %s sensor index is %i, task is %s, sensor number is %i, value i
 		recGblSetSevr( pai, READ_ALARM, INVALID_ALARM );
 		return ERROR;
 	}
+
+
 }
 
 static long 
@@ -561,12 +575,13 @@ bail:
 static long 
 write_bo(struct boRecord *pbo)
 {
-uint8_t *data;
+uint8_t  data[MSG_MAX_LENGTH] = { 0 };
 MchRec   recPvt = pbo->dpvt;
 MchDev   mch;
 MchData  mchData;
 char    *task;
 long     status = NO_CONVERT;
+int      s = 0;
 
 	if ( !recPvt )
 		return status;
@@ -577,18 +592,16 @@ long     status = NO_CONVERT;
 
 	if ( mchIsAlive[mchData->instance] ) {
 
-		if ( !strcmp( task, "RESET" ) ) {
-
-			if ( !(data = malloc(MSG_MAX_LENGTH)) ) {
-				errlogPrintf("write_bo: No memory for message\n");
-				return ERROR;
-			}
+		if ( !(strcmp( task, "RESET" )) ) {
 
 			epicsMutexLock( mch->mutex );
-		       	ipmiMsgColdReset( mchData, data );
+		       	s = ipmiMsgColdReset( mchData, data );
 			epicsMutexUnlock( mch->mutex );
 
-			free( data );
+			if ( s ) {
+				recGblSetSevr( pbo, WRITE_ALARM, INVALID_ALARM );
+				return ERROR;
+			}
 		}
 
 		pbo->udf = FALSE;
@@ -653,7 +666,7 @@ char     str[40];
         node = strtok( pmbbi->inp.value.vmeio.parm, "+" );
         if ( (p = strtok( NULL, "+")) ) {
                 task = p;
-                if ( strcmp( task, "STAT" ) && strcmp( task, "HS")&& strcmp( task, "FAN") ) {
+                if ( strcmp( task, "STAT" ) && strcmp( task, "HS") && strcmp( task, "FAN") ) {
 			sprintf( str, "Unknown task parameter %s", task);
 			status = S_dev_badSignal;
 		}
@@ -683,7 +696,7 @@ bail:
 static long 
 read_mbbi(struct mbbiRecord *pmbbi)
 {
-uint8_t *data;
+uint8_t  data[MSG_MAX_LENGTH] = { 0 };
 MchRec   recPvt = pmbbi->dpvt;
 MchDev   mch;
 MchData  mchData;
@@ -691,7 +704,9 @@ char    *task;
 uint8_t  value = 0, sensor;
 uint16_t addr = 0; /* get addr */
 short    index  = pmbbi->inp.value.vmeio.signal; /* Sensor index or FRU id */
-long     status = NO_CONVERT;
+long     status = 0;
+int      s = 0;
+size_t   responseSize;
 
 	if ( !recPvt )
 		return status;
@@ -701,39 +716,41 @@ long     status = NO_CONVERT;
 	task    = recPvt->task;
 
 	if ( task ) {
-		if ( !strcmp( task, "STAT" ) )
-			pmbbi->val = mchIsAlive[mchData->instance];
+		if ( !(strcmp( task, "STAT" )) )
 
-		else if ( !strcmp( task, "FAN" ) ) {
+			pmbbi->rval = mchIsAlive[mchData->instance];
+
+		else if ( !(strcmp( task, "FAN" )) ) {
 
 			value = ( mchData->fru[index].fanProp & (1<<7) ) ? 1 : 0;
 
-			pmbbi->val = pmbbi->rval = value;
+			pmbbi->rval = pmbbi->rval = value;
+
 		}
-		else if ( !strcmp( task, "HS") ) {
+		else if ( !(strcmp( task, "HS")) ) {
 
 			if ( mchIsAlive[mchData->instance] ) {
-				sensor = mchData->sens[index].sdr.number;
 
-				if ( !(data = malloc(MSG_MAX_LENGTH)) ) {
-					errlogPrintf("read_mbbi: No memory for message\n");
-					return ERROR;
-				}
+				responseSize = mchData->sens[index].readMsgLength;
+				sensor = mchData->sens[index].sdr.number;
 
 				epicsMutexLock( mch->mutex );
 
-				ipmiMsgReadSensor( mchData, data, sensor, addr );
-
-				/* Store raw sensor reading */
-				mchData->sens[index].val = value;
-				value = data[IPMI_RPLY_HS_SENSOR_READING_OFFSET];
+				if ( !(s = ipmiMsgReadSensor( mchData, data, sensor, addr, &responseSize )) ) {				
+					/* Store raw sensor reading */
+					value = data[IPMI_RPLY_HS_SENSOR_READING_OFFSET];
+					mchData->sens[index].val = value;
+				}
 
 				epicsMutexUnlock( mch->mutex );
 
-				free( data );
+		if ( s ) {
+			recGblSetSevr( pmbbi, READ_ALARM, INVALID_ALARM );
+			return ERROR;
+		}
+
 
 				pmbbi->rval = value;
-				pmbbi->val  = value;
 			}
 		}	
 	}
@@ -809,7 +826,7 @@ bail:
 static long 
 write_mbbo(struct mbboRecord *pmbbo)
 {
-uint8_t *data;
+uint8_t  data[MSG_MAX_LENGTH] = { 0 };
 MchRec   recPvt = pmbbo->dpvt;
 MchDev   mch;
 MchData  mchData;
@@ -817,7 +834,7 @@ char    *task;
 long     status = NO_CONVERT;
 int      cmd;
 int      id     = pmbbo->out.value.vmeio.signal;
-int      index, i = 0;
+int      index, i = 0, s = 0;
 volatile uint8_t val;
 
 	if ( !recPvt )
@@ -829,22 +846,15 @@ volatile uint8_t val;
 
 	if ( mchIsAlive[mchData->instance] ) {
 
-
-		if ( !(data = malloc(MSG_MAX_LENGTH)) ) {
-			errlogPrintf("write_mbbo: No memory for message\n");
-			return ERROR;
-		}
-
-		if ( !strcmp( task, "CHAS" ) ) {
+		if ( !(strcmp( task, "CHAS" )) ) {
 			epicsMutexLock( mch->mutex );
 			ipmiMsgChassisControl( mchData, data, pmbbo->val );
 			epicsMutexUnlock( mch->mutex );
 		}
-		else if ( !strcmp( task, "FRU" ) ) {
+		else if ( !(strcmp( task, "FRU" )) ) {
 
 			if ( pmbbo->val > 1 ) { /* reset not supported yet */
 				recGblSetSevr( pmbbo, STATE_ALARM, MAJOR_ALARM );
-				free( data );
 				return ERROR;
 			}
 
@@ -866,20 +876,23 @@ volatile uint8_t val;
 					i++;
 					if (i > RESET_TIMEOUT ) {
 						recGblSetSevr( pmbbo, TIMEOUT_ALARM, MAJOR_ALARM );
-						free( data );
 						return ERROR; /* also set FRU status */
 					}
 				}
 
 				epicsMutexLock( mch->mutex );
 
-				ipmiMsgSetFruActPolicyHelper( mchData, data, id, 1 );
+				s = ipmiMsgSetFruActPolicyHelper( mchData, data, id, 1 );
 
 				epicsMutexUnlock( mch->mutex );
 			 }	    
 		}
 
-       		free( data );
+
+		if ( s ) {
+			recGblSetSevr( pmbbo, WRITE_ALARM, INVALID_ALARM );
+			return ERROR;
+		}
 
 		pmbbo->udf = FALSE;
 		return status;
@@ -960,7 +973,7 @@ bail:
 static long 
 read_fru_ai(struct aiRecord *pai)
 {
-uint8_t *data;
+uint8_t  data[MSG_MAX_LENGTH] = { 0 };
 MchRec   recPvt  = pai->dpvt;
 MchDev   mch;
 MchData  mchData;
@@ -968,6 +981,7 @@ char    *task;
 int      id   = pai->inp.value.vmeio.signal;
 long     status = NO_CONVERT;
 Fru      fru;
+int      s = 0;
 
 	if ( !recPvt )
 		return status;
@@ -979,30 +993,27 @@ Fru      fru;
 
 	if ( mchInitDone[mchData->instance] ) {
 
-		if ( !strcmp( task, "BSN" ) && fru->board.sn.data )
+		if ( !(strcmp( task, "BSN" )) && fru->board.sn.data )
        			pai->val = (epicsFloat64)(*fru->board.sn.data);
 
-		else if ( !strcmp( task, "PSN" ) && fru->prod.sn.data )
+		else if ( !(strcmp( task, "PSN" )) && fru->prod.sn.data )
        			pai->val = (epicsFloat64)(*fru->prod.sn.data);
 
-		else if ( !strcmp( task, "FAN") ) {
+		else if ( !(strcmp( task, "FAN")) ) {
 
 			if ( mchIsAlive[mchData->instance] ) {
 
-				if ( !(data = malloc(MSG_MAX_LENGTH)) ) {
-					errlogPrintf("read_fru_ai: No memory for message\n");
-					return ERROR;
-				}
-
 				epicsMutexLock( mch->mutex );
 
-				ipmiMsgGetFanLevel( mchData, data, id );
-
-				pai->rval = data[IPMI_RPLY_GET_FAN_LEVEL_OFFSET];
+				if ( !(s = ipmiMsgGetFanLevel( mchData, data, id )) ) 
+					pai->rval = data[IPMI_RPLY_GET_FAN_LEVEL_OFFSET];
 
 				epicsMutexUnlock( mch->mutex );
 
-				free( data );
+				if ( s ) {
+					recGblSetSevr( pai, READ_ALARM, INVALID_ALARM );
+					return ERROR;
+				}
 
 				pai->val  = pai->rval;
 			}
@@ -1070,7 +1081,7 @@ char    str[40];
 	node = strtok( pstringin->inp.value.vmeio.parm, "+" );
 	if ( (p = strtok( NULL, "+" )) ) {
 		task = p;
-		if ( strcmp( task, "BMF" ) && strcmp( task, "BP" ) && strcmp( task, "PMF" ) && strcmp( task, "PP") && strcmp( task, "BPN" ) && strcmp( task, "PPN") ) {
+		if ( strcmp( task, "BMF" ) && strcmp( task, "BP" ) && strcmp( task, "PMF" ) && strcmp( task, "PP") && strcmp( task, "BPN" ) && strcmp( task, "PPN")) {
 			sprintf( str, "Unknown task parameter %s", task);
 			status = S_dev_badSignal;
 		}
@@ -1089,6 +1100,7 @@ char    str[40];
         }
 
 bail:
+
 	if ( status ) {
 	       recGblRecordError( status, (void *)pstringin , (const char *)str );
 	       pstringin->pact=TRUE;
@@ -1104,10 +1116,11 @@ MchRec   recPvt  = pstringin->dpvt;
 MchDev   mch;
 MchData  mchData;
 char    *task;
-short    id   = pstringin->inp.value.vmeio.signal;   /* FRU ID */
+short    id = pstringin->inp.value.vmeio.signal;   /* FRU ID */
 int      i;
 long     status = NO_CONVERT;
 Fru      fru;
+uint8_t  l = 0, *d = 0; /* FRU data length and raw */
 
 	if ( !recPvt )
 		return status;
@@ -1119,32 +1132,40 @@ Fru      fru;
 
 	if ( mchInitDone[mchData->instance] ) {
 
-		if ( !strcmp( task, "BMF" ) && fru->board.manuf.data )
-			for ( i = 0; i < fru->board.manuf.length; i++ )
-				pstringin->val[i] = fru->board.manuf.data[i];
+		if ( !(strcmp( task, "BMF" )) ) {
+			d = fru->board.manuf.data;
+			l = fru->board.manuf.length;
+		}
+		else if ( !(strcmp( task, "BP" )) ) {
+			d = fru->board.prod.data;
+			l = fru->board.prod.length;
+		}
+		else if ( !(strcmp( task, "PMF" )) ) {
+			d = fru->board.manuf.data;
+			l = fru->prod.manuf.length;
+		}
+		else if ( !(strcmp( task, "PP" )) ) {
+			d = fru->prod.prod.data;
+			l = fru->prod.prod.length;
+		}
+		else if ( !(strcmp( task, "BPN" )) ) {
+			d = fru->board.part.data;
+			l = fru->board.part.length;
+		}
+		else if ( !(strcmp( task, "PPN" )) ) {
+			d = fru->prod.part.data;
+			l = fru->prod.part.length;
+		}
 
-		if ( !strcmp( task, "BP" ) && fru->board.prod.data )
-			for ( i = 0; i < fru->board.prod.length; i++ )
-				pstringin->val[i] = fru->board.prod.data[i];
+		if ( d ) {
 
-		if ( !strcmp( task, "PMF" ) && fru->prod.manuf.data )
-			for ( i = 0; i < fru->prod.manuf.length; i++ )
-				pstringin->val[i] = fru->prod.manuf.data[i];
-
-		if ( !strcmp( task, "PP" ) && fru->prod.prod.data )
-			for ( i = 0; i < fru->prod.prod.length; i++ )
-				pstringin->val[i] = fru->prod.prod.data[i];
-
-		if ( !strcmp( task, "BPN" ) && fru->board.part.data )
-			for ( i = 0; i < fru->board.part.length; i++ )
-				pstringin->val[i] = fru->board.part.data[i];
-
-		if ( !strcmp( task, "PPN" ) && fru->prod.part.data )
-			for ( i = 0; i < fru->prod.part.length; i++ )
-				pstringin->val[i] = fru->prod.part.data[i];
+			l = ( l <= MAX_STRING_LENGTH ) ? l : MAX_STRING_LENGTH;
+			for ( i = 0; i < l; i++ )
+				pstringin->val[i] = d[i];
+		}
 
 #ifdef DEBUG
-errlogPrintf("\nread_fru_stringin: %s, task is %s, card is %i, id into FRU array is %i\n", pstringin->name, task, pstringin->inp.value.vmeio.card, pstringin->inp.value.vmeio.signal);
+errlogPrintf("read_fru_stringin: %s, task is %s, card is %i, id into FRU array is %i\n", pstringin->name, task, pstringin->inp.value.vmeio.card, pstringin->inp.value.vmeio.signal);
 #endif
 		pstringin->udf = FALSE;
 		return status;
@@ -1247,7 +1268,8 @@ char    *task;
 int      id      = plongout->out.value.vmeio.signal; /* FRU ID */
 long     status  = NO_CONVERT;
 Fru      fru;
-uint8_t *data;
+uint8_t  data[MSG_MAX_LENGTH] = { 0 };
+int      s = 0;
 
 	if ( !recPvt )
 		return status;
@@ -1257,20 +1279,19 @@ uint8_t *data;
 	task    = recPvt->task;
 	fru     = &mchData->fru[id];
 
-	if ( !strcmp( task, "FAN" ) ) {
-
-		if ( !(data = malloc(MSG_MAX_LENGTH)) ) {
-			errlogPrintf("write_fru_longout: No memory for message\n");
-			return ERROR;
-		}
+	if ( !(strcmp( task, "FAN" )) ) {
 
 		epicsMutexLock( mch->mutex );
 
-		ipmiMsgSetFanLevel( mchData, data, id, plongout->val );
+		s = ipmiMsgSetFanLevel( mchData, data, id, plongout->val );
 
 		epicsMutexUnlock( mch->mutex );
 
-		free( data );
+       		if ( s ) {
+       			recGblSetSevr( plongout, WRITE_ALARM, INVALID_ALARM );
+	       		return ERROR;
+		}
+
 	}
 
 #ifdef DEBUG
