@@ -13,7 +13,9 @@ extern "C" {
 #define MSG_RESEND     1  /* Start new session, then re-send original message */
 #define MSG_NO_RETRY   2  /* If no response, just exit */
 
-extern float REPLY_TIMEOUT;
+#define RPLY_TIMEOUT 2.0
+
+extern volatile int IPMICOMM_DEBUG; 
 
 /*
  * To-MCH IPMI message structure:
@@ -95,9 +97,9 @@ void incr2Uint8Array(uint8_t *data, int incr);
 
 void ipmiMsgSetSeqId(MchData mchData, uint8_t *message, uint8_t cmd);
 
-void ipmiMsgWriteRead(const char *name, uint8_t *message, size_t messageSize, uint8_t *response);
+int ipmiMsgWriteRead(const char *name, asynUser *pasynUser, uint8_t *message, size_t messageSize, uint8_t *response, size_t *responseSize, double timeout);
 
-int ipmiMsgWriteReadHelper(MchData mchData, uint8_t *message, size_t messageSize, uint8_t *response, int retry, uint8_t cmd);
+int ipmiMsgWriteReadHelper(MchData mchData, uint8_t *message, size_t messageSize, uint8_t *response, size_t *responseSize);
 
 void ipmiMsgGetChanAuth(MchData mchData, uint8_t *data);
 
@@ -107,29 +109,29 @@ void ipmiMsgActSess(MchData mchData, uint8_t *data);
 
 void ipmiMsgSetPriv(MchData mchData, uint8_t *data, uint8_t level);
 
-void ipmiMsgColdReset(MchData mchData, uint8_t *data);
+int ipmiMsgColdReset(MchData mchData, uint8_t *data);
 
-void ipmiMsgChassisControl(MchData mchData, uint8_t *data, uint8_t parm);
+int ipmiMsgChassisControl(MchData mchData, uint8_t *data, uint8_t parm);
 
-void ipmiMsgGetFruInfo(MchData mchData, uint8_t *data, uint8_t id);
+int ipmiMsgGetFruInfo(MchData mchData, uint8_t *data, uint8_t id);
 
-void ipmiMsgReadFru(MchData mchData, uint8_t *data, uint8_t id, uint8_t *readOffset, uint8_t readSize);
+int ipmiMsgReadFru(MchData mchData, uint8_t *data, uint8_t id, uint8_t *readOffset, uint8_t readSize);
 
-void ipmiMsgGetSdrRepInfo(MchData mchData, uint8_t *data);
+int ipmiMsgGetSdrRepInfo(MchData mchData, uint8_t *data);
 
-void ipmiMsgGetDevSdrInfo(MchData mchData, uint8_t *data, uint8_t parm);
+int ipmiMsgGetDevSdrInfo(MchData mchData, uint8_t *data, uint8_t parm);
 
-void ipmiMsgGetSdr(MchData mchData, uint8_t *data, uint8_t *id, uint8_t *res, uint8_t offset, uint8_t readSize, uint8_t parm);
+int ipmiMsgGetSdr(MchData mchData, uint8_t *data, uint8_t *id, uint8_t *res, uint8_t offset, uint8_t readSize, uint8_t parm);
 				
-void ipmiMsgReadSensor(MchData mchData, uint8_t *data, uint8_t sens, uint16_t addr);
+int ipmiMsgReadSensor(MchData mchData, uint8_t *data, uint8_t sens, uint16_t addr, size_t *responseSize);
 
 int ipmiMsgSetFruActPolicyHelper(MchData mchData, uint8_t *data, uint8_t fru, int parm);
 
-void ipmiMsgGetFanProp(MchData mchData, uint8_t *data, uint8_t fru);
+int ipmiMsgGetFanProp(MchData mchData, uint8_t *data, uint8_t fru);
 
-void ipmiMsgGetFanLevel(MchData mchData, uint8_t *data, uint8_t fru);
+int ipmiMsgGetFanLevel(MchData mchData, uint8_t *data, uint8_t fru);
 
-void ipmiMsgSetFanLevel(MchData mchData, uint8_t *data, uint8_t fru, uint8_t level);
+int ipmiMsgSetFanLevel(MchData mchData, uint8_t *data, uint8_t fru, uint8_t level);
 
 #ifdef __cplusplus
 };
