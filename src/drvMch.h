@@ -168,7 +168,6 @@ typedef struct MchDataRec_ {
 	uint8_t       str[16];       /* Session challenge string; used in establishing a session */
         uint8_t       seqSend[4];    /* Message sequence number for messages to MCH, null until session activated; chosen by MCH; rolls over at 0xFFFFFFFF */
         uint8_t       seqRply[4];    /* Message sequence number for messages from MCH; rolls over at 0xFFFFFFFF */
-	asynUser     *pasynUser;
 	SdrRepRec     sdrRep;
 	uint8_t       sensCount;     /* Sensor count */
 	SensorRec    *sens;          /* Array of sensors (size of senscount) */	
