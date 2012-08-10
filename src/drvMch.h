@@ -156,6 +156,7 @@ typedef struct SensorRec_ {
 	int           fruIndex;     /* Index into FRU array (same as FRU ID) for associated FRU ( -1 if no associated FRU ) */
 	uint8_t       instance;     /* Instance of this sensor type on this entity (usually a FRU) */
 	char          parm[10];     /* Describes signal type, used by device support */
+	size_t        readMsgLength;/* Get Sensor Reading message response length */
 } SensorRec, *Sensor;
 
 /* Handle for each MCH */
@@ -173,6 +174,7 @@ typedef struct MchDataRec_ {
 	SensorRec    *sens;          /* Array of sensors (size of senscount) */	
 	uint8_t       fruCount;      /* FRU count */
 	FruRec       *fru;           /* Array of FRUs (size of MAX_FRU) */
+	double        timeout;       /* Asyn read timeout */
 } MchDataRec, *MchData;
 
 
