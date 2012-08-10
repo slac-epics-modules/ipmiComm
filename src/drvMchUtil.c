@@ -140,7 +140,7 @@ for ( i = 0; i < mchData->sensCount; i++ ) {
  * sensors we discovered.
  */
 void
-sensorFruRecordScript( MchData mchData )
+sensorFruRecordScript(MchData mchData, int p)
 {
 FILE    *file;
 uint8_t  i, fruIndex;
@@ -180,78 +180,82 @@ int      found, inst;
 
 	       	fprintf( file, "dbLoadRecords(\"${TOP}/db/shelf.db\",\"dev=%s,link=%s\")\n", dev, mchData->name);
 
-		for ( i = 0; i < MAX_FRU; i++ ) {
+		/* If we have the info to populate our records */
+		if ( p ) {
 
-			fru = &mchData->fru[i];
+			for ( i = 0; i < MAX_FRU; i++ ) {
 
-			/* If we identified this FRU */
-			if ( fru->sdr.entityInst ) {
-				fprintf( file, "dbLoadRecords(\"${TOP}/db/module.db\",\"dev=%s,link=%s,code=%s,fruid=%i,inst=%i,index=%i,temp=%i,fan=%i,v=%i\")\n", /* continue next line */
-				dev, mchData->name, fru->parm, fru->sdr.fruId, fru->instance, i, fru->tempCnt, fru->fanCnt, fru->vCnt );
+				fru = &mchData->fru[i];
 
-				if ( (i >= UTCA_FRU_TYPE_CU_MIN) && (i <= UTCA_FRU_TYPE_CU_MAX) )
-					fprintf( file, "dbLoadRecords(\"${TOP}/db/module_cu.db\",\"dev=%s,link=%s,code=%s,fruid=%i,inst=%i\")\n", /* continue next line */
-					dev, mchData->name, fru->parm, fru->sdr.fruId, fru->instance );
-			}
+				/* If we identified this FRU */
+				if ( fru->sdr.entityInst ) {
+					fprintf( file, "dbLoadRecords(\"${TOP}/db/module.db\",\"dev=%s,link=%s,code=%s,fruid=%i,inst=%i,index=%i,temp=%i,fan=%i,v=%i\")\n", /* continue next line */
+					dev, mchData->name, fru->parm, fru->sdr.fruId, fru->instance, i, fru->tempCnt, fru->fanCnt, fru->vCnt );
 
-		}	
-			
-		for ( i = 0; i < mchData->sensCount; i++ ) {
-
-			sens = &mchData->sens[i];
-       			found = 0;
-
-			/* If we've associated this sensor with a FRU and given it an instance */
-			if ( sens->instance ) {
-
-				fruIndex = sens->fruIndex;	
-				fru   = &mchData->fru[fruIndex];    
-				inst  = fru->instance;
-				sprintf( code, "%s", fru->parm );
-
-				switch ( sens->sdr.sensType ) {
-	
-					default:
-						break;
-
-					case SENSOR_TYPE_TEMP:
-						sprintf( dbFile, "sensor_temp.db" ); 
-       						found = 1;	
-						break;
-	
-					case SENSOR_TYPE_FAN:
-						sprintf( dbFile, "sensor_fan.db" ); 
-						found = 1;
-						break;
-		
-					case SENSOR_TYPE_VOLTAGE:
-						sprintf( dbFile, "sensor_voltage.db" ); 
-						found = 1;
-						break;
-
-					case SENSOR_TYPE_CURRENT:
-						sprintf( dbFile, "sensor_current.db" ); 
-						found = 1;
-						break;
-
-					case SENSOR_TYPE_HOT_SWAP:
-						sprintf( dbFile, "sensor_hotswap.db" ); 
-						found = 1;
-						break;
+					if ( (i >= UTCA_FRU_TYPE_CU_MIN) && (i <= UTCA_FRU_TYPE_CU_MAX) )
+						fprintf( file, "dbLoadRecords(\"${TOP}/db/module_cu.db\",\"dev=%s,link=%s,code=%s,fruid=%i,inst=%i\")\n", /* continue next line */
+						dev, mchData->name, fru->parm, fru->sdr.fruId, fru->instance );
 				}
 
-				if ( sens->sdr.recType == SDR_TYPE_FULL_SENSOR )
-				    sprintf( desc, "'%s'", sens->sdr.str );
-				else
-				    sprintf( desc, "'%s'", code ); /* Improve this string */
+			}	
+			
+			for ( i = 0; i < mchData->sensCount; i++ ) {
 
-				if ( found )
-					fprintf( file, "dbLoadRecords(\"${TOP}/db/%s\",\"dev=%s,link=%s,code=%s,inst=%i,sensInst=%i,sens=%i,desc=%s\")\n", /* continue next line */
-					dbFile, dev, mchData->name, code, inst, sens->instance, i, desc );
+				sens = &mchData->sens[i];
+				found = 0;
+
+				/* If we've associated this sensor with a FRU and given it an instance */
+				if ( sens->instance ) {
+
+					fruIndex = sens->fruIndex;	
+					    fru   = &mchData->fru[fruIndex];    
+					inst  = fru->instance;
+					sprintf( code, "%s", fru->parm );
+
+					switch ( sens->sdr.sensType ) {
+	
+						default:
+							break;
+
+						case SENSOR_TYPE_TEMP:
+							sprintf( dbFile, "sensor_temp.db" ); 
+							found = 1;	
+							break;
+	
+						case SENSOR_TYPE_FAN:
+							sprintf( dbFile, "sensor_fan.db" ); 
+							found = 1;
+							break;
+		
+						case SENSOR_TYPE_VOLTAGE:
+							sprintf( dbFile, "sensor_voltage.db" ); 
+							found = 1;
+							break;
+
+						case SENSOR_TYPE_CURRENT:
+							sprintf( dbFile, "sensor_current.db" ); 
+							found = 1;
+							break;
+
+						case SENSOR_TYPE_HOT_SWAP:
+							sprintf( dbFile, "sensor_hotswap.db" ); 
+							found = 1;
+							break;
+					}
+
+					if ( sens->sdr.recType == SDR_TYPE_FULL_SENSOR )
+					    sprintf( desc, "'%s'", sens->sdr.str );
+					else
+					    sprintf( desc, "'%s'", code ); /* Improve this string */
+
+					if ( found )
+						fprintf( file, "dbLoadRecords(\"${TOP}/db/%s\",\"dev=%s,link=%s,code=%s,inst=%i,sensInst=%i,sens=%i,desc=%s\")\n", /* continue next line */
+						dbFile, dev, mchData->name, code, inst, sens->instance, i, desc );
+				}
 			}
-		}
 
-		fclose(file);
+		}
+       		fclose(file);
 	}
 	else
 		errlogPrintf("Failed to open %s; some or all sensor and/or FRU PVs will be missing\n", stFile);
