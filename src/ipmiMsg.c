@@ -277,7 +277,7 @@ uint32_t seqRplyInt;
        			if ( mchNewSession( mchData ) )
        				return -1;
 		}
-		else
+		else {
 			/* Extract sequence number from reply */
        			for ( i = 0; i < IPMI_RPLY_SEQ_LENGTH ; i++)
        				seq[i] = response[IPMI_RPLY_BRIDGED_SEQ_OFFSET + i];
@@ -325,7 +325,8 @@ uint32_t seqRplyInt;
 			}
 
 			if ( response[IPMI_RPLY_COMPLETION_CODE_OFFSET] )
-				return -1;				
+				return -1;	
+		}			
        	}
 						
        	else
