@@ -2,5 +2,12 @@ ipmiComm-R1-0-0:  Initial release. Built against EPICS base-R3-14-12
 
 ipmiComm-R1-1-0:  Add support for fan level readback, control, and to read fan properties
                   Additional minor cleanup/changes
+
+ipmiComm-R1-2-0:  Many changes. See Changelog for more details.
+                  Determine and specify expected response msg lengths to avoid timeouts, 
+                  where possible.
+                  Keep track of incoming msg sequence numbers.
+                  Set errors based on seq numbers, completion code, asyn status.
+                  Various fixes, clean-up.
                   
                   
