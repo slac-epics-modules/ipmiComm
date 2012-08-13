@@ -2,7 +2,6 @@
 #include <epicsInterrupt.h>
 #include <drvSup.h>
 #include <iocsh.h>
-#include <epicsExport.h>
 #include <errlog.h>
 #include <epicsMutex.h>
 #include <cantProceed.h>
@@ -45,10 +44,12 @@ int mchIsAlive[MAX_MCH]  = { 0 };
 int 
 mchCommStart(MchData mchData)
 {	
-uint8_t response[MSG_MAX_LENGTH];
+uint8_t response[MSG_MAX_LENGTH] = { 0 };
 int     i;
 
-/*	mchData->pasynUser = pasynUser;*/
+        /* Initialize our stored sequence number for messages from MCH to 0 */
+        for ( i = 0; i < IPMI_RPLY_SEQ_LENGTH ; i++)
+                mchData->seqRply[i] = 0;
 	
 	ipmiMsgGetChanAuth( mchData, response );
 
@@ -68,7 +69,7 @@ int     i;
         for ( i = 0; i < IPMI_RPLY_ID_LENGTH ; i++)
                 mchData->id[i] = response[IPMI_RPLY_ID_OFFSET + i];
 
-        /* Extract initial sequence number for messages from MCH */
+        /* Extract initial sequence number for messages to MCH */
         for ( i = 0; i < IPMI_RPLY_INIT_SEND_SEQ_LENGTH ; i++)
                 mchData->seqSend[i] = response[IPMI_RPLY_INIT_SEND_SEQ_OFFSET + i];
 
@@ -188,7 +189,7 @@ mchFruBoardDataGet(FruBoard board, uint8_t *raw, unsigned *offset)
 void
 mchFruDataGet(MchData mchData, Fru fru, uint8_t id) 
 {
-uint8_t    response[MSG_MAX_LENGTH];
+uint8_t    response[MSG_MAX_LENGTH] = { 0 };
 uint8_t   *raw; 
 int        i;
 uint16_t   sizeInt;  /* Size of FRU data area in bytes */
@@ -214,9 +215,9 @@ uint8_t   *readOffset = fru->readOffset;
 		return;
 	}
 
-	/* Too many reads! Later, detect no more data */
-	if ( (nread = floor( sizeInt/MSG_FRU_DATA_READ_SIZE )) > 50 )
-		nread = 30;
+	/* Too many reads! But no way to determine the end of the data until we read it, so for now... */
+	if ( ( nread = floor( sizeInt/MSG_FRU_DATA_READ_SIZE ) ) > 50 )
+		nread = 50;
 
 	/* Read FRU data, store in raw, increment our read offset for next read */
 	for ( i = 0; i < nread; i++ ) {
@@ -227,7 +228,7 @@ uint8_t   *readOffset = fru->readOffset;
 	}
 
 #ifdef DEBUG
-printf("FRU %i raw data: \n",id);
+printf("FRU %i raw data, size %i: \n",id, sizeInt);
 for ( i = 0; i < sizeInt; i++)
 	printf("%u ",raw[i]);
 printf("\n");
@@ -250,7 +251,7 @@ printf("\n");
 void
 mchFruGetDataAll(MchData mchData)
 {
-uint8_t *response  = malloc(MSG_MAX_LENGTH);
+uint8_t response[MSG_MAX_LENGTH] = { 0 };
 uint8_t  i;
 Fru fru;
 	for ( i = 0; i < MAX_FRU ; i++) {
@@ -270,8 +271,6 @@ Fru fru;
 			}
 		}			
 	}
-
-	free( response );
 
 #ifdef DEBUG
 printf("mchFruGetDataAll: FRU Summary:\n");
@@ -332,7 +331,7 @@ Sensor sens = &mchData->sens[index];
 void
 mchSdrRepGetInfo(MchData mchData)
 {
-uint8_t *response  = malloc(MSG_MAX_LENGTH);
+uint8_t response[MSG_MAX_LENGTH] = { 0 };
 uint8_t  flags;
 
 	ipmiMsgGetSdrRepInfo( mchData, response );
@@ -358,8 +357,6 @@ uint8_t  flags;
        	mchData->sdrRep.lun1       = DEV_SENSOR_LUN1(flags);
        	mchData->sdrRep.lun2       = DEV_SENSOR_LUN2(flags);
        	mchData->sdrRep.lun3       = DEV_SENSOR_LUN3(flags);
-
-	free( response );
 }
 
 /* 
@@ -398,7 +395,7 @@ int n, l, i;
 }
 
 /* 
- * Store SDR for one sensor or FRU
+ * Store SDR for one sensor
  */
 void
 mchSdrFullSens(SdrFull sdr, uint8_t *raw, int type)
@@ -458,9 +455,10 @@ uint8_t  res[2] = { 0 };
 Sensor   sens   = 0;
 Fru      fru    = 0;
 uint8_t  offset = 0;
-uint8_t  type   = 0;
+uint8_t  type   = 0, addr = 0;
 uint8_t *raw    = 0;
 int      i, iFull = 0, iFru = 0, fruId;
+size_t   responseSize;
 
 	mchSdrRepGetInfo( mchData );
 
@@ -497,6 +495,7 @@ int      i, iFull = 0, iFru = 0, fruId;
        		lastId = arrayToUint16( id );
        		id[0]  = response[IPMI_RPLY_GET_SDR_NEXT_ID_LSB_OFFSET];
        		id[1]  = response[IPMI_RPLY_GET_SDR_NEXT_ID_MSB_OFFSET];
+
        		if ( lastId == 0xFFFF ) {
        			break;
        		}
@@ -520,7 +519,15 @@ int      i, iFull = 0, iFru = 0, fruId;
 		if ( (type == SDR_TYPE_FULL_SENSOR) || (type == SDR_TYPE_COMPACT_SENSOR) ) {
 			mchSdrFullSens( &(mchData->sens[iFull].sdr) , raw + i*SDR_MAX_LENGTH, type );
 			mchData->sens[iFull].instance = 0; /* Initialize instance to 0 */
+
+			/* Save sensor reading response length for future reads (response varies per sensor) */
+			responseSize = mchData->sens[iFull].readMsgLength = 0;
+			ipmiMsgReadSensor( mchData, response, mchData->sens[iFull].sdr.number, addr, &responseSize );	
+
+			mchData->sens[iFull].readMsgLength = responseSize;
+
 			iFull++;
+
 		}
 	        else if ( type == SDR_TYPE_FRU_DEV ) {
 			fruId = raw[SDR_FRU_ID_OFFSET + i*SDR_MAX_LENGTH];
@@ -551,12 +558,13 @@ bail:
  *  Periodically ping MCH. This runs in its own thread.
  *  If MCH online/offline status changes, update global
  *  variable and process status record.
- *
- *  These messages are outside of a session and we don't
- *  modify our shared structure, so there is no need to lock
- *  during the message write. We call ipmiMsgWriteRead directly, 
- *  instead of using the helper routine which tries to recover a 
- *  disconnected session.
+  *
+  *  These messages are outside of a session and we don't
+  *  modify our shared structure, so there is no need to lock
+  *  during the message write (just while we modify the global
+  *  variable mchIsAlive.) We call ipmiMsgWriteRead directly, 
+  *  instead of using the helper routine which tries to recover a 
+  *  disconnected session.
  */
 
 void
@@ -564,9 +572,11 @@ mchPing(void *arg)
 {
 MchDev  mch     = arg;
 MchData mchData = mch->udata;
-uint8_t message[MSG_MAX_LENGTH];
-uint8_t response[MSG_MAX_LENGTH];
+uint8_t message[MSG_MAX_LENGTH] = { 0 };
+uint8_t response[MSG_MAX_LENGTH] = { 0 };
+size_t  responseSize;
 int    *alive = &(mchIsAlive[mchData->instance]);
+int     cos;
 
 	memcpy( message, RMCP_HEADER, sizeof( RMCP_HEADER ) );
 
@@ -576,27 +586,31 @@ int    *alive = &(mchIsAlive[mchData->instance]);
 
 	while (1) {
 
-		memset( response, 0, MSG_MAX_LENGTH ); /* Initialize response to 0 to detect no response */
+		cos = 0;
+		responseSize = IPMI_RPLY_PONG_LENGTH;
 
-		ipmiMsgWriteRead( mchData->name, message, sizeof ( RMCP_HEADER ) + sizeof( ASF_MSG ), response );
+		ipmiMsgWriteRead( mchData->name, message, sizeof ( RMCP_HEADER ) + sizeof( ASF_MSG ), response, &responseSize, RPLY_TIMEOUT );
 
-		if ( 0 == *response ) {
+       		epicsMutexLock( mch->mutex );
+
+		if ( responseSize == 0 ) {
 			if ( *alive == MCH_STAT_OK ) { 
-				epicsMutexLock( mch->mutex );
 				*alive = MCH_STAT_NORESPONSE;
-				epicsMutexUnlock( mch->mutex );
-				if ( drvMchStatScan )
-					scanIoRequest( drvMchStatScan );
+				cos = 1;
 			}
 		}
 		else {
 			if ( *alive == MCH_STAT_NORESPONSE ) {
-				epicsMutexLock( mch->mutex );
 				*alive = MCH_STAT_OK;
-				epicsMutexUnlock( mch->mutex );
-				if ( drvMchStatScan )
-					scanIoRequest( drvMchStatScan );
+				cos = 1;
 			}
+		}
+
+       	       	epicsMutexUnlock( mch->mutex );
+
+		if ( cos ) {
+       			if ( drvMchStatScan )
+       				scanIoRequest( drvMchStatScan );
 		}
 
 		epicsThreadSleep( PING_PERIOD );
@@ -620,6 +634,7 @@ uint8_t i;
 char    taskName[50];
 FILE   *file;
 char    filename[60];
+asynStatus status;
 
 	/* Allocate memory for MCH data structure */
 	if ( ! (mchData = calloc( 1, sizeof( *mchData ))) )
@@ -635,11 +650,13 @@ char    filename[60];
        	mchData->name = mch->name;
        	mch->udata = mchData;
 
+	mchData->timeout = 0.1; /* Shorter timeout during init because we do not always know response msg length */
+
 	/* Create empty file to load DB records */
 	sprintf( filename, "st.%s.cmd", mchData->name );
 	file = fopen( filename, "w" ); 
 	if ( !file )
-		errlogPrintf("Failed to create file %s.\n");
+		errlogPrintf("Failed to create file %s.\n", filename);
 	else
 		fclose( file );
 
@@ -670,17 +687,18 @@ char    filename[60];
 
 		mchSensorFruGetInstance( mchData );
 
-		/* Create script to load records */
-		sensorFruRecordScript( mchData );
-
 		mchInitDone[mchData->instance] = 1;
 
 		epicsMutexUnlock( mch->mutex );
 
-		REPLY_TIMEOUT = 0.1; /* After getting all configuration data, reduce timeout */
+		mchData->timeout = RPLY_TIMEOUT;
 	}
 	else
 		errlogPrintf("No response from %s; cannot complete initialization\n",mch->name);
+
+       	/* Create script to load records; done at init with no other threads modifying mchData, so need to lock */
+       	sensorFruRecordScript( mchData, mchInitDone[mchData->instance] );
+
 }
 
 static long
@@ -712,10 +730,10 @@ epicsExportAddress(drvet,drvMch);
 /* 
  * IOC shell command registration
  */
-static const iocshArg mchInitArg0       = { "port name",iocshArgString};
-static const iocshArg *mchInitArgs[1]   = { &mchInitArg0 };
-static const iocshFuncDef mchInitFuncDef = 
-	{ "mchInit", 1, mchInitArgs };
+static const iocshArg mchInitArg0        = { "port name",iocshArgString};
+static const iocshArg *mchInitArgs[1]    = { &mchInitArg0 };
+static const iocshFuncDef mchInitFuncDef = { "mchInit", 1, mchInitArgs };
+
 static void mchInitCallFunc(const iocshArgBuf *args)
 {
 	mchInit(args[0].sval);
@@ -723,8 +741,8 @@ static void mchInitCallFunc(const iocshArgBuf *args)
 
 static const iocshArg mchCreateFileArg0        = { "file name",iocshArgString};
 static const iocshArg *mchCreateFileArgs[1]    = { &mchCreateFileArg0 };
-static const iocshFuncDef mchCreateFileFuncDef = 
-	{ "mchCreateFile", 1, mchCreateFileArgs };
+static const iocshFuncDef mchCreateFileFuncDef = { "mchCreateFile", 1, mchCreateFileArgs };
+
 static void mchCreateFileCallFunc(const iocshArgBuf *args)
 {
 	mchCreateFile(args[0].sval);

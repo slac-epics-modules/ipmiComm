@@ -490,7 +490,7 @@ size_t   responseSize;
 				pai->val  = value;
 		}
 
-       		if ( IPMICOMM_DEBUG )
+       		if ( IPMICOMM_DEBUG > 2 )
 			printf("%s: raw %02x, sensor %02x, owner %i, lun %i, index %i, value %.1f\n",pai->name, raw, sensor, mchData->sens[index].sdr.owner, mchData->sens[index].sdr.lun, index, pai->val);
 
 #ifdef DEBUG
