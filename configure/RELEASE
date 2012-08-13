@@ -19,13 +19,11 @@ BASE_MODULE_VERSION=base-R3-14-12
 # IOC apps or other Support apps
 # =============================================================
 ASYN_MODULE_VERSION=asyn-R4-18-lcls1
-JSON_MODULE_VERSION=current
 
 # ============================================================
 # Support module locations
 # ============================================================
 ASYN=$(EPICS_MODULES)/asyn/$(ASYN_MODULE_VERSION)
-JSON=/afs/slac/g/lcls/package/json-c/$(JSON_MODULE_VERSION)
 
 # =================================================================
 # Define EPICS_BASE
