@@ -8,6 +8,7 @@ ipmiComm-R1-2-0:  Many changes. See Changelog for more details.
                   where possible.
                   Keep track of incoming msg sequence numbers.
                   Set errors based on seq numbers, completion code, asyn status.
+                  Add PV and device support to enable/disable communication with MCH.
                   Various fixes, clean-up.
                   
                   
