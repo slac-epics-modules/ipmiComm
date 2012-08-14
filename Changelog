@@ -28,3 +28,4 @@ src/ipmiDef.h - Add reply message lengths. Add from-MCH sequence number offset a
 src/ipmiComm.dbd - register drvIpmiRegisterCommands
 Db/sensor*.db - Change sensor record scan rate from 5 second to 10 second
 Db/module_cu_default.sub - Add sixth fan speed sensor to defaults
+
