@@ -9,6 +9,19 @@ record(mbbi, "$(crat):STAT") {
   field(PINI, "YES")
 }
 
+# Enable or disable session with MCH
+record(bo, "$(crat):MCHSESSION") {
+  field(DTYP, "MCHsensor")
+  field(OMSL, "supervisory")
+  field(OUT,  "#C0 S0 @$(node)+SESS")
+  field(ZNAM, "Disabled")
+  field(ZSV,  "MAJOR")
+  field(ONAM, "Enabled")
+  field(OSV,  "NO_ALARM")
+  field(VAL,  "1")
+  field(PINI, "YES")
+}
+
 # Sends Chassis Control IPMI command
 # Vadatech MCH results are unreliable
 # NAT MCH does not implement this command

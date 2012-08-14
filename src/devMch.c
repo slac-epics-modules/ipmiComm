@@ -44,11 +44,12 @@
          --------
 
          *   init_bo_record           - Record initialization
-         *   read_bo                  - Write binary output
+         *   write_bo                 - Write binary output
 
 	   Supported operations:
 
              * "RESET": perform cold reset (reboots MCH)
+             * "SESS":  close/open session with MCH
 
          Multibit-Binary Input Device Support:
          -------------------------------------------------------
@@ -438,7 +439,7 @@ size_t   responseSize;
 	mchData = mch->udata;
 	task    = recPvt->task;
 
-	if ( mchIsAlive[mchData->instance] ) {
+	if ( mchIsAlive[mchData->instance] && mchData->session ) {
 
 		responseSize = mchData->sens[index].readMsgLength;
 		sensor = mchData->sens[index].sdr.number;
@@ -545,7 +546,7 @@ char    str[40];
         node = strtok( pbo->out.value.vmeio.parm, "+" );
         if ( (p = strtok( NULL, "+")) ) {
                 task = p;
-                if ( strcmp( task, "RESET") ) {
+                if ( strcmp( task, "RESET") && strcmp( task, "SESS") ) {
 			sprintf( str, "Unknown task parameter %s", task);
 			status = S_dev_badSignal;
 		}
@@ -592,7 +593,21 @@ int      s = 0;
 
 	if ( mchIsAlive[mchData->instance] ) {
 
-		if ( !(strcmp( task, "RESET" )) ) {
+		if ( !(strcmp( task, "SESS" )) ) {
+
+			epicsMutexLock( mch->mutex );
+
+			if ( pbo->val )
+				mchData->session = 1; /* Re-enable session */
+			else {
+				mchData->session = 0;
+				ipmiMsgCloseSess( mchData, data );
+			}
+			
+			epicsMutexUnlock( mch->mutex );
+		}
+
+		else if ( !(strcmp( task, "RESET" )) && mchData->session ) {
 
 			epicsMutexLock( mch->mutex );
 		       	s = ipmiMsgColdReset( mchData, data );
@@ -727,7 +742,7 @@ size_t   responseSize;
 			pmbbi->rval = pmbbi->rval = value;
 
 		}
-		else if ( !(strcmp( task, "HS")) ) {
+		else if ( !(strcmp( task, "HS")) && mchData->session ) {
 
 			if ( mchIsAlive[mchData->instance] ) {
 
@@ -844,7 +859,7 @@ volatile uint8_t val;
 	mchData = mch->udata;
 	task    = recPvt->task;
 
-	if ( mchIsAlive[mchData->instance] ) {
+	if ( mchIsAlive[mchData->instance] && mchData->session ) {
 
 		if ( !(strcmp( task, "CHAS" )) ) {
 			epicsMutexLock( mch->mutex );
@@ -991,7 +1006,7 @@ int      s = 0;
 	task    = recPvt->task;
 	fru     = &mchData->fru[id];
 
-	if ( mchInitDone[mchData->instance] ) {
+	if ( mchInitDone[mchData->instance] && mchData->session ) {
 
 		if ( !(strcmp( task, "BSN" )) && fru->board.sn.data )
        			pai->val = (epicsFloat64)(*fru->board.sn.data);
@@ -1279,27 +1294,32 @@ int      s = 0;
 	task    = recPvt->task;
 	fru     = &mchData->fru[id];
 
-	if ( !(strcmp( task, "FAN" )) ) {
-
-		epicsMutexLock( mch->mutex );
-
-		s = ipmiMsgSetFanLevel( mchData, data, id, plongout->val );
-
-		epicsMutexUnlock( mch->mutex );
-
-       		if ( s ) {
-       			recGblSetSevr( plongout, WRITE_ALARM, INVALID_ALARM );
-	       		return ERROR;
-		}
-
-	}
-
 #ifdef DEBUG
 printf("write_fru_longout: %s FRU id is %i, value is %.0f\n",plongout->name, id, plongout->val);
 #endif
 
-       	plongout->udf = FALSE;
-       	return status;
+	if ( mchIsAlive[mchData->instance] && mchData->session ) {
+		if ( !(strcmp( task, "FAN" )) ) {
+
+			epicsMutexLock( mch->mutex );
+
+			s = ipmiMsgSetFanLevel( mchData, data, id, plongout->val );
+
+			epicsMutexUnlock( mch->mutex );
+
+			if ( s ) {
+				recGblSetSevr( plongout, WRITE_ALARM, INVALID_ALARM );
+				return ERROR;
+			}
+		}
+
+		plongout->udf = FALSE;
+		return status;
+	}
+	else {
+       	       	recGblSetSevr( plongout, WRITE_ALARM, INVALID_ALARM );
+		return ERROR;		
+	}
 }
 
 /*

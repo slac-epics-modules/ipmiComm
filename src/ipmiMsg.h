@@ -109,6 +109,8 @@ void ipmiMsgActSess(MchData mchData, uint8_t *data);
 
 void ipmiMsgSetPriv(MchData mchData, uint8_t *data, uint8_t level);
 
+void ipmiMsgCloseSess(MchData mchData, uint8_t *data);
+
 int ipmiMsgColdReset(MchData mchData, uint8_t *data);
 
 int ipmiMsgChassisControl(MchData mchData, uint8_t *data, uint8_t parm);

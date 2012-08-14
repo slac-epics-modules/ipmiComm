@@ -1,4 +1,10 @@
-10Aug2012 (SH)
+14Aug2012 (SH)
+Add PV to enable/disable communication with MCH. Disable closes session.
+  Change device support so that it checks enable/disable before sending message.
+  Changes to drvMch.h, ipmiMsg.h, devMch.c, shelf_default.db
+Increase reply timeout during init, change to drvMch.c
+
+13Aug2012 (SH)
 src/ipmiMsg.c/.h - When possible, specify expected msg response length so that 
   we don't have to wait for timeout. Return actual response length to be saved 
   for later write/reads. Keep track of incoming msg sequence numbers. 

@@ -174,6 +174,7 @@ typedef struct MchDataRec_ {
 	uint8_t       fruCount;      /* FRU count */
 	FruRec       *fru;           /* Array of FRUs (size of MAX_FRU) */
 	double        timeout;       /* Asyn read timeout */
+	int           session;       /* Enable session with MCH */
 } MchDataRec, *MchData;
 
 

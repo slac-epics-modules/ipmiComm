@@ -512,6 +512,7 @@ size_t   responseSize;
 		errlogPrintf("mchSdrGetDataAll: No memory for FRU data for %s\n", mchData->name);
 		goto bail;
 	}
+
 	/* Store SDR data; for now we only support Compact/Full Sensor Records and FRU Device Locator Records */
 	for ( i = 0; i < sdrCount; i++) {
 		type = raw[i*SDR_MAX_LENGTH + SDR_REC_TYPE_OFFSET];
@@ -650,7 +651,8 @@ asynStatus status;
        	mchData->name = mch->name;
        	mch->udata = mchData;
 
-	mchData->timeout = 0.1; /* Shorter timeout during init because we do not always know response msg length */
+	mchData->timeout = 1.0; /* Shorter timeout during init because we do not always know response msg length */
+	mchData->session = 1;   /* Default: enable session with MCH */
 
 	/* Create empty file to load DB records */
 	sprintf( filename, "st.%s.cmd", mchData->name );
