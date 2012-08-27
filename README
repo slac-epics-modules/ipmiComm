@@ -4,7 +4,7 @@
 #
 #	Auth: Sonya Hoobler
 #
-#	Last updated: 16 July 2012
+#	Last updated: 27 August 2012
 #
 ############################################################
 
@@ -55,11 +55,13 @@ NOTES ON THIS RELEASE
 
 -There is a EPICS PV $(crat):INIT for each crate. It is set to "Initialized"
  after all of the modules/sensors have been discovered. It is set to "Not
- initialized" if the software detects that the system has gone offline. This is
- because sensor addresses can change when new hardware is removed or reinstalled
- and we cannot be sure we are correctly addressing the sensors when the system
- comes back up. If INIT = "Not initialized", the ioc must be rebooted in order
- to re-discover the modules/sensors and resume system monitoring.
+ initialized" if the software detects that the system has gone offline and 
+ come back up in a different configuration. This is because sensor addresses 
+ can change when new hardware is removed or reinstalled and we cannot be sure 
+ we are correctly addressing the sensors when the system comes back up. Later,
+ we will handle this better. Until then, if INIT = "Not initialized", the ioc 
+ must be rebooted in order to re-discover the modules/sensors and resume 
+ system monitoring.
 
 -No alarm limits or severities have been implemented.
 
