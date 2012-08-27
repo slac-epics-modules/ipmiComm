@@ -1,7 +1,8 @@
-ipmiComm-R1-0-0:  Initial release. Built against EPICS base-R3-14-12
-
-ipmiComm-R1-1-0:  Add support for fan level readback, control, and to read fan properties
-                  Additional minor cleanup/changes
+ipmiComm-R1-3-0:  Use "initialized" flag to reflect whether our saved system 
+                  configuration matches the actual configuration. If we detect that 
+                  the system has just come back online, check hw configuration.
+                  If there have been any changes, set flag to "not initialized". 
+                  Misc other changes; see Changelog.
 
 ipmiComm-R1-2-0:  Many changes. See Changelog for more details.
                   Determine and specify expected response msg lengths to avoid timeouts, 
@@ -10,5 +11,10 @@ ipmiComm-R1-2-0:  Many changes. See Changelog for more details.
                   Set errors based on seq numbers, completion code, asyn status.
                   Add PV and device support to enable/disable communication with MCH.
                   Various fixes, clean-up.
+
+ipmiComm-R1-1-0:  Add support for fan level readback, control, and to read fan properties
+                  Additional minor cleanup/changes
                   
+ipmiComm-R1-0-0:  Initial release. Built against EPICS base-R3-14-12
+
                   
