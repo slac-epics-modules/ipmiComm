@@ -10,6 +10,10 @@
 #define SDR_FRU_MAX_LENGTH  33
 #define MAX_MCH             255
 
+#define MCH_INIT_NOT_DONE    0
+#define MCH_INIT_IN_PROGRESS 1
+#define MCH_INIT_DONE        2
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -59,7 +63,7 @@ typedef struct SdrFullRec_ {
 	uint8_t      recType;       /* Record type, 0x01 for Full Sensor Record */
         uint8_t      length;        /* Number of remaining record bytes (we only use the first few) */
 	uint8_t      owner;         /* Sensor owner ID, [7:1] slave address or software ID; [0] 0 = IPMB, 1 = system software */
-	uint8_t      lun;           /* Sensor owner LUN, [7:4] channel number; [3:2] reserved; ]1:0] sensor owner LUN */
+	uint8_t      lun;           /* Sensor owner LUN, [7:4] channel number; [3:2] reserved; [1:0] sensor owner LUN */
 	uint8_t      number;        /* Sensor number, unique behind given address and LUN, 0xFF reserved */
 	uint8_t      entityId;      /* Entity ID (physical entity that sensor is associated with) */
 	uint8_t      entityInst;    /* Entity instance, [7] 0 = physical entity, 1 = logical; [6:0] instance number 0x00-0x5F system-relative, 0x60-0x7F device-relative */
@@ -91,7 +95,7 @@ typedef struct SdrFullRec_ {
  * Handle for FRU Device Locator Record, IPMI Table 43-7
  */
 typedef struct SdrFruRec_ {
-	uint8_t      id[2];         /* Sensor ID (can change, so key bytes must also be used to identify a sensor */
+	uint8_t      id[2];         /* Sensor ID (can change, so key bytes must also be used to identify a sensor) */
 	uint8_t      ver;           /* SDR version (0x51) */
 	uint8_t      recType;       /* Record type, 0x01 for Full Sensor Record */
         uint8_t      length;        /* Number of remaining record bytes (we only use the first few) */
@@ -129,7 +133,7 @@ typedef struct SdrRepRec_ {
 /* Handle for each FRU */
 typedef struct FruRec_ {
 	uint8_t      type;          /* FRU type */
-	uint8_t      instance;      /* Instance of this FRU type */
+	uint8_t      instance;      /* Instance of this FRU type, set in drvMchUtil.c */
 	uint8_t      size[2];       /* FRU Inventory Area size, LS byte stored first */	
 	uint8_t      access;        /* Access FRU data by words or bytes */
 	uint8_t      readOffset[2];  
@@ -159,8 +163,8 @@ typedef struct SensorRec_ {
 	size_t        readMsgLength;/* Get Sensor Reading message response length */
 } SensorRec, *Sensor;
 
-/* Handle for each MCH */
-typedef struct MchDataRec_ {
+/* Struct for MCH session information */
+typedef struct MchSessRec_ {
 	const char   *name;          /* MCH port name used by asyn */
 	int           instance;      /* MCH instance number; assigned at init */
 	epicsThreadId pingThreadId;  /* Thread ID for task that periodically pings MCH */
@@ -168,15 +172,28 @@ typedef struct MchDataRec_ {
 	uint8_t       str[16];       /* Session challenge string; used in establishing a session */
         uint8_t       seqSend[4];    /* Message sequence number for messages to MCH, null until session activated; chosen by MCH; rolls over at 0xFFFFFFFF */
         uint8_t       seqRply[4];    /* Message sequence number for messages from MCH; rolls over at 0xFFFFFFFF */
+	uint8_t       seq;           /* IPMI sequence (6-bit number); used to confirm reply is for correct request */
+	double        timeout;       /* Asyn read timeout */
+	int           session;       /* Enable session with MCH */
+	int           err;           /* Count of sequential message errors */
+} MchSessRec, *MchSess;
+
+/* Struct for MCH system information */
+typedef struct MchSysRec_ {
+	const char   *name;          /* MCH port name used by asyn */
 	SdrRepRec     sdrRep;
 	uint8_t       sensCount;     /* Sensor count */
 	SensorRec    *sens;          /* Array of sensors (size of senscount) */	
 	uint8_t       fruCount;      /* FRU count */
 	FruRec       *fru;           /* Array of FRUs (size of MAX_FRU) */
-	double        timeout;       /* Asyn read timeout */
-	int           session;       /* Enable session with MCH */
+} MchSysRec, *MchSys;
+
+/* Struct for MCH system information */
+typedef struct MchDataRec_ {
+	MchSess        mchSess;       /* MCH session info */
 } MchDataRec, *MchData;
 
+extern MchSys mchSysData[MAX_MCH];
 
 #ifdef __cplusplus
 };

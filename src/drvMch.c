@@ -31,83 +31,233 @@
 #undef DEBUG
 
 int mchCounter = 0;
-int mchInitDone[MAX_MCH] = { 0 };
-int mchIsAlive[MAX_MCH]  = { 0 };
+int mchInitDone[MAX_MCH]   = { 0 };
+int mchIsAlive[MAX_MCH]    = { 0 };
+int mchWasOffline[MAX_MCH] = { 0 };
+
+/* MCH system info, frus, sensors, etc. */
+MchSys mchSysData[MAX_MCH] = { 0 };
+
+void mchSdrGetDataAll(MchSess mchSess, MchSys mchSys);
+void mchFruGetDataAll(MchSess mchSess, MchSys mchSys);
+
+/* Compare installed FRUs with those stored in mchData structure.
+ * Called after system has come back online after outage.
+ *
+ * Caller must perform locking.
+ *
+ *   RETURNS:
+ *            0 if no changes
+ *           -1 if changes
+ */
+int
+mchFruDiff(MchSess mchSess, MchSys mchSys)
+{
+MchSys mchSysTmp = 0;
+Fru fru, fruTmp;
+int i, j;
+int rval = 0;
+uint8_t *part = 0, *partTmp = 0, *sn = 0, *snTmp = 0;
+uint8_t inst, instTmp, lpart, lpartTmp, lsn, lsnTmp;
+
+	/* Allocate memory for temporary MCH data structure */
+	if ( ! (mchSysTmp = calloc( 1, sizeof( *mchSysTmp ))) )
+		cantProceed("FATAL ERROR: No memory for temporary MchData structure\n");
+
+       	/* Get SDR data */
+       	mchSdrGetDataAll( mchSess, mchSysTmp );
+
+       	/* Get FRU data */
+       	mchFruGetDataAll( mchSess, mchSysTmp );
+
+	for ( i = 0; i < MAX_FRU; i++ ) {
+
+		fru     = &mchSys->fru[i];
+		fruTmp  = &mchSysTmp->fru[i];
+		inst    = (fru->sdr.entityInst)    ? 1 : 0;
+		instTmp = (fruTmp->sdr.entityInst) ? 1 : 0;
+
+		if ( inst != instTmp ) {
+
+			if ( IPMICOMM_DEBUG )
+				printf("FRU %i presence; before: %i, now %i\n", i, inst, instTmp);
+       			rval = -1;
+       			break;
+       		}
+
+		/* If this FRU exists */
+		if ( inst ) {
+
+			lpart    = fru->board.part.length;
+			lpartTmp = fruTmp->board.part.length;
+			lsn      = fru->board.sn.length;
+			lsnTmp   = fruTmp->board.sn.length;
+
+			if ( (lpart != lpartTmp) || (lsn != lsnTmp) ) {
+				if ( IPMICOMM_DEBUG )
+					printf("FRU %i part or sn data lengths differ; part before %i now %i, sn before %i now %i\n", i, lpart, lpartTmp, lsn, lsnTmp);
+       				rval = -1;
+       				break;
+			}
+
+			for ( j = 0; j < lpart; j++ ) {
+
+				if ( part[j] != partTmp[j] ) {
+					if ( IPMICOMM_DEBUG )
+						printf("FRU %i part byte % different; before %i now %i\n", i, j, part[j], partTmp[j]);
+					rval = -1;
+					break;
+				}	
+			}		
+
+			if ( rval )
+				break;
+
+			for ( j = 0; j < lsn; j++ ) {
+
+				if ( sn[j] != snTmp[j] ) {
+					if ( IPMICOMM_DEBUG )
+						printf("FRU %i sn byte % different; before %i now %i\n", i, j, sn[j], snTmp[j]);
+					rval = -1;
+					break;
+				}	
+			}		
+
+			if ( rval )
+				break;
+		}
+	}
+		
+       	free( mchSysTmp );
+	return rval;
+}
+
+
 
 /* Start communication session with MCH
  * Multi-step handshaking sequence
  *
- * RETURN:
+ * If we have just reconnected after the
+ * MCH was offline, determine if the 
+ * installed FRUs have changed. If they have,
+ * we can not assume our sensor addresses
+ * are correct. Set "is initialized"
+ * flag to "no" and scan corresponding EPICS
+ * record.
+ *
+ * Caller must perform locking.
+ *
+ *   RETURNS:
  *         0 on success
  *         non-zero on failure
  */		
 int 
-mchCommStart(MchData mchData)
+mchCommStart(MchSess mchSess)
 {	
 uint8_t response[MSG_MAX_LENGTH] = { 0 };
 int     i;
+int    *init = &mchInitDone[mchSess->instance];
+int     inst = mchSess->instance;
 
-        /* Initialize our stored sequence number for messages from MCH to 0 */
-        for ( i = 0; i < IPMI_RPLY_SEQ_LENGTH ; i++)
-                mchData->seqRply[i] = 0;
+	if ( IPMICOMM_DEBUG )
+		errlogPrintf("Connecting to %s\n", mchSess->name);
+
+	/* Initialize IPMI sequence */
+	mchSess->seq = 1;
+
+        /* Initialize our stored sequence number for messages from MCH */
+	mchSess->seqRply[0] = IPMI_MSG_HEADER_SEQ_INITIAL;
+        for ( i = 1; i < IPMI_RPLY_SEQ_LENGTH - 1 ; i++)
+                mchSess->seqRply[i] = 0;
 	
-	ipmiMsgGetChanAuth( mchData, response );
+	if ( ipmiMsgGetChanAuth( mchSess, response ) )
+		return -1;	
 
-	ipmiMsgGetSess( mchData, response );
+	if ( ipmiMsgGetSess( mchSess, response ) )
+		return -1;
 
         /* Extract temporary session ID */
         for ( i = 0; i < IPMI_RPLY_TEMP_ID_LENGTH ; i++)
-                mchData->id[i] = response[IPMI_RPLY_TEMP_ID_OFFSET + i];
+                mchSess->id[i] = response[IPMI_RPLY_TEMP_ID_OFFSET + i];
 
         /* Extract challenge string */
         for ( i = 0; i < IPMI_RPLY_STR_LENGTH ; i++)
-                mchData->str[i] = response[IPMI_RPLY_STR_OFFSET + i];
+                mchSess->str[i] = response[IPMI_RPLY_STR_OFFSET + i];
 
-	ipmiMsgActSess( mchData, response );
+	if ( ipmiMsgActSess( mchSess, response ) )
+		return -1;
 
         /* Extract session ID */
         for ( i = 0; i < IPMI_RPLY_ID_LENGTH ; i++)
-                mchData->id[i] = response[IPMI_RPLY_ID_OFFSET + i];
+                mchSess->id[i] = response[IPMI_RPLY_ID_OFFSET + i];
 
         /* Extract initial sequence number for messages to MCH */
         for ( i = 0; i < IPMI_RPLY_INIT_SEND_SEQ_LENGTH ; i++)
-                mchData->seqSend[i] = response[IPMI_RPLY_INIT_SEND_SEQ_OFFSET + i];
+                mchSess->seqSend[i] = response[IPMI_RPLY_INIT_SEND_SEQ_OFFSET + i];
 
-	ipmiMsgSetPriv( mchData, response, IPMI_MSG_PRIV_LEVEL_ADMIN );
+	if ( ipmiMsgSetPriv( mchSess, response, IPMI_MSG_PRIV_LEVEL_ADMIN ) )
+		return -1;
 
-	return response[IPMI_RPLY_COMPLETION_CODE_OFFSET];
+	if ( mchWasOffline[inst] ) {
+
+       		mchWasOffline[inst] = 0;
+
+       		*init = MCH_INIT_IN_PROGRESS;
+       		if ( drvMchInitScan )
+       			scanIoRequest( drvMchInitScan );
+
+		if ( mchFruDiff( mchSess, mchSysData[inst] ) ) {
+
+			*init = MCH_INIT_NOT_DONE;
+			if ( drvMchInitScan )
+				scanIoRequest( drvMchInitScan );
+			errlogPrintf("%s MCH back online with different FRU configuration\n", mchSess->name);
+		}
+		else {
+			*init = MCH_INIT_DONE;
+			if ( drvMchInitScan )
+				scanIoRequest( drvMchInitScan );
+			errlogPrintf("%s MCH back online with same FRU configuration\n", mchSess->name);
+		}
+	}
+
+	return 0;
 }
 
 /* Start new session with MCH
  * Reset session sequence number and session ID to 0,
  * then call mchCommStart to initiate new session
  *
- * RETURN: (return val from mchCommStart)
- *         0 on success
- *         non-zero on failure          
+ * Caller must perform locking.
+ *
+ *   RETURNS: (return val from mchCommStart)
+ *           0 on success
+ *           non-zero on failure          
  */
 int
-mchNewSession(MchData mchData)
+mchNewSession(MchSess mchSess)
 {
 int i, rval = -1;
 
 	for ( i = 0; i < IPMI_MSG_HDR_SEQ_LENGTH ; i++)
-	        mchData->seqSend[i] = 0;
+	        mchSess->seqSend[i] = 0;
 
 	for ( i = 0; i < IPMI_MSG_HDR_ID_LENGTH ; i++)
-		mchData->id[i] = 0;
+		mchSess->id[i] = 0;
 
-	if ( mchIsAlive[mchData->instance] )	
-		rval = mchCommStart( mchData );
+	if ( mchIsAlive[mchSess->instance] )	
+		rval = mchCommStart( mchSess );
 
 	return rval;
 }
 
 /* Copy FRU area field to data structure
  *
- * RETURNS:
- *          0 on success
- *         -1 if no data to store
+ * Caller must perform locking.
+ *
+ *   RETURNS:
+ *           0 on success
+ *          -1 if no data to store
  */
 int
 mchFruFieldGet(FruField field, uint8_t *raw, unsigned *offset)
@@ -133,7 +283,9 @@ int i;
 }
 
 /* 
- * Copy FRU product area data to prod structure
+ * Copy FRU product area data to product structure
+ *
+ * Caller must perform locking.
  */
 void
 mchFruProdDataGet(FruProd prod, uint8_t *raw, unsigned *offset)
@@ -159,6 +311,8 @@ mchFruProdDataGet(FruProd prod, uint8_t *raw, unsigned *offset)
 
 /* 
  * Copy FRU board area data to board structure
+ *
+ * Caller must perform locking.
  */
 void
 mchFruBoardDataGet(FruBoard board, uint8_t *raw, unsigned *offset)
@@ -185,9 +339,11 @@ mchFruBoardDataGet(FruBoard board, uint8_t *raw, unsigned *offset)
  * Read FRU inventory info. If error in response
  * or FRU data area size is zero, return. Else read FRU data
  * and call mchFru*DataGet to store in FRU structure.
+ *
+ * Caller must perform locking.
  */
 void
-mchFruDataGet(MchData mchData, Fru fru, uint8_t id) 
+mchFruDataGet(MchSess mchSess, MchSys mchSys, Fru fru, uint8_t id) 
 {
 uint8_t    response[MSG_MAX_LENGTH] = { 0 };
 uint8_t   *raw; 
@@ -195,10 +351,9 @@ int        i;
 uint16_t   sizeInt;  /* Size of FRU data area in bytes */
 unsigned   nread;    /* Number of FRU data reads */
 unsigned   offset;
-uint8_t   *readOffset = fru->readOffset;
 
 	/* Get FRU Inventory Info */
-	ipmiMsgGetFruInfo( mchData, response, id );
+	ipmiMsgGetFruInfo( mchSess, response, id );
 
 	if ( response[IPMI_RPLY_COMPLETION_CODE_OFFSET] )
 		return;
@@ -219,10 +374,14 @@ uint8_t   *readOffset = fru->readOffset;
 	if ( ( nread = floor( sizeInt/MSG_FRU_DATA_READ_SIZE ) ) > 50 )
 		nread = 50;
 
+	/* Initialize read offset to 0 */
+	for ( i = 0; i < sizeof( fru->readOffset ); i ++ )
+		fru->readOffset[i] = 0;
+
 	/* Read FRU data, store in raw, increment our read offset for next read */
 	for ( i = 0; i < nread; i++ ) {
 		fru->read = i;
-		ipmiMsgReadFru( mchData, response, id, readOffset, MSG_FRU_DATA_READ_SIZE );
+		ipmiMsgReadFru( mchSess, response, id, fru->readOffset, MSG_FRU_DATA_READ_SIZE );
 		memcpy( raw + i*MSG_FRU_DATA_READ_SIZE, response + IPMI_RPLY_FRU_DATA_READ_OFFSET, MSG_FRU_DATA_READ_SIZE );
 		incr2Uint8Array( fru->readOffset, MSG_FRU_DATA_READ_SIZE );
 	}
@@ -244,26 +403,31 @@ printf("\n");
 }
 
 /* 
- * Get data for all FRUs. Must be done after SDR data stored in fru struct.
+ * Get data for all FRUs. Must be done after SDR data has been stored in FRU struct.
+ * If FRU is cooling unit, get fan properties.
+ *
  * FRUs are indexed by FRU number
- * Later, change this to also discover FRUs that do not have SDRs (like our SLAC board)
+ * Later, change this to also discover FRUs that do not have SDRs (like our SLAC board)?
+ *
+ * Caller must perform locking.
  */
 void
-mchFruGetDataAll(MchData mchData)
+mchFruGetDataAll(MchSess mchSess, MchSys mchSys)
 {
 uint8_t response[MSG_MAX_LENGTH] = { 0 };
-uint8_t  i;
+uint8_t i;
 Fru fru;
-	for ( i = 0; i < MAX_FRU ; i++) {
 
-		fru = &mchData->fru[i];
+	for ( i = 0; i < MAX_FRU ; i++ ) {
 
+	       	fru = &mchSys->fru[i];
+	
 		if ( fru->sdr.entityInst ) {
 
-			mchFruDataGet( mchData, fru , i);
+			mchFruDataGet( mchSess, mchSys, fru , i );
 
 			if ( (i >= UTCA_FRU_TYPE_CU_MIN) && (i <= UTCA_FRU_TYPE_CU_MAX) ) {
-				ipmiMsgGetFanProp( mchData, response, fru->sdr.fruId );
+				ipmiMsgGetFanProp( mchSess, response, fru->sdr.fruId );
 				fru->fanMin  = response[IPMI_RPLY_GET_FAN_PROP_MIN_OFFSET];
 				fru->fanMax  = response[IPMI_RPLY_GET_FAN_PROP_MAX_OFFSET];
 				fru->fanNom  = response[IPMI_RPLY_GET_FAN_PROP_NOM_OFFSET];
@@ -275,12 +439,11 @@ Fru fru;
 #ifdef DEBUG
 printf("mchFruGetDataAll: FRU Summary:\n");
 for ( i = 0; i < MAX_FRU  ; i++) {
-	fru = &mchData->fru[i];
+	fru = &mchSys->fru[i];
 	if ( fru->sdr.fruId )
 		printf("FRU %i %s was found, id %02x instance %02x\n", fru->sdr.fruId, fru->board.prod.data, fru->sdr.entityId, fru->sdr.entityInst);
 }
 #endif
-
 }
 
 /* 
@@ -295,17 +458,19 @@ for ( i = 0; i < MAX_FRU  ; i++) {
  * Note: these indices refer to our arrays of Sensors and FRUs--
  * they do not refer to the IPMI sensor number or IPMI SDR Record ID
  *
+ *
+ * Caller must perform locking.
  */
 void
-mchSensorGetFru(MchData mchData, uint8_t index)
+mchSensorGetFru(MchSys mchSys, uint8_t index)
 {
 int i;
 int id      = -1;
-Sensor sens = &mchData->sens[index];
+Sensor sens = &mchSys->sens[index];
 
 	/* First loop through FRUs */
 	for ( i = 0; i < MAX_FRU; i++ ) {
-		if ( (sens->sdr.entityId == mchData->fru[i].sdr.entityId) && (sens->sdr.entityInst == mchData->fru[i].sdr.entityInst ) ) {
+		if ( (sens->sdr.entityId == mchSys->fru[i].sdr.entityId) && (sens->sdr.entityInst == mchSys->fru[i].sdr.entityInst ) ) {
 			id = i;
 			break;
 		}
@@ -323,44 +488,50 @@ Sensor sens = &mchData->sens[index];
 	
 	/* Save hotswap sensor index to FRU structure (used by devSup) */
 	if ( (id != 0 ) && (sens->sdr.sensType == SENSOR_TYPE_HOT_SWAP) )
-       		mchData->fru[id].hotswap = index;
+       		mchSys->fru[id].hotswap = index;
 }
 
 
-/* Store SDR Repository info */
+/* 
+ * Store SDR Repository info 
+ *
+ * Caller must perform locking.
+ */
 void
-mchSdrRepGetInfo(MchData mchData)
+mchSdrRepGetInfo(MchSess mchSess, MchSys mchSys)
 {
 uint8_t response[MSG_MAX_LENGTH] = { 0 };
-uint8_t  flags;
+uint8_t flags;
 
-	ipmiMsgGetSdrRepInfo( mchData, response );
+	ipmiMsgGetSdrRepInfo( mchSess, response );
 
 	if ( response[IPMI_RPLY_COMPLETION_CODE_OFFSET] ) {
-		errlogPrintf("mchSdrRepGetInfo: Error reading SDR Repository info for %s\n", mchData->name);
+		errlogPrintf("mchSdrRepGetInfo: Error reading SDR Repository info for %s\n", mchSess->name);
 		return;
 	}
 
-	mchData->sdrRep.ver     = response[IPMI_RPLY_SDRREP_VER_OFFSET];
-	mchData->sdrRep.size[0] = response[IPMI_RPLY_SDRREP_CNT_LSB_OFFSET];
-	mchData->sdrRep.size[1] = response[IPMI_RPLY_SDRREP_CNT_MSB_OFFSET];
+	mchSys->sdrRep.ver     = response[IPMI_RPLY_SDRREP_VER_OFFSET];
+	mchSys->sdrRep.size[0] = response[IPMI_RPLY_SDRREP_CNT_LSB_OFFSET];
+	mchSys->sdrRep.size[1] = response[IPMI_RPLY_SDRREP_CNT_MSB_OFFSET];
 
-	ipmiMsgGetDevSdrInfo( mchData, response, 1 );
+	ipmiMsgGetDevSdrInfo( mchSess, response, 1 );
 
 	if ( response[IPMI_RPLY_COMPLETION_CODE_OFFSET] )
 		return;
 
-       	mchData->sdrRep.devSdrSize = response[IPMI_RPLY_DEV_SDR_CNT_OFFSET];
+       	mchSys->sdrRep.devSdrSize = response[IPMI_RPLY_DEV_SDR_CNT_OFFSET];
 	flags = response[IPMI_RPLY_DEV_SDR_FLAGS_OFFSET];
-       	mchData->sdrRep.devSdrDyn  = DEV_SENSOR_DYNAMIC(flags);
-       	mchData->sdrRep.lun0       = DEV_SENSOR_LUN0(flags);
-       	mchData->sdrRep.lun1       = DEV_SENSOR_LUN1(flags);
-       	mchData->sdrRep.lun2       = DEV_SENSOR_LUN2(flags);
-       	mchData->sdrRep.lun3       = DEV_SENSOR_LUN3(flags);
+       	mchSys->sdrRep.devSdrDyn  = DEV_SENSOR_DYNAMIC(flags);
+       	mchSys->sdrRep.lun0       = DEV_SENSOR_LUN0(flags);
+       	mchSys->sdrRep.lun1       = DEV_SENSOR_LUN1(flags);
+       	mchSys->sdrRep.lun2       = DEV_SENSOR_LUN2(flags);
+       	mchSys->sdrRep.lun3       = DEV_SENSOR_LUN3(flags);
 }
 
 /* 
- * Store SDR for one FRU
+ * Store SDR for one FRU into FRU data structure
+ *
+ * Caller must perform locking.
  */
 void
 mchSdrFruDev(SdrFru sdr, uint8_t *raw)
@@ -395,7 +566,9 @@ int n, l, i;
 }
 
 /* 
- * Store SDR for one sensor
+ * Store SDR for one sensor into sensor data structure
+ *
+ * Caller must perform locking.
  */
 void
 mchSdrFullSens(SdrFull sdr, uint8_t *raw, int type)
@@ -443,9 +616,13 @@ int n, l, i;
 		sdr->str[i+1] = '\0';
        	}     
 }
-				  
+
+/*
+ *
+ * Caller must perform locking.
+ */				  
 void				  
-mchSdrGetDataAll(MchData mchData)
+mchSdrGetDataAll(MchSess mchSess, MchSys mchSys)
 {
 uint8_t  response[MSG_MAX_LENGTH] = { 0 };
 uint16_t sdrCount;
@@ -460,18 +637,18 @@ uint8_t *raw    = 0;
 int      i, iFull = 0, iFru = 0, fruId;
 size_t   responseSize;
 
-	mchSdrRepGetInfo( mchData );
+	mchSdrRepGetInfo( mchSess, mchSys );
 
-	sdrCount = arrayToUint16( mchData->sdrRep.size );
+	sdrCount = arrayToUint16( mchSys->sdrRep.size );
 
 	if ( !(raw = calloc( sdrCount, SDR_MAX_LENGTH ) ) ) {
-		errlogPrintf("mchSdrGetDataAll: No memory for raw SDR data for %s\n", mchData->name);
+		errlogPrintf("mchSdrGetDataAll: No memory for raw SDR data for %s\n", mchSess->name);
 		goto bail;
 	}
     
        	for ( i = 0; i < sdrCount; i++) {
 		       
-       		ipmiMsgGetSdr( mchData, response, id, res, offset, 0xFF, 0 );
+       		ipmiMsgGetSdr( mchSess, response, id, res, offset, 0xFF, 0 );
 
        		memcpy( raw + (i*SDR_MAX_LENGTH), response + IPMI_RPLY_GET_SDR_DATA_OFFSET, SDR_MAX_LENGTH );
 
@@ -481,15 +658,15 @@ size_t   responseSize;
        				break;
 
        			case SDR_TYPE_FULL_SENSOR:
-       				mchData->sensCount++;
+       				mchSys->sensCount++;
        				break;
 
        			case SDR_TYPE_COMPACT_SENSOR:
-       				mchData->sensCount++;
+       				mchSys->sensCount++;
        				break;
 
        			case SDR_TYPE_FRU_DEV:
-       				mchData->fruCount++;
+       				mchSys->fruCount++;
        				break;
        		}
        		lastId = arrayToUint16( id );
@@ -503,13 +680,13 @@ size_t   responseSize;
 
 	sdrCount = i;
 
-	if ( !(mchData->sens = calloc( mchData->sensCount, sizeof(*sens) ) ) ) {
-		errlogPrintf("mchSdrGetDataAll: No memory for sensor data for %s\n", mchData->name);
+	if ( !(mchSys->sens = calloc( mchSys->sensCount, sizeof(*sens) ) ) ) {
+		errlogPrintf("mchSdrGetDataAll: No memory for sensor data for %s\n", mchSess->name);
 		goto bail;
 	}
 
-	if ( !(mchData->fru = calloc( MAX_FRU , sizeof(*fru) ) ) ) {
-		errlogPrintf("mchSdrGetDataAll: No memory for FRU data for %s\n", mchData->name);
+	if ( !(mchSys->fru = calloc( MAX_FRU , sizeof(*fru) ) ) ) {
+		errlogPrintf("mchSdrGetDataAll: No memory for FRU data for %s\n", mchSess->name);
 		goto bail;
 	}
 
@@ -518,22 +695,21 @@ size_t   responseSize;
 		type = raw[i*SDR_MAX_LENGTH + SDR_REC_TYPE_OFFSET];
 
 		if ( (type == SDR_TYPE_FULL_SENSOR) || (type == SDR_TYPE_COMPACT_SENSOR) ) {
-			mchSdrFullSens( &(mchData->sens[iFull].sdr) , raw + i*SDR_MAX_LENGTH, type );
-			mchData->sens[iFull].instance = 0; /* Initialize instance to 0 */
+			mchSdrFullSens( &(mchSys->sens[iFull].sdr) , raw + i*SDR_MAX_LENGTH, type );
+			mchSys->sens[iFull].instance = 0; /* Initialize instance to 0 */
 
-			/* Save sensor reading response length for future reads (response varies per sensor) */
-			responseSize = mchData->sens[iFull].readMsgLength = 0;
-			ipmiMsgReadSensor( mchData, response, mchData->sens[iFull].sdr.number, addr, &responseSize );	
+			/* Save sensor reading response length for future reads (response length varies per sensor) */
+			responseSize = mchSys->sens[iFull].readMsgLength = 0;
+			ipmiMsgReadSensor( mchSess, response, mchSys->sens[iFull].sdr.number, addr, &responseSize );	
 
-			mchData->sens[iFull].readMsgLength = responseSize;
+			mchSys->sens[iFull].readMsgLength = responseSize;
 
 			iFull++;
-
 		}
 	        else if ( type == SDR_TYPE_FRU_DEV ) {
 			fruId = raw[SDR_FRU_ID_OFFSET + i*SDR_MAX_LENGTH];
-			mchSdrFruDev( &(mchData->fru[fruId].sdr), raw + i*SDR_MAX_LENGTH );
-			mchData->fru[iFru].instance = 0;     /* Initialize instance to 0 */
+			mchSdrFruDev( &(mchSys->fru[fruId].sdr), raw + i*SDR_MAX_LENGTH );
+			mchSys->fru[iFru].instance = 0;     /* Initialize instance to 0 */
 			iFru++;
 		}
 	}
@@ -541,11 +717,11 @@ size_t   responseSize;
 #ifdef DEBUG
 printf("mchSdrGetDataAll Sumary:\n");
 for ( i = 0; i < iFull; i++ ) {
-	sens = &mchData->sens[i];
+	sens = &mchSys->sens[i];
 	printf("SDR %i, %s entity ID %02x, entity inst %02x, sensor number %02x, sens type %02x, owner %02x, LUN %02x, RexpBexp %i, M %i, MTol %i, B %i, BAcc %i\n", i, sens->sdr.str, sens->sdr.entityId, sens->sdr.entityInst, sens->sdr.number, sens->sdr.sensType, sens->sdr.owner, sens->sdr.lun, sens->sdr.RexpBexp, sens->sdr.M, sens->sdr.MTol, sens->sdr.B, sens->sdr.BAcc);
 }
 for ( i = 0; i < MAX_FRU; i++ ) {
-	fru = &mchData->fru[i];
+	fru = &mchSys->fru[i];
 	if ( fru->sdr.entityInst )
 		printf("SDR %i, entity ID %02x, entity inst %02x, FRU id %02x, %s\n", i, fru->sdr.entityId, fru->sdr.entityInst, fru->sdr.fruId, fru->sdr.str);
 }
@@ -573,10 +749,12 @@ mchPing(void *arg)
 {
 MchDev  mch     = arg;
 MchData mchData = mch->udata;
-uint8_t message[MSG_MAX_LENGTH] = { 0 };
+MchSess mchSess = mchData->mchSess;
+uint8_t message[MSG_MAX_LENGTH]  = { 0 };
 uint8_t response[MSG_MAX_LENGTH] = { 0 };
 size_t  responseSize;
-int    *alive = &(mchIsAlive[mchData->instance]);
+int    *alive   = &(mchIsAlive[mchSess->instance]);
+int    *offline = &(mchWasOffline[mchSess->instance]);
 int     cos;
 
 	memcpy( message, RMCP_HEADER, sizeof( RMCP_HEADER ) );
@@ -590,13 +768,14 @@ int     cos;
 		cos = 0;
 		responseSize = IPMI_RPLY_PONG_LENGTH;
 
-		ipmiMsgWriteRead( mchData->name, message, sizeof ( RMCP_HEADER ) + sizeof( ASF_MSG ), response, &responseSize, RPLY_TIMEOUT );
+		ipmiMsgWriteRead( mchSess->name, message, sizeof( RMCP_HEADER ) + sizeof( ASF_MSG ), response, &responseSize, RPLY_TIMEOUT );
 
        		epicsMutexLock( mch->mutex );
 
 		if ( responseSize == 0 ) {
 			if ( *alive == MCH_STAT_OK ) { 
 				*alive = MCH_STAT_NORESPONSE;
+				*offline = 1;
 				cos = 1;
 			}
 		}
@@ -631,15 +810,26 @@ mchInit(const char *name)
 {
 MchDev  mch     = 0; /* Device support data structure */
 MchData mchData = 0; /* MCH-specific info */
+MchSess mchSess = 0;
+MchSys  mchSys  = 0;
 uint8_t i;
 char    taskName[50];
 FILE   *file;
 char    filename[60];
 asynStatus status;
 
-	/* Allocate memory for MCH data structure */
+	/* Allocate memory for MCH data structures */
 	if ( ! (mchData = calloc( 1, sizeof( *mchData ))) )
 		cantProceed("FATAL ERROR: No memory for MchData structure\n");
+
+	if ( ! (mchSess = calloc( 1, sizeof( *mchSess ))) )
+		cantProceed("FATAL ERROR: No memory for MchSess structure\n");
+
+	if ( ! (mchSys = calloc( 1, sizeof( *mchSys ))) )
+		cantProceed("FATAL ERROR: No memory for MchSys structure\n");
+
+	mchSess->instance = mchCounter++;
+	mchSysData[mchSess->instance] = mchSys;    
 
        	/* Allocate memory for MCH device support structure */
        	if ( ! (mch = calloc( 1, sizeof( *mch ) )) )
@@ -648,14 +838,18 @@ asynStatus status;
        	if ( ! (mch = devMchRegister( name )) )
        		errlogPrintf("FATAL ERROR: Unable to register MCH %s with device support\n", name);
 
-       	mchData->name = mch->name;
+	mchData->mchSess = mchSess;
+
+       	mchSess->name = mch->name;
+       	mchSys->name  = mch->name;
        	mch->udata = mchData;
 
-	mchData->timeout = 1.0; /* Shorter timeout during init because we do not always know response msg length */
-	mchData->session = 1;   /* Default: enable session with MCH */
+       	mchSess->timeout = RPLY_TIMEOUT;
+	mchSess->session = 1;   /* Default: enable session with MCH */
+	mchSess->err     = 0;   /* Count of message errors */
 
 	/* Create empty file to load DB records */
-	sprintf( filename, "st.%s.cmd", mchData->name );
+	sprintf( filename, "st.%s.cmd", mchSess->name );
 	file = fopen( filename, "w" ); 
 	if ( !file )
 		errlogPrintf("Failed to create file %s.\n", filename);
@@ -663,43 +857,40 @@ asynStatus status;
 		fclose( file );
 
 	/* Start task to periodically ping MCH */
-	mchData->instance = mchCounter++;
 	sprintf( taskName, "%s-PING", mch->name ); 
-	mchData->pingThreadId = epicsThreadMustCreate( taskName, epicsThreadPriorityMedium, epicsThreadGetStackSize(epicsThreadStackMedium), mchPing, mch );
+	mchSess->pingThreadId = epicsThreadMustCreate( taskName, epicsThreadPriorityMedium, epicsThreadGetStackSize(epicsThreadStackMedium), mchPing, mch );
 
-	/* Wait for one ping cycle */ 
+	/* Wait for updated status from ping thread */ 
 	epicsThreadSleep( PING_PERIOD ); 
 
-	if ( mchIsAlive[mchData->instance] ) {
+	if ( mchIsAlive[mchSess->instance] ) {
 
 		epicsMutexLock( mch->mutex );
 
 		/* Initiate communication session with MCH */
-		mchCommStart( mchData );
+		mchCommStart( mchSess );
 
 		/* Get SDR data */
-		mchSdrGetDataAll( mchData );
+		mchSdrGetDataAll( mchSess, mchSys );
 
 		/* Get FRU data */
-		mchFruGetDataAll( mchData );
+		mchFruGetDataAll( mchSess, mchSys );
 
 		/* Get Sensor/FRU association */
-		for ( i = 0; i < mchData->sensCount; i++ )
-			mchSensorGetFru( mchData, i );
+		for ( i = 0; i < mchSys->sensCount; i++ )
+			mchSensorGetFru( mchSys, i );
 
-		mchSensorFruGetInstance( mchData );
+		mchSensorFruGetInstance( mchSys );
 
-		mchInitDone[mchData->instance] = 1;
+		mchInitDone[mchSess->instance] = MCH_INIT_DONE;
 
 		epicsMutexUnlock( mch->mutex );
-
-		mchData->timeout = RPLY_TIMEOUT;
 	}
 	else
 		errlogPrintf("No response from %s; cannot complete initialization\n",mch->name);
 
        	/* Create script to load records; done at init with no other threads modifying mchData, so need to lock */
-       	sensorFruRecordScript( mchData, mchInitDone[mchData->instance] );
+       	sensorFruRecordScript( mchSys, mchInitDone[mchSess->instance] );
 
 }
 
