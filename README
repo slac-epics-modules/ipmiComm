@@ -12,7 +12,7 @@ To add MicroTCA IPMI support to your application:
 
 1. Add to configure/RELEASE:
 
-IPMICOMM_MODULE_VERSION=working
+IPMICOMM_MODULE_VERSION=ipmiComm-R*-*-*
 IPMICOMM=$(EPICS_MODULES)/ipmiComm/$(IPMICOMM_MODULE_VERSION)
 
 2. Add to src/Makefile
@@ -30,7 +30,7 @@ DB_INSTALLS += $(IPMICOMM)/db/sensor_hotswap.db
 DB_INSTALLS += $(IPMICOMM)/db/sensor_voltage.db
 DB_INSTALLS += $(IPMICOMM)/db/sensor_current.db
 
-4. Add these lines to st.cmd for each MCH/shelf - *order is important*
+4. Add these lines to st.cmd for each MCH/shelf before iocInit. *Order is important*
 
 Example for crat-b34-cd38, whose DNS node name is actually mch-b34-cd38:
 
@@ -40,15 +40,26 @@ mchInit("crat-b34-cd38")
 < st.crat-b34-cd38.cmd
 
 
-NOTES ON FIRST RELEASE
+NOTES ON THIS RELEASE
 ---------------------------
+
+(below, 'ioc' refers to the managment ioc using ipmiComm to communicate 
+ with a remote crate. at LCLS, this ioc is a soft ioc called IOCManager.)
 
 -During ioc boot, the ioc will discover which modules/sensors exist
  for each carrier defined in st.cmd. It will then build a script to 
  load EPICS records for what has been discovered. The script is saved
- to the ioc's boot directory. The script is not in CVS. Any carriers
+ to the ioc's data directory. The script is not in CVS. Any carriers
  that are offline during ioc boot will not have scripts created for them
  and thus, no PVs will be loaded for them.
+
+-There is a EPICS PV $(crat):INIT for each crate. It is set to "Initialized"
+ after all of the modules/sensors have been discovered. It is set to "Not
+ initialized" if the software detects that the system has gone offline. This is
+ because sensor addresses can change when new hardware is removed or reinstalled
+ and we cannot be sure we are correctly addressing the sensors when the system
+ comes back up. If INIT = "Not initialized", the ioc must be rebooted in order
+ to re-discover the modules/sensors and resume system monitoring.
 
 -No alarm limits or severities have been implemented.
 
