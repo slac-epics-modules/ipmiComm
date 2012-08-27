@@ -621,7 +621,7 @@ uint8_t  imsg2[imsg2Size];
 uint8_t  bmsg1[bmsg1Size];
 uint8_t  bmsg2[bmsg2Size];
 size_t   messageSize;
-size_t   responseSize = 0;
+size_t   responseSize = IPMI_RPLY_GET_SDRREP_INFO_LENGTH;
 
 	memcpy( imsg2, SEND_MSG_MSG , imsg2Size );
 	memcpy( bmsg1, IPMI_MSG1    , bmsg1Size );
