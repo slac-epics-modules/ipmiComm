@@ -1,3 +1,14 @@
+27Aug2012 (SH)
+src/drvMch.c/.h - Break mchData struct into mchSess (session-related) and mchSys
+  (system data). If system was offline, check that all installed FRUs are the same.
+   If they are not, set "not initialized" flag, which sets sensor records to INVALID.
+src/ipmiMsg.c/.h - Return asyn status from all msg routines. Use mchSess struct
+   instead of mchData. Count msg errors, when reaches 10, restart session.
+src/devMch.c and ipmiComm.dbd - Add devBiMch bi support with i/o scan support.
+   Add support for "initialized" record. Use mchSess/mchSys instead of mchData.
+Db/shelf_default.db - New INIT and INITBYP records to reflect if the saved 
+   system configuration matches the actual system configuration. Change STAT to bi.
+
 14Aug2012 (SH)
 Add PV to enable/disable communication with MCH. Disable closes session.
   Change device support so that it checks enable/disable before sending message.
