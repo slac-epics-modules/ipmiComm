@@ -27,10 +27,10 @@ FILE *file;
 }
 
 void
-mchSensorFruGetInstance(MchData mchData)
+mchSensorFruGetInstance(MchSys mchSys)
 {
 int     f = MAX_FRU;
-int     s = mchData->sensCount;
+int     s = mchSys->sensCount;
 uint8_t fruEntId[f];                         /* Entity IDs */
 uint8_t fruEntInst[f];                       /* Counts of each ID */
 uint8_t sensTypeInst[f][MAX_SENSOR_TYPE];    /* Counts of sensor type per ID instance */
@@ -44,7 +44,7 @@ Sensor  sens;
 
 	for ( i = 0; i < f; i++ ) {
 
-		fru   = &mchData->fru[i];
+		fru   = &mchSys->fru[i];
                 id    = fru->sdr.fruId;
 		found = 0;
 
@@ -91,9 +91,9 @@ Sensor  sens;
 		/* Find sensors associated with this FRU, assign each an instance based on sensor type */
 		for ( j = 0; j < s; j++ ) {
 
-			sens = &mchData->sens[j];
+			sens = &mchSys->sens[j];
 
-			if ( mchData->fru[sens->fruIndex].sdr.fruId == id ) {
+			if ( mchSys->fru[sens->fruIndex].sdr.fruId == id ) {
 
 				/* If a real entity */
 				if ( fru->sdr.entityInst ) {
@@ -123,11 +123,11 @@ Sensor  sens;
 	}
 
 #ifdef DEBUG
-printf("mchSensorFruGetInstance: Found %i matching sensors, total sensor count is %i\n",sensCount, mchData->sensCount);
-for ( i = 0; i < mchData->sensCount; i++ ) {
-	sens = &mchData->sens[i];
+printf("mchSensorFruGetInstance: Found %i matching sensors, total sensor count is %i\n",sensCount, mchSys->sensCount);
+for ( i = 0; i < mchSys->sensCount; i++ ) {
+	sens = &mchSys->sens[i];
 	int fruIndex = sens->fruIndex;
-	fru  = &mchData->fru[fruIndex];
+	fru  = &mchSys->fru[fruIndex];
 	printf("Sensor %i, type %02x, inst %i, FRU entId %02x, entInst %02x, sens entId %02x  entInst %02x\n",sens->sdr.number, sens->sdr.sensType, sens->instance, fru->sdr.entityId, fru->sdr.entityInst, sens->sdr.entityId, sens->sdr.entityInst);
 }
 #endif
@@ -140,7 +140,7 @@ for ( i = 0; i < mchData->sensCount; i++ ) {
  * sensors we discovered.
  */
 void
-sensorFruRecordScript(MchData mchData, int p)
+sensorFruRecordScript(MchSys mchSys, int p)
 {
 FILE    *file;
 uint8_t  i, fruIndex;
@@ -153,17 +153,17 @@ int      found, inst;
 
 	/* Convert node name to PV device name */
 	for ( i = 0; i < sizeof( dev ); i++ ) {
-		if ( mchData->name[i] == (int)NULL)
+		if ( mchSys->name[i] == (int)NULL)
 			break;
 
-		if ( mchData->name[i] == '-' )
+		if ( mchSys->name[i] == '-' )
 			dev[i] = ':';
 		else
-			dev[i] = toupper( mchData->name[i] );
+			dev[i] = toupper( mchSys->name[i] );
 	}
 	dev[i] = '\0';
 
-	sprintf( stFile, "st.%s.cmd", mchData->name );
+	sprintf( stFile, "st.%s.cmd", mchSys->name );
 
 	/* If file already exists, do not make new one 
 	if ( (file = fopen( stFile, "r" )) ) {
@@ -172,43 +172,43 @@ int      found, inst;
 	}
 	*/
 
-	errlogPrintf("%s does not exist. Creating...\n", stFile);
+	errlogPrintf("Creating %s...\n", stFile);
 
 	file = fopen( stFile, "w" ); 
 
 	if ( file ) {	      
 
-	       	fprintf( file, "dbLoadRecords(\"${TOP}/db/shelf.db\",\"dev=%s,link=%s\")\n", dev, mchData->name);
+	       	fprintf( file, "dbLoadRecords(\"${TOP}/db/shelf.db\",\"dev=%s,link=%s\")\n", dev, mchSys->name);
 
 		/* If we have the info to populate our records */
 		if ( p ) {
 
 			for ( i = 0; i < MAX_FRU; i++ ) {
 
-				fru = &mchData->fru[i];
+				fru = &mchSys->fru[i];
 
 				/* If we identified this FRU */
 				if ( fru->sdr.entityInst ) {
 					fprintf( file, "dbLoadRecords(\"${TOP}/db/module.db\",\"dev=%s,link=%s,code=%s,fruid=%i,inst=%i,index=%i,temp=%i,fan=%i,v=%i\")\n", /* continue next line */
-					dev, mchData->name, fru->parm, fru->sdr.fruId, fru->instance, i, fru->tempCnt, fru->fanCnt, fru->vCnt );
+					dev, mchSys->name, fru->parm, fru->sdr.fruId, fru->instance, i, fru->tempCnt, fru->fanCnt, fru->vCnt );
 
 					if ( (i >= UTCA_FRU_TYPE_CU_MIN) && (i <= UTCA_FRU_TYPE_CU_MAX) )
 						fprintf( file, "dbLoadRecords(\"${TOP}/db/module_cu.db\",\"dev=%s,link=%s,code=%s,fruid=%i,inst=%i\")\n", /* continue next line */
-						dev, mchData->name, fru->parm, fru->sdr.fruId, fru->instance );
+						dev, mchSys->name, fru->parm, fru->sdr.fruId, fru->instance );
 				}
 
 			}	
 			
-			for ( i = 0; i < mchData->sensCount; i++ ) {
+			for ( i = 0; i < mchSys->sensCount; i++ ) {
 
-				sens = &mchData->sens[i];
+				sens = &mchSys->sens[i];
 				found = 0;
 
 				/* If we've associated this sensor with a FRU and given it an instance */
 				if ( sens->instance ) {
 
 					fruIndex = sens->fruIndex;	
-					    fru   = &mchData->fru[fruIndex];    
+					    fru   = &mchSys->fru[fruIndex];    
 					inst  = fru->instance;
 					sprintf( code, "%s", fru->parm );
 
@@ -250,7 +250,7 @@ int      found, inst;
 
 					if ( found )
 						fprintf( file, "dbLoadRecords(\"${TOP}/db/%s\",\"dev=%s,link=%s,code=%s,inst=%i,sensInst=%i,sens=%i,desc=%s\")\n", /* continue next line */
-						dbFile, dev, mchData->name, code, inst, sens->instance, i, desc );
+						dbFile, dev, mchSys->name, code, inst, sens->instance, i, desc );
 				}
 			}
 

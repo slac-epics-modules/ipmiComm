@@ -29,10 +29,10 @@ mchCreateFile(const char *filename);
  *   locations with Cooling Unit 1.
  */
 void
-mchSensorFruGetInstance(MchData mchData);
+mchSensorFruGetInstance(MchSys mchSys);
 
 void
-sensorFruRecordScript(MchData mchData, int p);
+sensorFruRecordScript(MchSys mchSys, int p);
 
 #ifdef __cplusplus
 };
