@@ -897,15 +897,13 @@ size_t   responseSize;
 		if ( !(strcmp( task, "FAN" )) ) {
 
 			value = ( mchSys->fru[index].fanProp & (1<<7) ) ? 1 : 0;
-
 			pmbbi->rval = value;
 		}
 
-		else if ( !(strcmp( task, "INIT" )) ) {
+		else if ( !(strcmp( task, "INIT" )) )
 
 			pmbbi->rval = mchInitDone[mchSess->instance];
-printf("read_mbbi %i %i\n",pmbbi->rval, mchInitDone[mchSess->instance]);
-}
+
 		else if ( !(strcmp( task, "HS")) && mchSess->session && mchInitDone[mchSess->instance] ) {
 
 			if ( mchIsAlive[mchSess->instance] ) {
@@ -923,12 +921,10 @@ printf("read_mbbi %i %i\n",pmbbi->rval, mchInitDone[mchSess->instance]);
 
 				epicsMutexUnlock( mch->mutex );
 
-		if ( s ) {
-			recGblSetSevr( pmbbi, READ_ALARM, INVALID_ALARM );
-			return ERROR;
-		}
-
-
+				if ( s ) {
+					recGblSetSevr( pmbbi, READ_ALARM, INVALID_ALARM );
+					return ERROR;
+				}
 				pmbbi->rval = value;
 			}
 		}	
