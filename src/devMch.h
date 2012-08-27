@@ -16,6 +16,7 @@ extern "C" {
 #endif
 
 IOSCANPVT drvMchStatScan;
+IOSCANPVT drvMchInitScan;
 
 /* Much of this stolen from devBusMapped */
 
