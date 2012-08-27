@@ -38,7 +38,7 @@ int mchWasOffline[MAX_MCH] = { 0 };
 /* MCH system info, frus, sensors, etc. */
 MchSys mchSysData[MAX_MCH] = { 0 };
 
-void mchSdrGetDataAll(MchSess mchSess, MchSys mchSys);
+int  mchSdrGetDataAll(MchSess mchSess, MchSys mchSys);
 void mchFruGetDataAll(MchSess mchSess, MchSys mchSys);
 
 /* Compare installed FRUs with those stored in mchData structure.
@@ -497,7 +497,7 @@ Sensor sens = &mchSys->sens[index];
  *
  * Caller must perform locking.
  */
-void
+int
 mchSdrRepGetInfo(MchSess mchSess, MchSys mchSys)
 {
 uint8_t response[MSG_MAX_LENGTH] = { 0 };
@@ -507,7 +507,7 @@ uint8_t flags;
 
 	if ( response[IPMI_RPLY_COMPLETION_CODE_OFFSET] ) {
 		errlogPrintf("mchSdrRepGetInfo: Error reading SDR Repository info for %s\n", mchSess->name);
-		return;
+		return -1;
 	}
 
 	mchSys->sdrRep.ver     = response[IPMI_RPLY_SDRREP_VER_OFFSET];
@@ -517,7 +517,7 @@ uint8_t flags;
 	ipmiMsgGetDevSdrInfo( mchSess, response, 1 );
 
 	if ( response[IPMI_RPLY_COMPLETION_CODE_OFFSET] )
-		return;
+		return 0; /* We don't currently use dev sdr, so don't return error */
 
        	mchSys->sdrRep.devSdrSize = response[IPMI_RPLY_DEV_SDR_CNT_OFFSET];
 	flags = response[IPMI_RPLY_DEV_SDR_FLAGS_OFFSET];
@@ -526,6 +526,8 @@ uint8_t flags;
        	mchSys->sdrRep.lun1       = DEV_SENSOR_LUN1(flags);
        	mchSys->sdrRep.lun2       = DEV_SENSOR_LUN2(flags);
        	mchSys->sdrRep.lun3       = DEV_SENSOR_LUN3(flags);
+
+	return 0;
 }
 
 /* 
@@ -621,7 +623,7 @@ int n, l, i;
  *
  * Caller must perform locking.
  */				  
-void				  
+int				  
 mchSdrGetDataAll(MchSess mchSess, MchSys mchSys)
 {
 uint8_t  response[MSG_MAX_LENGTH] = { 0 };
@@ -637,7 +639,8 @@ uint8_t *raw    = 0;
 int      i, iFull = 0, iFru = 0, fruId;
 size_t   responseSize;
 
-	mchSdrRepGetInfo( mchSess, mchSys );
+	if ( mchSdrRepGetInfo( mchSess, mchSys ) )
+		return -1;
 
 	sdrCount = arrayToUint16( mchSys->sdrRep.size );
 
@@ -814,9 +817,6 @@ MchSess mchSess = 0;
 MchSys  mchSys  = 0;
 uint8_t i;
 char    taskName[50];
-FILE   *file;
-char    filename[60];
-asynStatus status;
 
 	/* Allocate memory for MCH data structures */
 	if ( ! (mchData = calloc( 1, sizeof( *mchData ))) )
@@ -846,15 +846,6 @@ asynStatus status;
 
        	mchSess->timeout = RPLY_TIMEOUT;
 	mchSess->session = 1;   /* Default: enable session with MCH */
-	mchSess->err     = 0;   /* Count of message errors */
-
-	/* Create empty file to load DB records */
-	sprintf( filename, "st.%s.cmd", mchSess->name );
-	file = fopen( filename, "w" ); 
-	if ( !file )
-		errlogPrintf("Failed to create file %s.\n", filename);
-	else
-		fclose( file );
 
 	/* Start task to periodically ping MCH */
 	sprintf( taskName, "%s-PING", mch->name ); 
@@ -871,18 +862,21 @@ asynStatus status;
 		mchCommStart( mchSess );
 
 		/* Get SDR data */
-		mchSdrGetDataAll( mchSess, mchSys );
+		if ( !mchSdrGetDataAll( mchSess, mchSys ) ) {
 
-		/* Get FRU data */
-		mchFruGetDataAll( mchSess, mchSys );
+			/* Get FRU data */
+			mchFruGetDataAll( mchSess, mchSys );
 
-		/* Get Sensor/FRU association */
-		for ( i = 0; i < mchSys->sensCount; i++ )
-			mchSensorGetFru( mchSys, i );
+			/* Get Sensor/FRU association */
+			for ( i = 0; i < mchSys->sensCount; i++ )
+				mchSensorGetFru( mchSys, i );
 
-		mchSensorFruGetInstance( mchSys );
+			mchSensorFruGetInstance( mchSys );
 
-		mchInitDone[mchSess->instance] = MCH_INIT_DONE;
+			mchInitDone[mchSess->instance] = MCH_INIT_DONE;
+		}
+		else
+			errlogPrintf("Failed to read %s SDR; cannot complete initialization\n",mch->name);
 
 		epicsMutexUnlock( mch->mutex );
 	}
