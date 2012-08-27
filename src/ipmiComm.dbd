@@ -1,6 +1,7 @@
 driver(drvMch)
 device(ai,VME_IO,devAiMch,"MCHsensor")
 device(bo,VME_IO,devBoMch,"MCHsensor")
+device(bi,VME_IO,devBiMch,"MCHsensor")
 device(mbbi,VME_IO,devMbbiMch,"MCHsensor")
 device(mbbo,VME_IO,devMbboMch,"MCHsensor")
 device(ai,VME_IO,devAiFru,"FRUinfo")
