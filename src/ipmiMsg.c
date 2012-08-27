@@ -16,7 +16,9 @@
 
 volatile int IPMICOMM_DEBUG = 0; 
 
-/* Convert 2-element array (which stores LS byte first) to integer */
+/* 
+ * Convert 2-element uint8_t array (which stores LS byte first) to 16-bit integer 
+ */
 uint16_t 
 arrayToUint16(uint8_t *data )
 {
@@ -29,7 +31,8 @@ uint16_t value = 0;
 	return value;
 }
 
-/* Increment value of 2-element uint8_t array (which stores LS byte first)
+/* 
+ * Increment value of 2-element uint8_t array (which stores LS byte first)
  * Roll over to 0 when max possible value is reached.
  */
 void 
@@ -50,7 +53,9 @@ uint16_t value = 0;
 		*data++ = (value >> i*8) & 0xFF;	
 }
 
-/* Convert 4-element array (which stores LS byte first) to integer */
+/* 
+ * Convert 4-element uint8_t array (which stores LS byte first) to 32-bit integer 
+ */
 uint32_t 
 arrayToUint32(uint8_t *data)
 {
@@ -63,7 +68,8 @@ uint32_t value = 0;
 	return value;
 }
 
-/* Increment value of 4-element uint8_t array (which stores LS byte first)
+/* 
+ * Increment value of 4-element uint8_t array (which stores LS byte first)
  * Roll over to 0 when max possible value is reached.
  */
 void 
@@ -85,6 +91,10 @@ uint32_t    value  = 0;
 		*data++ = (value >> i*8) & 0xFF;	
 }
 
+/*
+ * Given pointer to uint8_t data array and size of array,
+ * calculate and return the two's complement checksum
+ */
 uint8_t
 calcTwosComplementChecksum(uint8_t *data, unsigned n)
 {
@@ -103,25 +113,25 @@ uint32_t cs = 0;
  * depending on message type. Copy to header.
  */
 void
-ipmiMsgSetSeqId(MchData mchData, uint8_t *message, uint8_t cmd)
+ipmiMsgSetSeqId(MchSess mchSess, uint8_t *message, uint8_t cmd)
 {
 int i;
 	/* Session sequence number is not incremented (or used) for messages outside of a session */
 	if ( cmd != IPMI_MSG_CMD_GET_CHAN_AUTH && cmd != IPMI_MSG_CMD_GET_SESSION_CHALLENGE && cmd != IPMI_MSG_CMD_ACTIVATE_SESSION && cmd != IPMI_MSG_CMD_SET_PRIV_LEVEL && cmd )
-		incr4Uint8Array( mchData->seqSend , 1 );
+		incr4Uint8Array( mchSess->seqSend , 1 );
 
 	/* Close Session command contains the session ID */
 	if ( cmd == IPMI_MSG_CMD_CLOSE_SESSION ) {
 		for ( i = 0; i < IPMI_MSG2_ID_LENGTH ; i++)
-			message[IPMI_MSG2_ID_OFFSET + i] = mchData->id[i];
+			message[IPMI_MSG2_ID_OFFSET + i] = mchSess->id[i];
 	}
 
 	/* Copy data to IPMI header */
 	for ( i = 0; i < IPMI_MSG_HDR_SEQ_LENGTH ; i++)
-		message[IPMI_MSG_HDR_SEQ_OFFSET + i] = mchData->seqSend[i];
+		message[IPMI_MSG_HDR_SEQ_OFFSET + i] = mchSess->seqSend[i];
 
 	for ( i = 0; i < IPMI_MSG_HDR_ID_LENGTH ; i++)
-		message[IPMI_MSG_HDR_ID_OFFSET + i]  = mchData->id[i];
+		message[IPMI_MSG_HDR_ID_OFFSET + i]  = mchSess->id[i];
 }
 
 /*
@@ -139,7 +149,7 @@ int i;
  *            number of bytes in message
  */
 int			                    
-ipmiMsgBuild(MchData mchData, uint8_t *message, uint8_t cmd, uint8_t *imsg2, size_t imsg2Size, uint8_t *bmsg1, size_t bmsg1Size, uint8_t *bmsg2, size_t bmsg2Size)
+ipmiMsgBuild(MchSess mchSess, uint8_t *message, uint8_t cmd, uint8_t *imsg2, size_t imsg2Size, uint8_t *bmsg1, size_t bmsg1Size, uint8_t *bmsg2, size_t bmsg2Size)
 {
 size_t   iheaderSize = sizeof(IPMI_HEADER); 
 size_t   imsg1Size   = sizeof(IPMI_MSG1);
@@ -151,12 +161,12 @@ uint8_t  cs2;
 	memcpy( iheader, IPMI_HEADER, iheaderSize );
 	memcpy( imsg1,   IPMI_MSG1  , imsg1Size   );
 
-	ipmiMsgSetSeqId( mchData, iheader, cmd );
+	ipmiMsgSetSeqId( mchSess, iheader, cmd );
 
 	/* Activate Session command echoes the challenge string */
 	if ( cmd == IPMI_MSG_CMD_ACTIVATE_SESSION ) {
 		for ( i = 0; i < IPMI_MSG2_STR_LENGTH ; i++)
-			imsg2[IPMI_MSG2_STR_OFFSET + i] = mchData->str[i];
+			imsg2[IPMI_MSG2_STR_OFFSET + i] = mchSess->str[i];
 	}
 
 	/* Number of bytes in message */
@@ -174,6 +184,15 @@ uint8_t  cs2;
 	/* Calculate checksums */
 	imsg1[imsg1Size - 1] = calcTwosComplementChecksum( (uint8_t *)imsg1, imsg1Size - 1 );
 	cs2 = imsg2[imsg2Size - 1] = calcTwosComplementChecksum( (uint8_t *)imsg2, imsg2Size - 1 );
+
+	/* This isn't working. Waiting for response from Vadatech.
+	Set IPMI sequence number 
+       	imsg2[IPMI_MSG2_SEQLUN_OFFSET] += mchSess->seq << 2;
+	
+       	if ( mchSess->seq >= 0x3F )
+       		mchSess->seq = 1;
+       	else
+       		mchSess->seq++; */
 
 	offset += iheaderSize;
 	memcpy( message + offset, imsg1, imsg1Size );
@@ -206,8 +225,10 @@ uint8_t  cs2;
  * Send message and read response
  * 
  * responseSize is the expected response length. It is 0 if the response length is not known.
- * In that case, set it to MSG_MAX_LENGTH. Because we don't always know the response length, 
+ * In that case, set it to MSG_MAX_LENGTH.  When we don't know the response length, 
  * asyn may return status 'timeout', which we ignore.
+ *
+ *   RETURNS: asyn status from write/read
  */
 int
 ipmiMsgWriteRead(const char *name, uint8_t *message, size_t messageSize, uint8_t *response, size_t *responseSize, double timeout)
@@ -231,102 +252,126 @@ int        i;
 
 	pasynManager->freeAsynUser( pasynUser );
 
-	if ( IPMICOMM_DEBUG && status )
-		printf("%s Message status %i, received %i, expected %i, timeout %.1f\n", name, status, responseLen, *responseSize, timeout );
+	if ( IPMICOMM_DEBUG ) {
 
-	if ( IPMICOMM_DEBUG > 3 ) {
-		printf("%s Message status %i, received %i, expected %i, raw data:\n", name, status, responseLen, *responseSize );
-		for ( i = 0; i < MSG_MAX_LENGTH; i++ )
-			printf("%02x ", response[i]);
-		printf("\n");
+		if ( status )
+			printf("%s Message status %i, received %i, expected %i, timeout %.1f\n", name, status, responseLen, *responseSize, timeout );
+
+		if ( IPMICOMM_DEBUG > 3 ) {
+			printf("%s Message status %i, received %i, expected %i, raw data:\n", name, status, responseLen, *responseSize );
+			for ( i = 0; i < MSG_MAX_LENGTH; i++ )
+				printf("%02x ", response[i]);
+			printf("\n");
+		}
 	}
 
 	*responseSize = responseLen;
 
-	if ( status )
-		return -1;
-
-	return 0;
+	return status;
 }
 
 
-/* Used for bridged mesages
+/* 
+ * Used for bridged mesages
  *
  * Call ipmiMsgWriteRead. 
- * If there is no response but MCH is alive, start a new session and then optionally
- * re-send original message.
+ * If error, increment error count. Else, set error count back to zero.
+ * If MCH is alive, but there is no response or error count reaches 10,
+ * start a new session and return error. 
+ * Check session sequence, completion code.
  *
  *   RETURNS: 0 if non-zero response
  *           -1 if error, no response, or failed to start new session
  */
 int
-ipmiMsgWriteReadHelper(MchData mchData, uint8_t *message, size_t messageSize, uint8_t *response, size_t *responseSize)
+ipmiMsgWriteReadHelper(MchSess mchSess, uint8_t *message, size_t messageSize, uint8_t *response, size_t *responseSize)
 {
 int      i, status;
+uint8_t  ipmiSeq = 0;
+int      ipmiSeqOffs = IPMI_RPLY_BRIDGED_SEQLUN_OFFSET;
 uint8_t  seq[4];
 uint32_t seqInt;
 uint32_t seqRplyInt;
+int      err = 0;
 
-       	if ( mchIsAlive[mchData->instance] ) {
+       	if ( mchIsAlive[mchSess->instance] ) {
 
-		status = ipmiMsgWriteRead( mchData->name, message, messageSize, response, responseSize, mchData->timeout );
+		status = ipmiMsgWriteRead( mchSess->name, message, messageSize, response, responseSize, mchSess->timeout );
 
-		if ( *responseSize == 0 ) {
+		/* Verify correct IPMI sequence 
+		ipmiSeq = (response[ipmiSeqOffs] && 0xFC) >> 2;
 
-       			/* Start new session */
-       			if ( mchNewSession( mchData ) )
-       				return -1;
+		if ( ipmiSeq != mchSess->seq ) {
+			printf("%s Incorrect IPMI sequence; got %i %i but expected %i\n", mchSess->name, response[ipmiSeq], ipmiSeq, mchSess->seq );
+			return -1;
+		} */
+
+
+		if ( (*responseSize == 0) || (mchSess->err > 9) ) {
+
+			if ( IPMICOMM_DEBUG )
+				printf("%s start new session; err count is %i\n", mchSess->name, mchSess->err);
+
+			mchSess->err = 0;
+
+       			/* Close current session, start new one, and return error */
+			ipmiMsgCloseSess( mchSess, response );
+       			mchNewSession( mchSess );
+       		       	return -1;
 		}
 		else {
-			/* Extract sequence number from reply */
+			/* Extract session sequence number from reply */
        			for ( i = 0; i < IPMI_RPLY_SEQ_LENGTH ; i++)
        				seq[i] = response[IPMI_RPLY_BRIDGED_SEQ_OFFSET + i];
 	       
-
 			seqInt     = arrayToUint32( seq );
-			seqRplyInt = arrayToUint32( mchData->seqRply );
+			seqRplyInt = arrayToUint32( mchSess->seqRply );
 
-			/* Check sequence number. If it is 0, we did not receive a second message,
-                         * so increment our stored seq number by 1. Else, if seq number is not 
+			/* Check session sequence number. If it is 0, we probably did not receive a second message,
+                         * so increment our stored seq number by 1 and set error. Else, if seq number is not 
 			 * increasing or more than 7 counts higher than last time, increment stored 
-                         * seq number by 2 (for the 2 responses). Else store sequence number.
+                         * seq number by 2 (for the 2 responses) and set error. Else store sequence number.
                          *
                          * If seq number error, ipmiMsgWriteRead returned error, or completion code
                          * non-zero, return error.
                          */
 			if ( seqInt == 0 ) {
 				if ( IPMICOMM_DEBUG )
-					printf("%s received 0 sequence number\n", mchData->name);
+					printf("%s received 0 sequence number\n", mchSess->name);
 				if ( IPMICOMM_DEBUG > 1 ) {
-					printf("%s msg raw:\n", mchData->name);
+					printf("%s msg raw:\n", mchSess->name);
 					for ( i = 0; i < *responseSize; i++ )
 						printf("%02x ", response[i]);
 					printf("\n");
 				}
-				incr4Uint8Array( mchData->seqRply, 1);
-				return -1;
-			}
-				
+				incr4Uint8Array( mchSess->seqRply, 1 );
+				err = 1;
+			}				
 			else if ( (seqInt <= seqRplyInt) || (seqInt - seqRplyInt > 7) ) {
 				if ( IPMICOMM_DEBUG > 1 )
-					printf("%s sequence number %i, previous %i\n", mchData->name, seqInt, seqRplyInt);
-				incr4Uint8Array( mchData->seqRply, 2);
-				return -1;
+					printf("%s sequence number %i, previous %i\n", mchSess->name, seqInt, seqRplyInt);
+				incr4Uint8Array( mchSess->seqRply, 2 );
+				err = 1;
 			}
-
 			else if ( status ) {
 				for ( i = 0; i < IPMI_RPLY_SEQ_LENGTH ; i++)
-					mchData->seqRply[i] = seq[i];
-				return -1;
+					mchSess->seqRply[i] = seq[i];
 			}
 			else {
 				for ( i = 0; i < IPMI_RPLY_SEQ_LENGTH ; i++)
-					mchData->seqRply[i] = seq[i];
+					mchSess->seqRply[i] = seq[i];
 			}
 
 			if ( response[IPMI_RPLY_COMPLETION_CODE_OFFSET] )
-				return -1;	
-		}			
+				err = 1;	
+		}
+
+	       	if ( err ) {
+	       		mchSess->err++;
+	       		return -1;
+	       	}
+	       	else
+	       		mchSess->err = 0;
        	}
 						
        	else
@@ -344,39 +389,38 @@ uint32_t seqRplyInt;
  *    Set Session Privilege
  *
  * Messages sent outside of a session or to close a session 
- * use ipmiMsgWriteRead directly, which does not try to re-send 
- * or start a new session.
+ * use ipmiMsgWriteRead directly, which does not try to start a new session.
  */
 
 /* Get Channel Authentication Capabilities */
-void
-ipmiMsgGetChanAuth(MchData mchData, uint8_t *data)
+int
+ipmiMsgGetChanAuth(MchSess mchSess, uint8_t *data)
 {
 uint8_t  message[MSG_MAX_LENGTH] = { 0 };
 uint8_t *imsg2        = GET_AUTH_MSG;
 size_t   imsg2Size    = sizeof( GET_AUTH_MSG );
-size_t   messageSize  = ipmiMsgBuild( mchData, message, IPMI_MSG_CMD_GET_CHAN_AUTH, imsg2, imsg2Size, 0, 0, 0, 0 );
+size_t   messageSize  = ipmiMsgBuild( mchSess, message, IPMI_MSG_CMD_GET_CHAN_AUTH, imsg2, imsg2Size, 0, 0, 0, 0 );
 size_t   responseSize = IPMI_RPLY_GET_CHAN_AUTH_LENGTH;
 
-	ipmiMsgWriteRead( mchData->name, message, messageSize, data, &responseSize, RPLY_TIMEOUT );
+	return ipmiMsgWriteRead( mchSess->name, message, messageSize, data, &responseSize, RPLY_TIMEOUT );
 }
 
 /* Get Session Challenge */
-void
-ipmiMsgGetSess(MchData mchData, uint8_t *data)
+int
+ipmiMsgGetSess(MchSess mchSess, uint8_t *data)
 {
 uint8_t  message[MSG_MAX_LENGTH] = { 0 };
 uint8_t *imsg2        = GET_SESS_MSG;
 size_t   imsg2Size    = sizeof( GET_SESS_MSG );
-size_t   messageSize  = ipmiMsgBuild( mchData, message, IPMI_MSG_CMD_GET_SESSION_CHALLENGE, imsg2, imsg2Size, 0, 0, 0, 0 );
+size_t   messageSize  = ipmiMsgBuild( mchSess, message, IPMI_MSG_CMD_GET_SESSION_CHALLENGE, imsg2, imsg2Size, 0, 0, 0, 0 );
 size_t   responseSize = IPMI_RPLY_GET_SESSION_CHALLENGE_LENGTH;
 
-	ipmiMsgWriteRead( mchData->name, message, messageSize, data, &responseSize, RPLY_TIMEOUT );
+	return ipmiMsgWriteRead( mchSess->name, message, messageSize, data, &responseSize, RPLY_TIMEOUT );
 }
 
 /* Activate Session */
-void
-ipmiMsgActSess(MchData mchData, uint8_t *data)
+int
+ipmiMsgActSess(MchSess mchSess, uint8_t *data)
 {
 uint8_t  message[MSG_MAX_LENGTH] = { 0 };
 uint8_t *imsg2     = ACT_SESS_MSG;
@@ -387,16 +431,16 @@ int      i;
 
 	/* Copy challenge string */
 	for ( i = 0; i < IPMI_MSG2_STR_LENGTH ; i++)
-		imsg2[IPMI_MSG2_STR_OFFSET + i] = mchData->str[i];
+		imsg2[IPMI_MSG2_STR_OFFSET + i] = mchSess->str[i];
 
-	messageSize = ipmiMsgBuild( mchData, message, IPMI_MSG_CMD_ACTIVATE_SESSION, imsg2, imsg2Size, 0, 0, 0, 0 );
+	messageSize = ipmiMsgBuild( mchSess, message, IPMI_MSG_CMD_ACTIVATE_SESSION, imsg2, imsg2Size, 0, 0, 0, 0 );
 
-	ipmiMsgWriteRead( mchData->name, message, messageSize, data, &responseSize, RPLY_TIMEOUT );
+	return ipmiMsgWriteRead( mchSess->name, message, messageSize, data, &responseSize, RPLY_TIMEOUT );
 }
 
 /* Set Privilege Level */
-void
-ipmiMsgSetPriv(MchData mchData, uint8_t *data, uint8_t level)
+int
+ipmiMsgSetPriv(MchSess mchSess, uint8_t *data, uint8_t level)
 {
 uint8_t  message[MSG_MAX_LENGTH] = { 0 };
 uint8_t *imsg2     = SET_PRIV_MSG;
@@ -406,14 +450,14 @@ size_t   responseSize = IPMI_RPLY_SET_PRIV_LEVEL_LENGTH;
 
 	imsg2[IPMI_MSG2_PRIV_LEVEL_OFFSET] = level;
 
-  	messageSize = ipmiMsgBuild( mchData, message, IPMI_MSG_CMD_SET_PRIV_LEVEL, imsg2, imsg2Size, 0, 0, 0, 0 );
+  	messageSize = ipmiMsgBuild( mchSess, message, IPMI_MSG_CMD_SET_PRIV_LEVEL, imsg2, imsg2Size, 0, 0, 0, 0 );
 
-	ipmiMsgWriteRead( mchData->name, message, messageSize, data, &responseSize, RPLY_TIMEOUT );
+	return ipmiMsgWriteRead( mchSess->name, message, messageSize, data, &responseSize, RPLY_TIMEOUT );
 }
 
 /* Close Session */
-void
-ipmiMsgCloseSess(MchData mchData, uint8_t *data)
+int
+ipmiMsgCloseSess(MchSess mchSess, uint8_t *data)
 {
 uint8_t  message[MSG_MAX_LENGTH];
 uint8_t *imsg2     = CLOSE_SESS_MSG;
@@ -421,14 +465,20 @@ size_t   imsg2Size = sizeof( CLOSE_SESS_MSG );
 size_t   messageSize;
 size_t   responseSize = IPMI_RPLY_CLOSE_SESSION_LENGTH;
 
-	messageSize = ipmiMsgBuild( mchData, message, IPMI_MSG_CMD_CLOSE_SESSION, imsg2, imsg2Size, 0, 0, 0, 0 );
+	return messageSize = ipmiMsgBuild( mchSess, message, IPMI_MSG_CMD_CLOSE_SESSION, imsg2, imsg2Size, 0, 0, 0, 0 );
 
-	ipmiMsgWriteRead( mchData->name, message, messageSize, data, &responseSize, RPLY_TIMEOUT );
+	ipmiMsgWriteRead( mchSess->name, message, messageSize, data, &responseSize, RPLY_TIMEOUT );
 }
 
-/* Cold Reset. Do not reconnect; next request message will handle reconnection */
+/* 
+ * Cold Reset. Do not reconnect; next request message will handle reconnection
+ * 
+ *   RETURNS: status from ipmiMsgWriteReadHelper
+ *            0 on success
+ *            non-zero for error
+ */
 int
-ipmiMsgColdReset(MchData mchData, uint8_t *data)
+ipmiMsgColdReset(MchSess mchSess, uint8_t *data)
 {
 uint8_t  message[MSG_MAX_LENGTH] = { 0 };
 uint8_t *imsg2     = BASIC_MSG;
@@ -438,14 +488,19 @@ size_t   responseSize = 0;
 
 	imsg2[IPMI_MSG2_CMD_OFFSET] = IPMI_MSG_CMD_COLD_RESET;
 
-	messageSize = ipmiMsgBuild( mchData, message, IPMI_MSG_CMD_COLD_RESET, imsg2, imsg2Size, 0, 0, 0, 0 );
+	messageSize = ipmiMsgBuild( mchSess, message, IPMI_MSG_CMD_COLD_RESET, imsg2, imsg2Size, 0, 0, 0, 0 );
 
-	return ipmiMsgWriteReadHelper( mchData, message, messageSize, data, &responseSize );
+	return ipmiMsgWriteReadHelper( mchSess, message, messageSize, data, &responseSize );
 }
 
-/* Chassis Control */
+/* Chassis Control 
+ *
+ *   RETURNS: status from ipmiMsgWriteReadHelper
+ *            0 on success
+ *            non-zero for error
+ */
 int
-ipmiMsgChassisControl(MchData mchData, uint8_t *data, uint8_t parm)
+ipmiMsgChassisControl(MchSess mchSess, uint8_t *data, uint8_t parm)
 {
 uint8_t  message[MSG_MAX_LENGTH] = { 0 };
 size_t   imsg2Size   = sizeof( SEND_MSG_MSG );
@@ -469,14 +524,19 @@ size_t   responseSize = 0;
 	bmsg2[IPMI_MSG2_CMD_OFFSET]    = IPMI_MSG_CMD_CHAS_CTRL;
 	bmsg2[IPMI_MSG2_SENSOR_OFFSET] = parm;
 
-	messageSize = ipmiMsgBuild( mchData, message, IPMI_MSG_CMD_CHAS_CTRL, imsg2, imsg2Size, bmsg1, bmsg1Size, bmsg2, bmsg2Size );
+	messageSize = ipmiMsgBuild( mchSess, message, IPMI_MSG_CMD_CHAS_CTRL, imsg2, imsg2Size, bmsg1, bmsg1Size, bmsg2, bmsg2Size );
 
-	return ipmiMsgWriteReadHelper( mchData, message, messageSize, data, &responseSize );
+	return ipmiMsgWriteReadHelper( mchSess, message, messageSize, data, &responseSize );
 }
 
-/* Get FRU Inventory Info */
+/* Get FRU Inventory Info 
+ *
+ *   RETURNS: status from ipmiMsgWriteReadHelper
+ *            0 on success
+ *            non-zero for error
+ */
 int
-ipmiMsgGetFruInfo(MchData mchData, uint8_t *data, uint8_t id)
+ipmiMsgGetFruInfo(MchSess mchSess, uint8_t *data, uint8_t id)
 {
 uint8_t  message[MSG_MAX_LENGTH] = { 0 };
 size_t   imsg2Size   = sizeof( SEND_MSG_MSG );
@@ -500,14 +560,19 @@ size_t   responseSize = IPMI_RPLY_GET_FRU_INFO_LENGTH;
 	bmsg2[IPMI_MSG2_CMD_OFFSET]    = IPMI_MSG_CMD_GET_FRU_INFO;
 	bmsg2[IPMI_MSG2_SENSOR_OFFSET] = id;
 
-	messageSize = ipmiMsgBuild( mchData, message, IPMI_MSG_CMD_GET_FRU_INFO, imsg2, imsg2Size, bmsg1, bmsg1Size, bmsg2, bmsg2Size );
+	messageSize = ipmiMsgBuild( mchSess, message, IPMI_MSG_CMD_GET_FRU_INFO, imsg2, imsg2Size, bmsg1, bmsg1Size, bmsg2, bmsg2Size );
 
-	return ipmiMsgWriteReadHelper( mchData, message, messageSize, data, &responseSize );
+	return ipmiMsgWriteReadHelper( mchSess, message, messageSize, data, &responseSize );
 }
 
-/* Read FRU data */
+/* Read FRU data 
+ *
+ *   RETURNS: status from ipmiMsgWriteReadHelper
+ *            0 on success
+ *            non-zero for error
+ */
 int
-ipmiMsgReadFru(MchData mchData, uint8_t *data, uint8_t id, uint8_t *readOffset, uint8_t readSize)
+ipmiMsgReadFru(MchSess mchSess, uint8_t *data, uint8_t id, uint8_t *readOffset, uint8_t readSize)
 {
 uint8_t  message[MSG_MAX_LENGTH] = { 0 };
 size_t   imsg2Size   = sizeof( SEND_MSG_MSG );
@@ -534,14 +599,19 @@ size_t   responseSize = IPMI_RPLY_READ_FRU_DATA_BASE_LENGTH + readSize;
 	bmsg2[IPMI_MSG2_READ_FRU_MSB_OFFSET] = readOffset[1];
 	bmsg2[IPMI_MSG2_READ_FRU_CNT_OFFSET] = readSize;
 
-	messageSize = ipmiMsgBuild( mchData, message, IPMI_MSG_CMD_READ_FRU_DATA, imsg2, imsg2Size, bmsg1, bmsg1Size, bmsg2, bmsg2Size );
+	messageSize = ipmiMsgBuild( mchSess, message, IPMI_MSG_CMD_READ_FRU_DATA, imsg2, imsg2Size, bmsg1, bmsg1Size, bmsg2, bmsg2Size );
 
-	return ipmiMsgWriteReadHelper( mchData, message, messageSize, data, &responseSize );
+	return ipmiMsgWriteReadHelper( mchSess, message, messageSize, data, &responseSize );
 }
 
-/* Get SDR (Sensor Data Record) Repository Info */
+/* Get SDR (Sensor Data Record) Repository Info 
+ *
+ *   RETURNS: status from ipmiMsgWriteReadHelper
+ *            0 on success
+ *            non-zero for error
+ */
 int
-ipmiMsgGetSdrRepInfo(MchData mchData, uint8_t *data)
+ipmiMsgGetSdrRepInfo(MchSess mchSess, uint8_t *data)
 {
 uint8_t  message[MSG_MAX_LENGTH] = { 0 };
 size_t   imsg2Size   = sizeof( SEND_MSG_MSG );
@@ -565,9 +635,9 @@ size_t   responseSize = 0;
 	bmsg2[IPMI_MSG2_RSADDR_OFFSET] = IPMI_MSG_ADDR_BMC;
 	bmsg2[IPMI_MSG2_CMD_OFFSET]    = IPMI_MSG_CMD_GET_SDRREP_INFO;
 
-	messageSize = ipmiMsgBuild( mchData, message, IPMI_MSG_CMD_GET_SDRREP_INFO, imsg2, imsg2Size, bmsg1, bmsg1Size, bmsg2, bmsg2Size );
+	messageSize = ipmiMsgBuild( mchSess, message, IPMI_MSG_CMD_GET_SDRREP_INFO, imsg2, imsg2Size, bmsg1, bmsg1Size, bmsg2, bmsg2Size );
 
-	return ipmiMsgWriteReadHelper( mchData, message, messageSize, data, &responseSize );
+	return ipmiMsgWriteReadHelper( mchSess, message, messageSize, data, &responseSize );
 }
 
 /* 
@@ -578,10 +648,13 @@ size_t   responseSize = 0;
  *
  * Used for both Get SDR (parm = 0) and Get Device SDR (parm = 1). 
  * Only differences in the message are the network function and command code.
+ *
+ *   RETURNS: status from ipmiMsgWriteReadHelper
+ *            0 on success
+ *            non-zero for error
  */
-
 int
-ipmiMsgGetSdr(MchData mchData, uint8_t *data, uint8_t *id, uint8_t *res, uint8_t offset, uint8_t readSize, uint8_t parm)
+ipmiMsgGetSdr(MchSess mchSess, uint8_t *data, uint8_t *id, uint8_t *res, uint8_t offset, uint8_t readSize, uint8_t parm)
 {
 uint8_t  message[MSG_MAX_LENGTH] = { 0 };
 size_t   imsg2Size   = sizeof( SEND_MSG_MSG );
@@ -611,14 +684,19 @@ uint8_t  cmd = parm ? IPMI_MSG_CMD_GET_DEV_SDR : IPMI_MSG_CMD_GET_SDR;
 	bmsg2[IPMI_MSG2_GET_SDR_OFFSET_OFFSET]  = offset;
 	bmsg2[IPMI_MSG2_GET_SDR_CNT_OFFSET]     = readSize;
 
-	messageSize = ipmiMsgBuild( mchData, message, cmd, imsg2, imsg2Size, bmsg1, bmsg1Size, bmsg2, bmsg2Size );
+	messageSize = ipmiMsgBuild( mchSess, message, cmd, imsg2, imsg2Size, bmsg1, bmsg1Size, bmsg2, bmsg2Size );
 
-	return ipmiMsgWriteReadHelper( mchData, message, messageSize, data, &responseSize );
+	return ipmiMsgWriteReadHelper( mchSess, message, messageSize, data, &responseSize );
 }
 
-/* Get Device Sensor Data Record (SDR) Info */
+/* Get Device Sensor Data Record (SDR) Info 
+ *
+ *   RETURNS: status from ipmiMsgWriteReadHelper
+ *            0 on success
+ *            non-zero for error
+ */
 int
-ipmiMsgGetDevSdrInfo(MchData mchData, uint8_t *data, uint8_t parm)
+ipmiMsgGetDevSdrInfo(MchSess mchSess, uint8_t *data, uint8_t parm)
 {
 uint8_t  message[MSG_MAX_LENGTH] = { 0 };
 size_t   imsg2Size   = sizeof( SEND_MSG_MSG );
@@ -643,14 +721,19 @@ size_t   responseSize = 0;
 	bmsg2[IPMI_MSG2_CMD_OFFSET]    = IPMI_MSG_CMD_GET_DEV_SDR_INFO;
         bmsg2[IPMI_MSG2_GET_DEV_SDR_INFO_OP_OFFSET] = parm;
 
-	messageSize = ipmiMsgBuild( mchData, message, IPMI_MSG_CMD_GET_DEV_SDR_INFO, imsg2, imsg2Size, bmsg1, bmsg1Size, bmsg2, bmsg2Size );
+	messageSize = ipmiMsgBuild( mchSess, message, IPMI_MSG_CMD_GET_DEV_SDR_INFO, imsg2, imsg2Size, bmsg1, bmsg1Size, bmsg2, bmsg2Size );
 
-	return ipmiMsgWriteReadHelper( mchData, message, messageSize, data, &responseSize );
+	return ipmiMsgWriteReadHelper( mchSess, message, messageSize, data, &responseSize );
 }
 	
-/* Get Sensor Reading. Caller specifies expected message response length. */
+/* Get Sensor Reading. Caller specifies expected message response length. 
+ *
+ *   RETURNS: status from ipmiMsgWriteReadHelper
+ *            0 on success
+ *            non-zero for error
+ */
 int
-ipmiMsgReadSensor(MchData mchData, uint8_t *data, uint8_t sens, uint16_t addr, size_t *responseSize)
+ipmiMsgReadSensor(MchSess mchSess, uint8_t *data, uint8_t sens, uint8_t lun, size_t *responseSize)
 {
 uint8_t  message[MSG_MAX_LENGTH] = { 0 };
 size_t   imsg2Size   = sizeof( SEND_MSG_MSG );
@@ -666,20 +749,26 @@ size_t   messageSize;
 	memcpy( bmsg2, SENS_READ_MSG, bmsg2Size );
 
 	imsg2[IPMI_MSG2_CHAN_OFFSET] = 0x40/*channel*/;
+       	imsg2[IPMI_MSG2_SEQLUN_OFFSET] = lun;
 
 	bmsg1[IPMI_MSG1_RSADDR_OFFSET] = IPMI_MSG_ADDR_CM;
 	bmsg1[IPMI_MSG1_NETFN_OFFSET]  = IPMI_MSG_NETFN_SENSOR_EVENT;
 
 	bmsg2[IPMI_MSG2_SENSOR_OFFSET] = sens;
 
-	messageSize = ipmiMsgBuild( mchData, message, IPMI_MSG_CMD_SENSOR_READ, imsg2, imsg2Size, bmsg1, bmsg1Size, bmsg2, bmsg2Size );
+	messageSize = ipmiMsgBuild( mchSess, message, IPMI_MSG_CMD_SENSOR_READ, imsg2, imsg2Size, bmsg1, bmsg1Size, bmsg2, bmsg2Size );
 
-	return ipmiMsgWriteReadHelper( mchData, message, messageSize, data, responseSize );
+	return ipmiMsgWriteReadHelper( mchSess, message, messageSize, data, responseSize );
 }
 
-/* Set FRU Activation */
+/* Set FRU Activation 
+ *
+ *   RETURNS: status from ipmiMsgWriteReadHelper
+ *            0 on success
+ *            non-zero for error
+ */
 int
-ipmiMsgSetFruActivation(MchData mchData, uint8_t *data, uint8_t fru, uint8_t parm)
+ipmiMsgSetFruActivation(MchSess mchSess, uint8_t *data, uint8_t fru, uint8_t parm)
 {
 uint8_t  message[MSG_MAX_LENGTH] = { 0 };
 size_t   imsg2Size   = sizeof( SEND_MSG_MSG );
@@ -703,9 +792,9 @@ size_t   responseSize = IPMI_RPLY_SET_FRU_POLICY_LENGTH;
 	bmsg2[IPMI_MSG2_SET_FRU_ACT_FRU_OFFSET] = fru;
 	bmsg2[IPMI_MSG2_SET_FRU_ACT_CMD_OFFSET] = parm;
 
-	messageSize = ipmiMsgBuild( mchData, message, IPMI_MSG_CMD_SET_FRU_ACT, imsg2, imsg2Size, bmsg1, bmsg1Size, bmsg2, bmsg2Size );
+	messageSize = ipmiMsgBuild( mchSess, message, IPMI_MSG_CMD_SET_FRU_ACT, imsg2, imsg2Size, bmsg1, bmsg1Size, bmsg2, bmsg2Size );
 
-	return ipmiMsgWriteReadHelper( mchData, message, messageSize, data, &responseSize );
+	return ipmiMsgWriteReadHelper( mchSess, message, messageSize, data, &responseSize );
 }
 
 /* Set FRU Activation Policy
@@ -714,9 +803,13 @@ size_t   responseSize = IPMI_RPLY_SET_FRU_POLICY_LENGTH;
  *
  * Activate version causes FRU to transition from "Inactive" to "Activation Request"
  * Deactivate version causes FRU to transition from "Active" to "Deactivation Request"
+ * 
+ *   RETURNS: status from ipmiMsgWriteReadHelper
+ *            0 on success
+ *            non-zero for error
  */
 int 
-ipmiMsgSetFruActPolicy(MchData mchData, uint8_t *data, uint8_t fru, uint8_t mask, uint8_t bits)
+ipmiMsgSetFruActPolicy(MchSess mchSess, uint8_t *data, uint8_t fru, uint8_t mask, uint8_t bits)
 {
 uint8_t  message[MSG_MAX_LENGTH] = { 0 };
 size_t   imsg2Size   = sizeof( SEND_MSG_MSG );
@@ -741,21 +834,21 @@ size_t   responseSize = 0;
 	bmsg2[IPMI_MSG2_SET_FRU_POLICY_MASK_OFFSET] = mask;
 	bmsg2[IPMI_MSG2_SET_FRU_POLICY_BITS_OFFSET] = bits;
 
-	messageSize = ipmiMsgBuild( mchData, message, IPMI_MSG_CMD_SET_FRU_POLICY, imsg2, imsg2Size, bmsg1, bmsg1Size, bmsg2, bmsg2Size );
+	messageSize = ipmiMsgBuild( mchSess, message, IPMI_MSG_CMD_SET_FRU_POLICY, imsg2, imsg2Size, bmsg1, bmsg1Size, bmsg2, bmsg2Size );
 
-	return ipmiMsgWriteReadHelper( mchData, message, messageSize, data, &responseSize );
+	return ipmiMsgWriteReadHelper( mchSess, message, messageSize, data, &responseSize );
 }
 
 /* 
  * Based on parm (0 for Deactivate, 1 for Activate),
  * set appropriate mask and bits and call Set FRU Activation Policy
  *
- * RETURN:
+ * RETURNS:
  *         -1 if illegal parm value 
  *         or retrun value of ipmiMsgSetFruActPolicy (0 on success)
  */
 int
-ipmiMsgSetFruActPolicyHelper(MchData mchData, uint8_t *data, uint8_t fru, int parm) 
+ipmiMsgSetFruActPolicyHelper(MchSess mchSess, uint8_t *data, uint8_t fru, int parm) 
 {
 uint8_t mask;
 uint8_t bits;
@@ -771,12 +864,17 @@ uint8_t bits;
 	else
 		return -1;
 
-       	return ipmiMsgSetFruActPolicy( mchData, data, fru, mask, bits );
+       	return ipmiMsgSetFruActPolicy( mchSess, data, fru, mask, bits );
 
 }
-/* Get Device ID */
+/* Get Device ID 
+ *
+ *   RETURNS: status from ipmiMsgWriteReadHelper
+ *            0 on success
+ *            non-zero for error
+ */
 int
-ipmiMsgGetDeviceId(MchData mchData, uint8_t *data, uint8_t rsAddr)
+ipmiMsgGetDeviceId(MchSess mchSess, uint8_t *data, uint8_t rsAddr)
 {
 uint8_t  message[MSG_MAX_LENGTH] = { 0 };
 size_t   imsg2Size   = sizeof( SEND_MSG_MSG );
@@ -799,14 +897,19 @@ size_t   responseSize = 0;
 
 	bmsg2[IPMI_MSG2_CMD_OFFSET] = IPMI_MSG_CMD_GET_DEVICE_ID;
                                                                           
-	messageSize = ipmiMsgBuild( mchData, message, 0/*IPMI_MSG_CMD_GET_DEVICE_ID*/, imsg2, imsg2Size, bmsg1, bmsg1Size, bmsg2, bmsg2Size );
+	messageSize = ipmiMsgBuild( mchSess, message, 0/*IPMI_MSG_CMD_GET_DEVICE_ID*/, imsg2, imsg2Size, bmsg1, bmsg1Size, bmsg2, bmsg2Size );
 
-	return ipmiMsgWriteReadHelper( mchData, message, messageSize, data, &responseSize );
+	return ipmiMsgWriteReadHelper( mchSess, message, messageSize, data, &responseSize );
 }
 
-/* Get Fan Speed Properties */
+/* Get Fan Speed Properties  
+ *
+ *   RETURNS: status from ipmiMsgWriteReadHelper
+ *            0 on success
+ *            non-zero for error
+ */
 int
-ipmiMsgGetFanProp(MchData mchData, uint8_t *data, uint8_t fru)
+ipmiMsgGetFanProp(MchSess mchSess, uint8_t *data, uint8_t fru)
 {
 uint8_t  message[MSG_MAX_LENGTH] = { 0 };
 size_t   imsg2Size   = sizeof( SEND_MSG_MSG );
@@ -829,14 +932,19 @@ size_t   responseSize = IPMI_RPLY_GET_FAN_PROP_LENGTH;
 
 	bmsg2[IPMI_MSG2_SET_FRU_ACT_FRU_OFFSET] = fru;
 
-	messageSize = ipmiMsgBuild( mchData, message, IPMI_MSG_CMD_GET_FAN_PROP, imsg2, imsg2Size, bmsg1, bmsg1Size, bmsg2, bmsg2Size );
+	messageSize = ipmiMsgBuild( mchSess, message, IPMI_MSG_CMD_GET_FAN_PROP, imsg2, imsg2Size, bmsg1, bmsg1Size, bmsg2, bmsg2Size );
 
-	return ipmiMsgWriteReadHelper( mchData, message, messageSize, data, &responseSize );
+	return ipmiMsgWriteReadHelper( mchSess, message, messageSize, data, &responseSize );
 }
 
-/* Get Fan Level */
+/* Get Fan Level 
+ *
+ *   RETURNS: status from ipmiMsgWriteReadHelper
+ *            0 on success
+ *            non-zero for error
+ */
 int
-ipmiMsgGetFanLevel(MchData mchData, uint8_t *data, uint8_t fru)
+ipmiMsgGetFanLevel(MchSess mchSess, uint8_t *data, uint8_t fru)
 {
 uint8_t  message[MSG_MAX_LENGTH] = { 0 };
 size_t   imsg2Size   = sizeof( SEND_MSG_MSG );
@@ -859,14 +967,19 @@ size_t   responseSize = IPMI_RPLY_GET_FAN_LEVEL_LENGTH;
 
 	bmsg2[IPMI_MSG2_SET_FRU_ACT_FRU_OFFSET] = fru;
 
-	messageSize = ipmiMsgBuild( mchData, message, IPMI_MSG_CMD_GET_FAN_LEVEL, imsg2, imsg2Size, bmsg1, bmsg1Size, bmsg2, bmsg2Size );
+	messageSize = ipmiMsgBuild( mchSess, message, IPMI_MSG_CMD_GET_FAN_LEVEL, imsg2, imsg2Size, bmsg1, bmsg1Size, bmsg2, bmsg2Size );
 
-	return ipmiMsgWriteReadHelper( mchData, message, messageSize, data, &responseSize );
+	return ipmiMsgWriteReadHelper( mchSess, message, messageSize, data, &responseSize );
 }
 
-/* Set Fan Level */
+/* Set Fan Level 
+ *
+ *   RETURNS: status from ipmiMsgWriteReadHelper
+ *            0 on success
+ *            non-zero for error
+ */
 int
-ipmiMsgSetFanLevel(MchData mchData, uint8_t *data, uint8_t fru, uint8_t level)
+ipmiMsgSetFanLevel(MchSess mchSess, uint8_t *data, uint8_t fru, uint8_t level)
 {
 uint8_t  message[MSG_MAX_LENGTH] = { 0 };
 size_t   imsg2Size   = sizeof( SEND_MSG_MSG );
@@ -890,12 +1003,12 @@ size_t   responseSize = IPMI_RPLY_SET_FAN_LEVEL_LENGTH;
 	bmsg2[IPMI_MSG2_SET_FRU_ACT_FRU_OFFSET] = fru;
 	bmsg2[IPMI_MSG2_SET_FAN_LEVEL_LEVEL_OFFSET] = level;
 
-	messageSize = ipmiMsgBuild( mchData, message, IPMI_MSG_CMD_SET_FAN_LEVEL, imsg2, imsg2Size, bmsg1, bmsg1Size, bmsg2, bmsg2Size );
+	messageSize = ipmiMsgBuild( mchSess, message, IPMI_MSG_CMD_SET_FAN_LEVEL, imsg2, imsg2Size, bmsg1, bmsg1Size, bmsg2, bmsg2Size );
 
-	return ipmiMsgWriteReadHelper( mchData, message, messageSize, data, &responseSize );
+	return ipmiMsgWriteReadHelper( mchSess, message, messageSize, data, &responseSize );
 }
 
-/* Set debug flag; 1 = on, 0 = off */
+/* Set debug message flag; 0 = off, multiple levels of verbosity */
 void
 ipmiSetDebug(int debug)
 {
