@@ -48,6 +48,7 @@
 #define IPMI_MSG2_ID_LENGTH                  4    
 #define IPMI_MSG2_STR_OFFSET                 5    /* Challenge string */
 #define IPMI_MSG2_STR_LENGTH                 16   
+#define IPMI_MSG2_SEQLUN_OFFSET              1    /* MS 6 bits: IPMI sequence, LS 2 bits: LUN */
 #define IPMI_MSG2_CMD_OFFSET                 2    /* Command code */
 #define IPMI_MSG2_CHAN_OFFSET                3    /* Channel to send message over (0 for IPMB) */
 #define IPMI_MSG2_SENSOR_OFFSET              3    /* Sensor number */
@@ -146,6 +147,7 @@
 #define IPMI_RPLY_MAX_PRIV_LENGTH            1
 #define IPMI_RPLY_SEQ_OFFSET                 18     /* From-MCH sequence number (in reply to non-bridged message) */
 #define IPMI_RPLY_SEQ_LENGTH                 4
+#define IPMI_RPLY_SEQLUN_OFFSET              31     /* MS 6 bits: IPMI sequence, LS 2 bits: LUN */
 #define IPMI_RPLY_COMPLETION_CODE_OFFSET     42
 #define IPMI_RPLY_SENSOR_READING_OFFSET      43     /* Sensor reading (1 byte) */
 #define IPMI_RPLY_HS_SENSOR_READING_OFFSET   45     /* Hot swap sensor reading (1 byte) */
@@ -169,6 +171,7 @@
 
 /* For responses to bridged messages (returns 2 messages which we read as 1); offset from beginning of first message */
 #define IPMI_RPLY_BRIDGED_SEQ_OFFSET         27     /* From-MCH sequence number */
+#define IPMI_RPLY_BRIDGED_SEQLUN_OFFSET      41     /* MS 6 bits: IPMI sequence, LS 2 bits: LUN */
 
 #define IPMI_DATA_TYPE(x)          x & 3<<6
 #define IPMI_DATA_LENGTH(x)        x & 0x3F
