@@ -1,16 +1,47 @@
-record(mbbi, "$(crat):STAT") {
+record(bi, "$(crat):STAT") {
+  field(DESC, "MCH online status")
   field(DTYP, "MCHsensor")
   field(SCAN, "I/O Intr")
   field(INP, "#C0 S0 @$(node)+STAT")
-  field(ZRVL, "0")
-  field(ZRST, "Offline")
-  field(ONVL, "1")
-  field(ONST, "Online")
+  field(ZNAM, "Offline")
+  field(ZSV,  "MAJOR")
+  field(ONAM, "Online")
+  field(OSV,  "NO_ALARM")
   field(PINI, "YES")
 }
 
+record(mbbi, "$(crat):INIT") {
+  field(DESC, "MCH comm initialized")
+  field(DTYP, "MCHsensor")
+  field(SCAN, "I/O Intr")
+  field(INP,  "#C0 S0 @$(node)+INIT")
+  field(ZRST, "Not initialized")
+  field(ZRVL, "0")
+  field(ZRSV, "MAJOR")
+  field(ONST, "Initializing...")
+  field(ONVL, "1")
+  field(ONSV, "MINOR")
+  field(TWST, "Initialized")
+  field(TWVL, "2")
+  field(TWSV, "NO_ALARM")
+  field(PINI, "YES")
+}
+
+record(bo, "$(crat):INITBYP") {
+  field(DESC, "Override init for testing")
+  field(DTYP, "MCHsensor")
+  field(OMSL, "supervisory")
+  field(OUT, "#C0 S0 @$(node)+INIT")
+  field(ZNAM, "Not initialized")
+  field(ZSV,  "MAJOR")
+  field(ONAM, "Initialized")
+  field(OSV,  "NO_ALARM")
+  field(PINI, "NO")
+}
+
 # Enable or disable session with MCH
-record(bo, "$(crat):MCHSESSION") {
+record(bo, "$(crat):SESSENBL") {
+  field(DESC, "MCH session enable")
   field(DTYP, "MCHsensor")
   field(OMSL, "supervisory")
   field(OUT,  "#C0 S0 @$(node)+SESS")
@@ -18,7 +49,7 @@ record(bo, "$(crat):MCHSESSION") {
   field(ZSV,  "MAJOR")
   field(ONAM, "Enabled")
   field(OSV,  "NO_ALARM")
-  field(VAL,  "1")
+  field(RVAL,  "1")
   field(PINI, "YES")
 }
 
