@@ -165,13 +165,6 @@ int      found, inst;
 
 	sprintf( stFile, "st.%s.cmd", mchSys->name );
 
-	/* If file already exists, do not make new one 
-	if ( (file = fopen( stFile, "r" )) ) {
-		errlogPrintf("%s already exists\n", stFile);
-		return;
-	}
-	*/
-
 	errlogPrintf("Creating %s...\n", stFile);
 
 	file = fopen( stFile, "w" ); 
