@@ -1,3 +1,7 @@
+21Sep2012 (SH)
+Fix FRU board and part serial number data type: should be string instead of number
+  Changes to Db/module.db and src/devMch.c
+
 27Aug2012 (SH)
 src/drvMch.c/.h - Break mchData struct into mchSess (session-related) and mchSys
   (system data). If system was offline, check that all installed FRUs are the same.
