@@ -1,3 +1,8 @@
+ipmiComm-R1-3-2:  Set message seq number in request and verify response contains same number
+                    Changes to src/drvMch.c and src/ipmiMsg.c
+                  Handle error returned from SDR read
+                    Change to src/drvMch.c
+
 ipmiComm-R1-3-1:  Fix FRU board and part serial number data type: should be string instead of number
                     Changes to Db/module.db and src/devMch.c
 
