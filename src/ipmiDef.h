@@ -147,7 +147,7 @@
 #define IPMI_RPLY_MAX_PRIV_LENGTH            1
 #define IPMI_RPLY_SEQ_OFFSET                 18     /* From-MCH sequence number (in reply to non-bridged message) */
 #define IPMI_RPLY_SEQ_LENGTH                 4
-#define IPMI_RPLY_SEQLUN_OFFSET              31     /* MS 6 bits: IPMI sequence, LS 2 bits: LUN */
+#define IPMI_RPLY_SEQLUN_OFFSET              18     /* MS 6 bits: IPMI sequence, LS 2 bits: LUN */
 #define IPMI_RPLY_COMPLETION_CODE_OFFSET     42
 #define IPMI_RPLY_SENSOR_READING_OFFSET      43     /* Sensor reading (1 byte) */
 #define IPMI_RPLY_HS_SENSOR_READING_OFFSET   45     /* Hot swap sensor reading (1 byte) */
