@@ -163,7 +163,7 @@ int     inst = mchSess->instance;
 		errlogPrintf("Connecting to %s\n", mchSess->name);
 
 	/* Initialize IPMI sequence */
-	mchSess->seq = 1;
+	mchSess->seq = 0;
 
         /* Initialize our stored sequence number for messages from MCH */
 	mchSess->seqRply[0] = IPMI_MSG_HEADER_SEQ_INITIAL;
@@ -628,7 +628,6 @@ mchSdrGetDataAll(MchSess mchSess, MchSys mchSys)
 {
 uint8_t  response[MSG_MAX_LENGTH] = { 0 };
 uint16_t sdrCount;
-uint16_t lastId = 0;
 uint8_t  id[2]  = { 0 };
 uint8_t  res[2] = { 0 };
 Sensor   sens   = 0;
@@ -651,34 +650,36 @@ size_t   responseSize;
     
        	for ( i = 0; i < sdrCount; i++) {
 		       
-       		ipmiMsgGetSdr( mchSess, response, id, res, offset, 0xFF, 0 );
+       		if ( ipmiMsgGetSdr( mchSess, response, id, res, offset, 0xFF, 0 ) )
+			i--;
 
-       		memcpy( raw + (i*SDR_MAX_LENGTH), response + IPMI_RPLY_GET_SDR_DATA_OFFSET, SDR_MAX_LENGTH );
+		else {
+			memcpy( raw + (i*SDR_MAX_LENGTH), response + IPMI_RPLY_GET_SDR_DATA_OFFSET, SDR_MAX_LENGTH );
 
-       		switch ( response[IPMI_RPLY_GET_SDR_DATA_OFFSET + SDR_REC_TYPE_OFFSET] ) {
+			switch ( response[IPMI_RPLY_GET_SDR_DATA_OFFSET + SDR_REC_TYPE_OFFSET] ) {
 
-       			default:
-       				break;
+				default:
+					break;
+	
+				case SDR_TYPE_FULL_SENSOR:
+					mchSys->sensCount++;
+					break;
 
-       			case SDR_TYPE_FULL_SENSOR:
-       				mchSys->sensCount++;
-       				break;
+				case SDR_TYPE_COMPACT_SENSOR:
+					mchSys->sensCount++;
+					break;
 
-       			case SDR_TYPE_COMPACT_SENSOR:
-       				mchSys->sensCount++;
-       				break;
+				case SDR_TYPE_FRU_DEV:
+					mchSys->fruCount++;
+					break;
+			}
+			id[0]  = response[IPMI_RPLY_GET_SDR_NEXT_ID_LSB_OFFSET];
+			id[1]  = response[IPMI_RPLY_GET_SDR_NEXT_ID_MSB_OFFSET];
 
-       			case SDR_TYPE_FRU_DEV:
-       				mchSys->fruCount++;
-       				break;
-       		}
-       		lastId = arrayToUint16( id );
-       		id[0]  = response[IPMI_RPLY_GET_SDR_NEXT_ID_LSB_OFFSET];
-       		id[1]  = response[IPMI_RPLY_GET_SDR_NEXT_ID_MSB_OFFSET];
+			if ( arrayToUint16( id ) == 0xFFFF )
+				break;
+		}
 
-       		if ( lastId == 0xFFFF ) {
-       			break;
-       		}
        	}
 
 	sdrCount = i;

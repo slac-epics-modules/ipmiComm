@@ -181,18 +181,17 @@ uint8_t  cs2;
 
 	memcpy( message + offset, iheader, iheaderSize );
 
-	/* Calculate checksums */
-	imsg1[imsg1Size - 1] = calcTwosComplementChecksum( (uint8_t *)imsg1, imsg1Size - 1 );
-	cs2 = imsg2[imsg2Size - 1] = calcTwosComplementChecksum( (uint8_t *)imsg2, imsg2Size - 1 );
-
-	/* This isn't working. Waiting for response from Vadatech.
-	Set IPMI sequence number 
-       	imsg2[IPMI_MSG2_SEQLUN_OFFSET] += mchSess->seq << 2;
-	
+	/* Set IPMI sequence number */
        	if ( mchSess->seq >= 0x3F )
        		mchSess->seq = 1;
        	else
-       		mchSess->seq++; */
+       		mchSess->seq++;
+
+       	imsg2[IPMI_MSG2_SEQLUN_OFFSET] |= (mchSess->seq << 2);
+
+	/* Calculate checksums */
+	imsg1[imsg1Size - 1] = calcTwosComplementChecksum( (uint8_t *)imsg1, imsg1Size - 1 );
+	cs2 = imsg2[imsg2Size - 1] = calcTwosComplementChecksum( (uint8_t *)imsg2, imsg2Size - 1 );
 
 	offset += iheaderSize;
 	memcpy( message + offset, imsg1, imsg1Size );
@@ -288,7 +287,7 @@ ipmiMsgWriteReadHelper(MchSess mchSess, uint8_t *message, size_t messageSize, ui
 {
 int      i, status;
 uint8_t  ipmiSeq = 0;
-int      ipmiSeqOffs = IPMI_RPLY_BRIDGED_SEQLUN_OFFSET;
+int      ipmiSeqOffs = IPMI_RPLY_SEQLUN_OFFSET;
 uint8_t  seq[4];
 uint32_t seqInt;
 uint32_t seqRplyInt;
@@ -298,14 +297,13 @@ int      err = 0;
 
 		status = ipmiMsgWriteRead( mchSess->name, message, messageSize, response, responseSize, mchSess->timeout );
 
-		/* Verify correct IPMI sequence 
-		ipmiSeq = (response[ipmiSeqOffs] && 0xFC) >> 2;
+		/* Verify correct IPMI sequence */
+		ipmiSeq = (response[ipmiSeqOffs] & 0xFC) >> 2;
 
 		if ( ipmiSeq != mchSess->seq ) {
-			printf("%s Incorrect IPMI sequence; got %i %i but expected %i\n", mchSess->name, response[ipmiSeq], ipmiSeq, mchSess->seq );
+			printf("%s Incorrect IPMI sequence; got %i but expected %i\n", mchSess->name, ipmiSeq, mchSess->seq );
 			return -1;
-		} */
-
+		}
 
 		if ( (*responseSize == 0) || (mchSess->err > 9) ) {
 
