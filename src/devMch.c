@@ -1123,7 +1123,7 @@ char    str[40];
 	node = strtok( pai->inp.value.vmeio.parm, "+" );
 	if ( (p = strtok( NULL, "+" )) ) {
 		task = p;
-		if ( strcmp( task, "TYPE" ) && strcmp( task, "BSN" ) && strcmp( task, "PSN" ) && strcmp( task, "FAN")  ) {
+		if ( strcmp( task, "TYPE" ) && strcmp( task, "FAN")  ) {
 			sprintf( str, "Unknown task parameter %s", task);
 			status = S_dev_badSignal;
 		}
@@ -1178,13 +1178,7 @@ int      s = 0;
 
 	if ( mchInitDone[mchSess->instance] ) {
 
-		if ( !(strcmp( task, "BSN" )) && fru->board.sn.data )
-       			pai->val = (epicsFloat64)(*fru->board.sn.data);
-
-		else if ( !(strcmp( task, "PSN" )) && fru->prod.sn.data )
-       			pai->val = (epicsFloat64)(*fru->prod.sn.data);
-
-		else if ( !(strcmp( task, "FAN")) ) {
+		if ( !(strcmp( task, "FAN")) ) {
 
 			if ( mchIsAlive[mchSess->instance] && mchSess->session ) {
 
@@ -1266,7 +1260,7 @@ char    str[40];
 	node = strtok( pstringin->inp.value.vmeio.parm, "+" );
 	if ( (p = strtok( NULL, "+" )) ) {
 		task = p;
-		if ( strcmp( task, "BMF" ) && strcmp( task, "BP" ) && strcmp( task, "PMF" ) && strcmp( task, "PP") && strcmp( task, "BPN" ) && strcmp( task, "PPN")) {
+		if ( strcmp( task, "BMF" ) && strcmp( task, "BP" ) && strcmp( task, "PMF" ) && strcmp( task, "PP") && strcmp( task, "BPN" ) && strcmp( task, "PPN") && strcmp( task, "BSN" ) && strcmp( task, "PSN" )) {
 			sprintf( str, "Unknown task parameter %s", task);
 			status = S_dev_badSignal;
 		}
@@ -1346,6 +1340,16 @@ uint8_t  l = 0, *d = 0; /* FRU data length and raw */
 			d = fru->prod.part.data;
 			l = fru->prod.part.length;
 		}
+		else if ( !(strcmp( task, "BSN" )) ) {/* && fru->board.sn.data )*/
+			d = fru->board.sn.data;
+			l = fru->board.sn.length;
+		}       			/*pai->val = (epicsFloat64)(*fru->board.sn.data);*/
+
+		else if ( !(strcmp( task, "PSN" )) ) {/*&& fru->prod.sn.data )*/
+			d = fru->prod.sn.data;
+			l = fru->prod.sn.length;
+		}
+       			/*pai->val = (epicsFloat64)(*fru->prod.sn.data);*/
 
 		if ( d ) {
 

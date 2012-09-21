@@ -34,7 +34,7 @@ record(stringin, "$(dev):$(code)$(inst)_BPRODNAME") {
   field(PINI, "YES")
 }
 
-record(ai, "$(dev):$(code)$(inst)_BSN") {
+record(stringin, "$(dev):$(code)$(inst)_BSN") {
   field(DESC, "Board serial number")
   field(DTYP, "FRUinfo")
   field(INP, "#C0 S$(index) @$(link)+BSN")
@@ -62,7 +62,7 @@ record(stringin, "$(dev):$(code)$(inst)_PPRODNAME") {
   field(PINI, "YES")
 }
 
-record(ai, "$(dev):$(code)$(inst)_PSN") {
+record(stringin, "$(dev):$(code)$(inst)_PSN") {
   field(DESC, "Product serial number")
   field(DTYP, "FRUinfo")
   field(INP, "#C0 S$(index) @$(link)+PSN")
