@@ -479,13 +479,13 @@ uint8_t  lun;
 			bits = data[IPMI_RPLY_SENSOR_ENABLE_BITS_OFFSET];
 			if ( IPMI_SENSOR_READING_DISABLED(bits) || IPMI_SENSOR_SCANNING_DISABLED(bits) ) {
 				if ( IPMICOMM_DEBUG )
-					printf("%s sensor reading or scanning is disabled. Bits: %02x\n",pai->name, bits);
-				recGblSetSevr( pai, READ_ALARM, INVALID_ALARM );
-				return ERROR;
+					printf("%s sensor reading and/or scanning disabled. Bits: %02x\n",pai->name, bits);
+				s = ERROR;
 			}
-
-			raw = data[IPMI_RPLY_SENSOR_READING_OFFSET];
-			mchSys->sens[index].val = raw;
+			else {
+				raw = data[IPMI_RPLY_SENSOR_READING_OFFSET];
+				mchSys->sens[index].val = raw;
+			}
 		}
 	
 		epicsMutexUnlock( mch->mutex );
@@ -925,13 +925,13 @@ size_t   responseSize;
 					if ( IPMI_SENSOR_READING_DISABLED(bits) || IPMI_SENSOR_SCANNING_DISABLED(bits) ) {
 						if ( IPMICOMM_DEBUG )
 						    printf("%s sensor reading or scanning is disabled. Bits: %02x\n", pmbbi->name, bits);
-						recGblSetSevr( pmbbi, READ_ALARM, INVALID_ALARM );
-						return ERROR;
+						s = ERROR;
 					}
-			
-					/* Store raw sensor reading */
-					value = data[IPMI_RPLY_HS_SENSOR_READING_OFFSET];
-					mchSys->sens[index].val = value;
+					else {
+						/* Store raw sensor reading */
+						value = data[IPMI_RPLY_HS_SENSOR_READING_OFFSET];
+						mchSys->sens[index].val = value;
+					}
 				}
 
 				epicsMutexUnlock( mch->mutex );
