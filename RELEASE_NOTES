@@ -1,4 +1,4 @@
-ipmiComm-R1-3-3:  Check sensor 'scanning' and 'reading/state' are enabled before copying
+ipmiComm-R1-3-3:  Check sensor 'reading/state available' before copying
                     sensor reading to PV. Changes to src/devMch.c and src/ipmiDef.c
 
 ipmiComm-R1-3-2:  Set message seq number in request and verify response contains same number

@@ -1,7 +1,7 @@
 Release: ipmiComm-R1-3-3
 
 24Sep2012 (SH)
-Check sensor 'scanning' and 'reading/state' are enabled before copying
+Check sensor 'reading/state availabe' before copying
   sensor reading to PV. Changes to:
   src/devMch.c, ipmiDef.c
 
