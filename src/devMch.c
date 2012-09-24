@@ -449,7 +449,7 @@ MchSess  mchSess;
 MchSys   mchSys;
 char    *task;
 uint8_t  data[MSG_MAX_LENGTH] = { 0 };
-uint8_t  raw, sensor;
+uint8_t  raw, sensor, bits;
 short    index   = pai->inp.value.vmeio.signal; /* Sensor index */
 long     status  = NO_CONVERT;
 SdrFull  sdr;
@@ -476,6 +476,14 @@ uint8_t  lun;
 		epicsMutexLock( mch->mutex );
 
 		if ( !(s = ipmiMsgReadSensor( mchSess, data, sensor, lun, &responseSize )) ) {
+			bits = data[IPMI_RPLY_SENSOR_ENABLE_BITS_OFFSET];
+			if ( IPMI_SENSOR_READING_DISABLED(bits) || IPMI_SENSOR_SCANNING_DISABLED(bits) ) {
+				if ( IPMICOMM_DEBUG )
+					printf("%s sensor reading or scanning is disabled. Bits: %02x\n",pai->name, bits);
+				recGblSetSevr( pai, READ_ALARM, INVALID_ALARM );
+				return ERROR;
+			}
+
 			raw = data[IPMI_RPLY_SENSOR_READING_OFFSET];
 			mchSys->sens[index].val = raw;
 		}
@@ -875,7 +883,7 @@ MchData  mchData;
 MchSess  mchSess;
 MchSys   mchSys;
 char    *task;
-uint8_t  value = 0, sensor;
+uint8_t  value = 0, sensor, bits;
 uint16_t addr = 0; /* get addr */
 short    index  = pmbbi->inp.value.vmeio.signal; /* Sensor index or FRU id */
 long     status = 0;
@@ -913,7 +921,15 @@ size_t   responseSize;
 
 				epicsMutexLock( mch->mutex );
 
-				if ( !(s = ipmiMsgReadSensor( mchSess, data, sensor, addr, &responseSize )) ) {				
+				if ( !(s = ipmiMsgReadSensor( mchSess, data, sensor, addr, &responseSize )) ) {	
+					bits = data[IPMI_RPLY_SENSOR_ENABLE_BITS_OFFSET];
+					if ( IPMI_SENSOR_READING_DISABLED(bits) || IPMI_SENSOR_SCANNING_DISABLED(bits) ) {
+						if ( IPMICOMM_DEBUG )
+						    printf("%s sensor reading or scanning is disabled. Bits: %02x\n",pai->name, bits);
+						recGblSetSevr( pai, READ_ALARM, INVALID_ALARM );
+						return ERROR;
+					}
+			
 					/* Store raw sensor reading */
 					value = data[IPMI_RPLY_HS_SENSOR_READING_OFFSET];
 					mchSys->sens[index].val = value;

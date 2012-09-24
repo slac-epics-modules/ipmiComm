@@ -150,6 +150,7 @@
 #define IPMI_RPLY_SEQLUN_OFFSET              18     /* MS 6 bits: IPMI sequence, LS 2 bits: LUN */
 #define IPMI_RPLY_COMPLETION_CODE_OFFSET     42
 #define IPMI_RPLY_SENSOR_READING_OFFSET      43     /* Sensor reading (1 byte) */
+#define IPMI_RPLY_SENSOR_ENABLE_BITS_OFFSET  44     /* Sensor enable bits: event msgs; scanning; reading/state */
 #define IPMI_RPLY_HS_SENSOR_READING_OFFSET   45     /* Hot swap sensor reading (1 byte) */
 #define IPMI_RPLY_FRU_AREA_SIZE_LSB_OFFSET   43     /* FRU inventory area size in bytes, LSB */
 #define IPMI_RPLY_FRU_AREA_SIZE_MSB_OFFSET   44     /* FRU inventory area size in bytes, MSB */
@@ -172,6 +173,9 @@
 /* For responses to bridged messages (returns 2 messages which we read as 1); offset from beginning of first message */
 #define IPMI_RPLY_BRIDGED_SEQ_OFFSET         27     /* From-MCH sequence number */
 #define IPMI_RPLY_BRIDGED_SEQLUN_OFFSET      41     /* MS 6 bits: IPMI sequence, LS 2 bits: LUN */
+
+#define IPMI_RPLY_SENSOR_READING_DISABLED(x)  x & 1<<5
+#define IPMI_RPLY_SENSOR_SCANNING_DISABLED(x) x & 1<<6
 
 #define IPMI_DATA_TYPE(x)          x & 3<<6
 #define IPMI_DATA_LENGTH(x)        x & 0x3F
