@@ -492,7 +492,7 @@ uint8_t  lun;
 
 		if ( s ) {
 			if ( IPMICOMM_DEBUG )
-				printf("%s writeread error sensor %02x index %i\n",pai->name, sensor, index);
+				printf("%s writeread error sensor %02x index %i\n", pai->name, sensor, index);
 			recGblSetSevr( pai, READ_ALARM, INVALID_ALARM );
 			return ERROR;
 		}
@@ -770,7 +770,6 @@ MchSess  mchSess;
 MchSys   mchSys;
 char    *task;
 long     status = 0;
-int      s = 0;
 
 	if ( !recPvt )
 		return status;
@@ -925,8 +924,8 @@ size_t   responseSize;
 					bits = data[IPMI_RPLY_SENSOR_ENABLE_BITS_OFFSET];
 					if ( IPMI_SENSOR_READING_DISABLED(bits) || IPMI_SENSOR_SCANNING_DISABLED(bits) ) {
 						if ( IPMICOMM_DEBUG )
-						    printf("%s sensor reading or scanning is disabled. Bits: %02x\n",pai->name, bits);
-						recGblSetSevr( pai, READ_ALARM, INVALID_ALARM );
+						    printf("%s sensor reading or scanning is disabled. Bits: %02x\n", pmbbi->name, bits);
+						recGblSetSevr( pmbbi, READ_ALARM, INVALID_ALARM );
 						return ERROR;
 					}
 			
