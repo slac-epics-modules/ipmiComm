@@ -174,8 +174,8 @@
 #define IPMI_RPLY_BRIDGED_SEQ_OFFSET         27     /* From-MCH sequence number */
 #define IPMI_RPLY_BRIDGED_SEQLUN_OFFSET      41     /* MS 6 bits: IPMI sequence, LS 2 bits: LUN */
 
-#define IPMI_RPLY_SENSOR_READING_DISABLED(x)  x & 1<<5
-#define IPMI_RPLY_SENSOR_SCANNING_DISABLED(x) x & 1<<6
+#define IPMI_SENSOR_READING_DISABLED(x)  x & 1<<5
+#define IPMI_SENSOR_SCANNING_DISABLED(x) x & 1<<6
 
 #define IPMI_DATA_TYPE(x)          x & 3<<6
 #define IPMI_DATA_LENGTH(x)        x & 0x3F
