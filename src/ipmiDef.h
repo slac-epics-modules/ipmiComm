@@ -145,7 +145,7 @@
 #define IPMI_RPLY_INIT_SEND_SEQ_LENGTH       4
 #define IPMI_RPLY_MAX_PRIV_OFFSET            30     /* Maximum privilege level allowed for session */
 #define IPMI_RPLY_MAX_PRIV_LENGTH            1
-#define IPMI_RPLY_SEQ_OFFSET                 18     /* From-MCH sequence number (in reply to non-bridged message) */
+#define IPMI_RPLY_SEQ_OFFSET                 5      /* From-MCH sequence number (in reply to non-bridged message) */
 #define IPMI_RPLY_SEQ_LENGTH                 4
 #define IPMI_RPLY_SEQLUN_OFFSET              18     /* MS 6 bits: IPMI sequence, LS 2 bits: LUN */
 #define IPMI_RPLY_COMPLETION_CODE_OFFSET     42
