@@ -1340,7 +1340,7 @@ uint8_t  l = 0, *d = 0; /* FRU data length and raw */
 			l = fru->board.prod.length;
 		}
 		else if ( !(strcmp( task, "PMF" )) ) {
-			d = fru->board.manuf.data;
+			d = fru->prod.manuf.data;
 			l = fru->prod.manuf.length;
 		}
 		else if ( !(strcmp( task, "PP" )) ) {
