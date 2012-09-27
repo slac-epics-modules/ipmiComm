@@ -42,7 +42,7 @@
 #define IPMI_MSG_HDR_ID_LENGTH               4    
 #define IPMI_MSG_HDR_NBYTES_OFFSET           9    /* Number of bytes in IPMI message (includes bridged message) */
 #define IPMI_MSG1_RSADDR_OFFSET              0
-#define IPMI_MSG1_NETFN_OFFSET               1
+#define IPMI_MSG1_NETFNLUN_OFFSET            1
 #define IPMI_MSG2_RSADDR_OFFSET              0    /* Requester's address (used in bridged IPMI msg 2) */
 #define IPMI_MSG2_ID_OFFSET                  3    /* Session ID */
 #define IPMI_MSG2_ID_LENGTH                  4    
@@ -99,12 +99,12 @@
 #define IPMI_MSG_CMD_GET_FAN_LEVEL           0x16
 #define IPMI_MSG_CMD_SET_FAN_LEVEL           0x15
 
-/* IPMI message request network function codes combined with LUN */
-#define IPMI_MSG_NETFN_CHASSIS                0x00  /* 0x00 << 2 combined with 2-bit LUN */
-#define IPMI_MSG_NETFN_SENSOR_EVENT           0x10  /* 0x04 << 2 combined with 2-bit LUN */
-#define IPMI_MSG_NETFN_APP_REQUEST            0x18  /* 0x06 << 2 combined with 2-bit LUN */
-#define IPMI_MSG_NETFN_STORAGE                0x28  /* 0x0A << 2 combined with 2-bit LUN */
-#define IPMI_MSG_NETFN_PICMG                  0xB0  /* 0x2C << 2 combined with 2-bit LUN */
+/* IPMI message request network function codes */
+#define IPMI_MSG_NETFN_CHASSIS                0x00
+#define IPMI_MSG_NETFN_SENSOR_EVENT           0x04
+#define IPMI_MSG_NETFN_APP_REQUEST            0x06
+#define IPMI_MSG_NETFN_STORAGE                0x0A
+#define IPMI_MSG_NETFN_PICMG                  0x2C
 
 /* Response message lengths (0s for those we haven't figured out yet) */
 #define IPMI_RPLY_PONG_LENGTH                    28
