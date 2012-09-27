@@ -1,7 +1,12 @@
+27Sep2012 (SH)
+NETFN macros no longer include LUN; break LUN and NetFn out. 
+Rename IPMI_MSG1_NETFNLUN_OFFSET IPMI_MSG1_NETFN_OFFSET
+Changes to src/ipmiDef.c, ipmiDef.h, ipmiMsg.c
+
 Release: ipmiComm-R1-3-3
 
 24Sep2012 (SH)
-Check sensor 'reading/state availabe' before copying
+Check sensor 'reading/state available' before copying
   sensor reading to PV. Changes to:
   src/devMch.c, ipmiDef.c
 
