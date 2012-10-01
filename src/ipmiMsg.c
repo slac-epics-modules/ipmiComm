@@ -277,7 +277,7 @@ int        i;
  * If error, increment error count. Else, set error count back to zero.
  * If MCH is alive, but there is no response or error count reaches 10,
  * start a new session and return error. 
- * Check session sequence, completion code.
+ * Check message sequence, session sequence, completion code.
  *
  *   RETURNS: 0 if non-zero response
  *           -1 if error, no response, or failed to start new session
@@ -291,90 +291,67 @@ int      ipmiSeqOffs = IPMI_RPLY_SEQLUN_OFFSET;
 uint8_t  seq[4];
 uint32_t seqInt;
 uint32_t seqRplyInt;
-int      err = 0;
 
-       	if ( mchIsAlive[mchSess->instance] ) {
+       	if ( !mchIsAlive[mchSess->instance] )
+		return -1;
 
-		status = ipmiMsgWriteRead( mchSess->name, message, messageSize, response, responseSize, mchSess->timeout );
+       	status = ipmiMsgWriteRead( mchSess->name, message, messageSize, response, responseSize, mchSess->timeout );
 
-		/* Verify correct IPMI sequence */
-		ipmiSeq = (response[ipmiSeqOffs] & 0xFC) >> 2;
+       	if ( (*responseSize == 0) || (mchSess->err > 9) ) {
 
-		if ( ipmiSeq != mchSess->seq ) {
-			printf("%s Incorrect IPMI sequence; got %i but expected %i\n", mchSess->name, ipmiSeq, mchSess->seq );
+       		if ( IPMICOMM_DEBUG )
+       			printf("%s start new session; err count is %i\n", mchSess->name, mchSess->err);
+
+       		/* Reset error count to 0 */
+       		mchSess->err = 0;
+
+       		/* Close current session, start new one, and return error */
+       		ipmiMsgCloseSess( mchSess, response );
+       		mchNewSession( mchSess );
+       	       	return -1;
+       	}
+
+       	/* Verify IPMI message sequence number. If incorrect, increment error count and return error */
+       	ipmiSeq = (response[ipmiSeqOffs] & 0xFC) >> 2;
+       	if ( ipmiSeq != mchSess->seq ) {
+	       	if ( IPMICOMM_DEBUG )
+	       		printf("%s Incorrect IPMI sequence; got %i but expected %i\n", mchSess->name, ipmiSeq, mchSess->seq );
+	       	mchSess->err++;
+	       	return -1;
+       	}
+
+	/* Extract session sequence number from reply */
+	for ( i = 0; i < IPMI_RPLY_SEQ_LENGTH ; i++)
+       	       	seq[i] = response[IPMI_RPLY_SEQ_OFFSET + i];
+	       
+	seqInt     = arrayToUint32( seq );
+	seqRplyInt = arrayToUint32( mchSess->seqRply );
+
+	/* Check session sequence number. If it is not increasing or more than 
+	 * 7 counts higher than last time, increment our stored seq number and set error. 
+	 * Else store sequence number.
+	 *
+	 * If seq number error or completion code non-zero, increment error count and return error.
+         * Else reset error count to 0 and return success.
+	 */
+	if ( (seqInt <= seqRplyInt) || (seqInt - seqRplyInt > 7) ) {
+		if ( IPMICOMM_DEBUG > 1 )
+	       		printf("%s sequence number %i, previous %i\n", mchSess->name, seqInt, seqRplyInt);
+	       	incr4Uint8Array( mchSess->seqRply, 1 );
+		mchSess->err++;
+		return -1;
+       	}
+       	else {
+		for ( i = 0; i < IPMI_RPLY_SEQ_LENGTH ; i++)
+			mchSess->seqRply[i] = seq[i];
+
+		if ( response[IPMI_RPLY_COMPLETION_CODE_OFFSET] ) {
+			mchSess->err++;
 			return -1;
 		}
+	}
 
-		if ( (*responseSize == 0) || (mchSess->err > 9) ) {
-
-			if ( IPMICOMM_DEBUG )
-				printf("%s start new session; err count is %i\n", mchSess->name, mchSess->err);
-
-			mchSess->err = 0;
-
-       			/* Close current session, start new one, and return error */
-			ipmiMsgCloseSess( mchSess, response );
-       			mchNewSession( mchSess );
-       		       	return -1;
-		}
-		else {
-			/* Extract session sequence number from reply */
-       			for ( i = 0; i < IPMI_RPLY_SEQ_LENGTH ; i++)
-       				seq[i] = response[IPMI_RPLY_BRIDGED_SEQ_OFFSET + i];
-	       
-			seqInt     = arrayToUint32( seq );
-			seqRplyInt = arrayToUint32( mchSess->seqRply );
-
-			/* Check session sequence number. If it is 0, we probably did not receive a second message,
-                         * so increment our stored seq number by 1 and set error. Else, if seq number is not 
-			 * increasing or more than 7 counts higher than last time, increment stored 
-                         * seq number by 2 (for the 2 responses) and set error. Else store sequence number.
-                         *
-                         * If seq number error, ipmiMsgWriteRead returned error, or completion code
-                         * non-zero, return error.
-                         */
-			if ( seqInt == 0 ) {
-				if ( IPMICOMM_DEBUG )
-					printf("%s received 0 sequence number\n", mchSess->name);
-				if ( IPMICOMM_DEBUG > 1 ) {
-					printf("%s msg raw:\n", mchSess->name);
-					for ( i = 0; i < *responseSize; i++ )
-						printf("%02x ", response[i]);
-					printf("\n");
-				}
-				incr4Uint8Array( mchSess->seqRply, 1 );
-				err = 1;
-			}				
-			else if ( (seqInt <= seqRplyInt) || (seqInt - seqRplyInt > 7) ) {
-				if ( IPMICOMM_DEBUG > 1 )
-					printf("%s sequence number %i, previous %i\n", mchSess->name, seqInt, seqRplyInt);
-				incr4Uint8Array( mchSess->seqRply, 2 );
-				err = 1;
-			}
-			else if ( status ) {
-				for ( i = 0; i < IPMI_RPLY_SEQ_LENGTH ; i++)
-					mchSess->seqRply[i] = seq[i];
-			}
-			else {
-				for ( i = 0; i < IPMI_RPLY_SEQ_LENGTH ; i++)
-					mchSess->seqRply[i] = seq[i];
-			}
-
-			if ( response[IPMI_RPLY_COMPLETION_CODE_OFFSET] )
-				err = 1;	
-		}
-
-	       	if ( err ) {
-	       		mchSess->err++;
-	       		return -1;
-	       	}
-	       	else
-	       		mchSess->err = 0;
-       	}
-						
-       	else
-	       	return -1;
-
+	mchSess->err = 0;
 	return 0;
 }
 
