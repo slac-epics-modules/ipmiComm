@@ -42,7 +42,8 @@ int  mchSdrGetDataAll(MchSess mchSess, MchSys mchSys);
 void mchFruGetDataAll(MchSess mchSess, MchSys mchSys);
 
 /* Compare installed FRUs with those stored in mchData structure.
- * Called after system has come back online after outage.
+ * Will be used to detect changes in installed FRUs.
+ * (Not in use yet)
  *
  * Caller must perform locking.
  *
@@ -200,6 +201,15 @@ int     inst = mchSess->instance;
 
 	if ( mchWasOffline[inst] ) {
 
+			*init = MCH_INIT_NOT_DONE;
+			if ( drvMchInitScan )
+				scanIoRequest( drvMchInitScan );
+			errlogPrintf("%s MCH back online, but FRUs and sensor addresses may have changed\n", mchSess->name);
+	}
+
+	/* Leave commented for now until ready to handle dynamic sensor addresses and shelf contents
+	if ( mchWasOffline[inst] ) {
+
        		mchWasOffline[inst] = 0;
 
        		*init = MCH_INIT_IN_PROGRESS;
@@ -220,6 +230,7 @@ int     inst = mchSess->instance;
 			errlogPrintf("%s MCH back online with same FRU configuration\n", mchSess->name);
 		}
 	}
+	*/
 
 	return 0;
 }
