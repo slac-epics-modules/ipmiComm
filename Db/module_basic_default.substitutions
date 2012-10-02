@@ -1,9 +1,9 @@
 #==============================================================================
 #
 # Abs:  Default MCH module and sensor PVs, to be used by visibility rules 
-#       on EDM displays and potentially overloaded during ioc boot
+#       on EDM displays and potentially overloaded during ioc boot.
 #
-# Name:  module_mch_default.substitutions
+# Name:  module_basic_default.substitutions
 #
 # Macros in:
 #	dev      Shelf name, for example CRAT:LI28:RF01
@@ -35,6 +35,11 @@ file sensor_default.db
            { $(crat)    ,  $(id)	,  $(unit)  	,  TEMP3	}
            { $(crat)    ,  $(id)	,  $(unit)  	,  TEMP4	}
            { $(crat)    ,  $(id)	,  $(unit)  	,  TEMP5	}
+           { $(crat)    ,  $(id)	,  $(unit)  	,  TEMP6	}
+           { $(crat)    ,  $(id)	,  $(unit)  	,  TEMP7	}
+           { $(crat)    ,  $(id)	,  $(unit)  	,  TEMP8	}
+           { $(crat)    ,  $(id)	,  $(unit)  	,  TEMP9	}
+           { $(crat)    ,  $(id)	,  $(unit)  	,  TEMP10	}
            { $(crat)    ,  $(id)	,  $(unit)  	,  V1		}
            { $(crat)    ,  $(id)	,  $(unit)  	,  V2		}
            { $(crat)    ,  $(id)	,  $(unit)  	,  V3		}

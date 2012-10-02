@@ -40,4 +40,9 @@ file sensor_default.db
            { $(crat)    ,  $(id)	,  $(unit)  	,  V3		}
            { $(crat)    ,  $(id)	,  $(unit)  	,  V4		}
            { $(crat)    ,  $(id)	,  $(unit)  	,  V5		}
+           { $(crat)    ,  $(id)	,  $(unit)  	,  V6		}
+           { $(crat)    ,  $(id)	,  $(unit)  	,  V7		}
+           { $(crat)    ,  $(id)	,  $(unit)  	,  V8		}
+           { $(crat)    ,  $(id)	,  $(unit)  	,  V9		}
+           { $(crat)    ,  $(id)	,  $(unit)  	,  V10		}
 }			

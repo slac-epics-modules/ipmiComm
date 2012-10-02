@@ -18,6 +18,7 @@ record(mbbi, "$(dev):$(code)$(inst)_TYPE") {
 record(ai, "$(dev):$(code)$(inst)_FRUID") {
   field(DESC, "Module type")
   field(VAL,  "$(fruid)")
+  field(PINI, "YES")
 }
 
 record(stringin, "$(dev):$(code)$(inst)_BMANUF") {

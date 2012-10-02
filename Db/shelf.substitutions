@@ -28,32 +28,11 @@ file shelf_default.db
 	   { $(dev)	, $(link)	}	
 }
 
-file module_mch_default.db
+file module_basic_default.db
 {
    pattern { crat	,  id	,  unit	}
            { $(dev)     ,  MCH	,  1  	}
            { $(dev)     ,  MCH	,  2  	}
-}
-
-file module_cu_default.db
-{
-   pattern { crat	,  id	,  unit	}
-           { $(dev)     ,  CU	,  1  	}
-           { $(dev)     ,  CU	,  2  	}
-}
-
-file module_pm_default.db
-{
-   pattern { crat	,  id	,  unit	}
-           { $(dev)     ,  PM	,  1  	}
-           { $(dev)     ,  PM	,  2  	}
-           { $(dev)     ,  PM	,  3  	}
-           { $(dev)     ,  PM	,  4  	}
-}
-
-file module_amc_rtm_default.db
-{
-   pattern { crat	,  id	,  unit	}
            { $(dev)     ,  AMC	,  1  	}
            { $(dev)     ,  AMC	,  2  	}
            { $(dev)     ,  AMC	,  3  	}
@@ -78,5 +57,21 @@ file module_amc_rtm_default.db
            { $(dev)     ,  RTM	,  10  	}
            { $(dev)     ,  RTM	,  11  	}
            { $(dev)     ,  RTM	,  12  	}
+}
+
+file module_cu_default.db
+{
+   pattern { crat	,  id	,  unit	}
+           { $(dev)     ,  CU	,  1  	}
+           { $(dev)     ,  CU	,  2  	}
+}
+
+file module_pm_default.db
+{
+   pattern { crat	,  id	,  unit	}
+           { $(dev)     ,  PM	,  1  	}
+           { $(dev)     ,  PM	,  2  	}
+           { $(dev)     ,  PM	,  3  	}
+           { $(dev)     ,  PM	,  4  	}
 }
 
