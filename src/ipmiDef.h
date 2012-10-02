@@ -72,6 +72,7 @@
 #define IPMI_MSG2_SET_FRU_POLICY_MASK_OFFSET 5
 #define IPMI_MSG2_SET_FRU_POLICY_BITS_OFFSET 6
 #define IPMI_MSG2_SET_FAN_LEVEL_LEVEL_OFFSET 5    /* New fan level to set */
+#define IPMI_MSG2_GET_POWER_LEVEL_TYPE_OFFSET 5
 
 /* IPMI message command codes (cmd) */
 #define IPMI_MSG_CMD_GET_CHAN_AUTH           0x38
@@ -95,6 +96,7 @@
 #define IPMI_MSG_CMD_SET_FRU_POLICY          0x0A
 #define IPMI_MSG_CMD_SET_FRU_ACT             0x0C
 #define IPMI_MSG_CMD_GET_DEVICE_ID           0x01
+#define IPMI_MSG_CMD_GET_POWER_LEVEL         0x12
 #define IPMI_MSG_CMD_GET_FAN_PROP            0x14
 #define IPMI_MSG_CMD_GET_FAN_LEVEL           0x16
 #define IPMI_MSG_CMD_SET_FAN_LEVEL           0x15
@@ -180,6 +182,37 @@
 #define IPMI_DATA_TYPE(x)          x & 3<<6
 #define IPMI_DATA_LENGTH(x)        x & 0x3F
 #define IPMI_DATA_LANG_ENGLISH(x)  x==0 || x==25                 
+
+/* Completion codes, IPMI spec Table 5-2 */
+#define IPMI_COMP_CODE_NORMAL                   0x00
+#define IPMI_COMP_CODE_NODE_BUSY                0xC0
+#define IPMI_COMP_CODE_INVALID_COMMAND          0xC1
+#define IPMI_COMP_CODE_INVALID_COMMAND_FOR_LUN  0xC2
+#define IPMI_COMP_CODE_TIMEOUT                  0xC3
+#define IPMI_COMP_CODE_OUT_OF_SPACE             0xC4
+#define IPMI_COMP_CODE_RESERVATION              0xC5
+#define IPMI_COMP_CODE_REQUEST_TRUNCATED        0xC6
+#define IPMI_COMP_CODE_REQUEST_LENGTH_INVALID   0xC7
+#define IPMI_COMP_CODE_REQUEST_LENGTH_LIMIT     0xC8
+#define IPMI_COMP_CODE_PARAMETER_RANGE          0xC9
+#define IPMI_COMP_CODE_REQUESTED_BYTES          0xCA
+#define IPMI_COMP_CODE_REQUESTED_DATA           0xCB
+#define IPMI_COMP_CODE_INVALID_FIELD            0xCC
+#define IPMI_COMP_CODE_COMMAND_ILLEGAL          0xCD
+#define IPMI_COMP_CODE_COMMAND_RESPONSE         0xCE
+#define IPMI_COMP_CODE_DUPLICATED_REQUEST       0xCF
+#define IPMI_COMP_CODE_SDR_REP_UPDATE           0xD0
+#define IPMI_COMP_CODE_DEVICE_FW_UPDATE         0xD1
+#define IPMI_COMP_CODE_BMC_INIT                 0xD2
+#define IPMI_COMP_CODE_DESTINATION_UNAVAIL      0xD3
+#define IPMI_COMP_CODE_PRIVILEGE                0xD4
+#define IPMI_COMP_CODE_NOT_SUPPORTED            0xD5
+#define IPMI_COMP_CODE_SUBFUNCTION_UNAVAIL      0xD6
+#define IPMI_COMP_CODE_DEVICE_SPECIFIC_MIN      0x01
+#define IPMI_COMP_CODE_DEVICE_SPECIFIC_MAX      0x7E
+#define IPMI_COMP_CODE_COMMAND_SPECIFIC_MIN     0x80
+#define IPMI_COMP_CODE_COMMAND_SPECIFIC_MAX     0xBE
+#define IPMI_COMP_CODE_UNSPECIFIED              0xFF
 
 /* Sensor Data Record (SDR) types*/
 #define SDR_TYPE_FULL_SENSOR      0x01

@@ -1,3 +1,25 @@
+02Oct2012 (SH)
+Add PICMG Get Power Level message
+  Changes to ipmiMsg.c/.h, ipmiDef.c/.h
+Print non-zero completion code information
+  Changes to ipmiMsg.c, ipmiDef.h
+  New routine ipmiCompletionCode
+  Add command and network function arguments to ipmiWriteReadHelper;
+    pass these arguments from most ipmi message routines
+ipmiMsg.c: ipmiWriteReadHelper: if non-zero completion code, return
+  value of code
+drvMch.c: during FRU data read if error returned is 'sensor/data
+  not present', abort read
+
+01Oct2012 (SH)
+src/drvMch.c: Sensor addresses can change when system power cycled, 
+  even if FRU configuration is unchanged. Thus if we detect
+  MCH was offline, set communication status to 'not initialized'.
+src/ipmiMsg.c: ipmiMsgWriteReadHelper: reorganize routine; do not
+  check asyn status from ipmiMsgWriteRead; check session sequence number
+  in first response (often in send message response) so that NAT and MCH
+  checks can be identical (NAT sends one message only).  
+
 27Sep2012 (SH)
 NETFN macros no longer include LUN; break LUN and NetFn out. 
 Rename IPMI_MSG1_NETFNLUN_OFFSET IPMI_MSG1_NETFN_OFFSET

@@ -171,3 +171,12 @@ uint8_t SET_FAN_LEVEL_MSG[] = {  IPMI_MSG_ADDR_BMC,           /* Requester's add
                                  0,                           /* Fan level */	
                                  0,                           /* OPTIONAL local control enable state, 0 to disable, 1 to enable */	
                                  0 };                         /* For checksum */
+
+/* Set Power Level */
+uint8_t GET_POWER_LEVEL_MSG[] = {  IPMI_MSG_ADDR_BMC,         /* Requester's address */            
+                                 0,                           /* Message sequence number */         
+                                 IPMI_MSG_CMD_GET_POWER_LEVEL,/* Command code */         
+			         0,                           /* PICMG Identifier, 0x00 is used */
+                                 0,                           /* FRU ID */	
+                                 0,                           /* Power type: steady state, desired, early, desired early */	
+                                 0 };                         /* For checksum */

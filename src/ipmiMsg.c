@@ -108,6 +108,306 @@ uint32_t cs = 0;
 	return ( 0x100 - (cs & 0xFF) );	
 }
 
+/* Print command description and response completion code */
+void
+ipmiCompletionCode(const char *name, uint8_t code, uint8_t cmd, uint8_t netfn)
+{
+char cmdStr[50];
+char codeStr[100];
+
+	switch ( code ) {
+
+		default:
+			sprintf( codeStr, "Unspecified completion code" );
+			goto codeDone;
+
+		case IPMI_COMP_CODE_NORMAL:                
+			sprintf( codeStr, "Command completed normally" );
+			goto codeDone;
+
+		case IPMI_COMP_CODE_NODE_BUSY:               
+			sprintf( codeStr, "Node busy" );
+			goto codeDone;
+
+		case IPMI_COMP_CODE_INVALID_COMMAND:         
+			sprintf( codeStr, "Invalid command" );
+			goto codeDone;
+
+		case IPMI_COMP_CODE_INVALID_COMMAND_FOR_LUN: 
+			sprintf( codeStr, "Invalid command for given LUN" );
+			goto codeDone;
+
+		case IPMI_COMP_CODE_TIMEOUT:                 
+			sprintf( codeStr, "Timeout while processing command" );
+			goto codeDone;
+
+		case IPMI_COMP_CODE_OUT_OF_SPACE:            
+			sprintf( codeStr, "Out of space" );
+			goto codeDone;
+
+		case IPMI_COMP_CODE_RESERVATION:   
+			sprintf( codeStr, "Reservation cancelled or invalid reservation ID" );
+			goto codeDone;
+          
+		case IPMI_COMP_CODE_REQUEST_TRUNCATED:       
+			sprintf( codeStr, "Request data truncated" );
+			goto codeDone;
+
+		case IPMI_COMP_CODE_REQUEST_LENGTH_INVALID:  
+			sprintf( codeStr, "Request data length invalid" );
+			goto codeDone;
+
+		case IPMI_COMP_CODE_REQUEST_LENGTH_LIMIT:    
+			sprintf( codeStr, "Request data field length exceeded" );
+			goto codeDone;
+
+		case IPMI_COMP_CODE_PARAMETER_RANGE: 
+			sprintf( codeStr, "Parameter out of range" );
+			goto codeDone;
+        
+		case IPMI_COMP_CODE_REQUESTED_BYTES:    
+			sprintf( codeStr, "Cannot return number of requested data bytes" );
+			goto codeDone;
+     
+		case IPMI_COMP_CODE_REQUESTED_DATA:  
+			sprintf( codeStr, "Requested sensor, data, or record not present" );
+			goto codeDone;
+        
+		case IPMI_COMP_CODE_INVALID_FIELD: 
+			sprintf( codeStr, "Invalid data field in request" );
+			goto codeDone;
+          
+		case IPMI_COMP_CODE_COMMAND_ILLEGAL:        
+			sprintf( codeStr, "Command illegal for specified sensor or record type" );
+			goto codeDone;
+ 
+		case IPMI_COMP_CODE_COMMAND_RESPONSE:        
+			sprintf( codeStr, "Command response could not be provided" );
+			goto codeDone;
+
+		case IPMI_COMP_CODE_DUPLICATED_REQUEST:  
+			sprintf( codeStr, "Cannot execute duplicated request" );
+			goto codeDone;
+    
+		case IPMI_COMP_CODE_SDR_REP_UPDATE:        
+			sprintf( codeStr, "Response could not be provided. SDR repository in update mode" );
+			goto codeDone;
+  
+		case IPMI_COMP_CODE_DEVICE_FW_UPDATE:        
+			sprintf( codeStr, "Response could not be provided. Device in firmware update mode" );
+			goto codeDone;
+
+		case IPMI_COMP_CODE_BMC_INIT:    
+			sprintf( codeStr, "Response could not be provided. BMC initialization in progress" );
+			goto codeDone;
+            
+		case IPMI_COMP_CODE_DESTINATION_UNAVAIL:   
+			sprintf( codeStr, "Destination unavailable" );
+			goto codeDone;
+  
+		case IPMI_COMP_CODE_PRIVILEGE:     
+			sprintf( codeStr, "Insufficient privilege level or other security-based restriction" );
+			goto codeDone;
+          
+		case IPMI_COMP_CODE_NOT_SUPPORTED:     
+			sprintf( codeStr, "Command or request parameter not supported in present state" );
+			goto codeDone;
+      
+		case IPMI_COMP_CODE_SUBFUNCTION_UNAVAIL:     
+			sprintf( codeStr, "Parameter is illegal because sub-function is unavailable" );
+			goto codeDone;
+
+	}
+
+
+	if ( (code >= IPMI_COMP_CODE_DEVICE_SPECIFIC_MIN) && (code <= IPMI_COMP_CODE_DEVICE_SPECIFIC_MAX) ) 
+		sprintf( codeStr, "Device-specific completion code %02x", code );
+
+	else if ( (code >= IPMI_COMP_CODE_COMMAND_SPECIFIC_MIN) && (code <= IPMI_COMP_CODE_DEVICE_SPECIFIC_MAX) ) {
+
+		switch ( cmd ) {
+
+			default: 
+				sprintf( codeStr, "Command-specific completion code %02x", code );
+				goto codeDone;
+
+			case IPMI_MSG_CMD_SEND_MSG:
+
+				switch ( code ) {
+
+					default: 
+					sprintf( codeStr, "Send Message completion code %02x", code );
+						goto codeDone;
+
+					case 0x80:
+						sprintf( codeStr, "Invalid session handle" );
+						goto codeDone;
+				}
+		}
+	}
+
+codeDone:
+
+	switch ( netfn ) {
+
+		default:
+			break;
+
+		case IPMI_MSG_NETFN_CHASSIS:
+
+			switch ( cmd ) {
+
+				default:
+					sprintf( cmdStr, "NetFn Chassis command %02x", cmd );
+					break;
+
+				case IPMI_MSG_CMD_GET_CHAS_STATUS:       
+					sprintf( cmdStr, "Get Chassis Status" );
+					break;
+
+				case IPMI_MSG_CMD_CHAS_CTRL:             
+					sprintf( cmdStr, "Chassis Control" );
+					break;
+			}
+			break;
+
+		case IPMI_MSG_NETFN_APP_REQUEST:
+
+			switch ( cmd ) {
+
+				default:
+					sprintf( cmdStr, "NetFn App Request command %02x", cmd );
+					break;
+				
+				case IPMI_MSG_CMD_GET_CHAN_AUTH:         
+					sprintf( cmdStr, "Get Channel Authentication Capabilities" );
+					break;
+
+				case IPMI_MSG_CMD_GET_SESSION_CHALLENGE: 
+					sprintf( cmdStr, "Get Session Challenge" );
+					break;
+
+				case IPMI_MSG_CMD_ACTIVATE_SESSION:      
+					sprintf( cmdStr, "Activate Session" );
+					break;
+
+				case IPMI_MSG_CMD_SET_PRIV_LEVEL:        
+					sprintf( cmdStr, "Set Privilege Level" );
+					break;
+
+				case IPMI_MSG_CMD_CLOSE_SESSION:         
+					sprintf( cmdStr, "Close Session" );
+					break;
+
+				case IPMI_MSG_CMD_SEND_MSG:              
+					sprintf( cmdStr, "Send Message" );
+					break;
+
+				case IPMI_MSG_CMD_COLD_RESET:            
+					sprintf( cmdStr, "Cold Reset" );
+					break;
+			}
+			break;
+
+		case IPMI_MSG_NETFN_SENSOR_EVENT:
+
+			switch ( cmd ) {
+
+				default:
+					sprintf( cmdStr, "NetFn Sensor/Event command %02x", cmd );
+					break;
+
+				case IPMI_MSG_CMD_SENSOR_READ:           
+					sprintf( cmdStr, "Get Sensor Reading" );
+					break;
+
+				case IPMI_MSG_CMD_GET_DEV_SDR_INFO:      
+					sprintf( cmdStr, "Get Device SDR Info" );
+					break;
+
+				case IPMI_MSG_CMD_GET_DEV_SDR:           
+					sprintf( cmdStr, "Get Device SDR" );
+					break;
+			}
+			break;
+
+		case IPMI_MSG_NETFN_STORAGE:
+
+			switch ( cmd ) {
+
+				default:
+					sprintf( cmdStr, "NetFn Storage command %02x", cmd );
+					break;
+
+				case IPMI_MSG_CMD_GET_FRU_INFO:          
+					sprintf( cmdStr, "Get FRU Inventory Area Info" );
+					break;
+
+				case IPMI_MSG_CMD_READ_FRU_DATA:         
+					sprintf( cmdStr, "Read FRU Data" );
+					break;
+
+				case IPMI_MSG_CMD_WRITE_FRU_DATA:        
+					sprintf( cmdStr, "Write FRU Data" );
+					break;
+
+				case IPMI_MSG_CMD_GET_SDRREP_INFO:       
+					sprintf( cmdStr, "Get SDR Repository Info" );
+					break;
+
+				case IPMI_MSG_CMD_RESERVE_SDRREP:        
+					sprintf( cmdStr, "Reserve SDR Repository" );
+					break;
+
+				case IPMI_MSG_CMD_GET_SDR:               
+					sprintf( cmdStr, "Get SDR" );
+					break;
+			}
+			break;
+
+		case IPMI_MSG_NETFN_PICMG:
+
+			switch ( cmd ) {
+
+				default:
+					sprintf( cmdStr, "NetFn PICMG command %02x", cmd );
+					break;
+
+				case IPMI_MSG_CMD_SET_FRU_POLICY:        
+					sprintf( cmdStr, "Set FRU Activation Policy" );
+					break;
+
+				case IPMI_MSG_CMD_SET_FRU_ACT:           
+					sprintf( cmdStr, "Set FRU Activaion" );
+					break;
+
+				case IPMI_MSG_CMD_GET_DEVICE_ID:         
+					sprintf( cmdStr, "Get Device ID" );
+					break;
+
+				case IPMI_MSG_CMD_GET_POWER_LEVEL:       
+					sprintf( cmdStr, "Get FRU Power Level" );
+					break;
+
+				case IPMI_MSG_CMD_GET_FAN_PROP:          
+					sprintf( cmdStr, "Get Fan Properties" );
+					break;
+
+				case IPMI_MSG_CMD_GET_FAN_LEVEL:         
+					sprintf( cmdStr, "Get Fan Level" );
+					break;
+
+				case IPMI_MSG_CMD_SET_FAN_LEVEL:         
+					sprintf( cmdStr, "Set Fan Level" );
+					break;
+			}
+	}
+
+	if ( IPMICOMM_DEBUG )
+		printf("%s %s: %s\n", name, cmdStr, codeStr);
+
+}
+
 /* 
  * Set session sequence number and session ID for IPMI message,
  * depending on message type. Copy to header.
@@ -251,7 +551,7 @@ int        i;
 
 	pasynManager->freeAsynUser( pasynUser );
 
-	if ( IPMICOMM_DEBUG ) {
+	if ( IPMICOMM_DEBUG > 1 ) {
 
 		if ( status )
 			printf("%s Message status %i, received %i, expected %i, timeout %.1f\n", name, status, responseLen, *responseSize, timeout );
@@ -279,14 +579,14 @@ int        i;
  * start a new session and return error. 
  * Check message sequence, session sequence, completion code.
  *
- *   RETURNS: 0 if non-zero response
- *           -1 if error, no response, or failed to start new session
+ *   RETURNS: 0 if error-free response
+ *            non-zero if error, no response, or failed to start new session
  */
 int
-ipmiMsgWriteReadHelper(MchSess mchSess, uint8_t *message, size_t messageSize, uint8_t *response, size_t *responseSize)
+ipmiMsgWriteReadHelper(MchSess mchSess, uint8_t *message, size_t messageSize, uint8_t *response, size_t *responseSize, uint8_t cmd, uint8_t netfn)
 {
 int      i, status;
-uint8_t  ipmiSeq = 0;
+uint8_t  ipmiSeq = 0, code;
 int      ipmiSeqOffs = IPMI_RPLY_SEQLUN_OFFSET;
 uint8_t  seq[4];
 uint32_t seqInt;
@@ -345,9 +645,10 @@ uint32_t seqRplyInt;
 		for ( i = 0; i < IPMI_RPLY_SEQ_LENGTH ; i++)
 			mchSess->seqRply[i] = seq[i];
 
-		if ( response[IPMI_RPLY_COMPLETION_CODE_OFFSET] ) {
+		if ( (code = response[IPMI_RPLY_COMPLETION_CODE_OFFSET]) ) {
+			ipmiCompletionCode( mchSess->name, code, cmd, netfn );
 			mchSess->err++;
-			return -1;
+			return code;
 		}
 	}
 
@@ -460,12 +761,13 @@ uint8_t *imsg2     = BASIC_MSG;
 size_t   imsg2Size = sizeof( BASIC_MSG );
 size_t   messageSize;
 size_t   responseSize = 0;
+uint8_t  cmd = IPMI_MSG_CMD_COLD_RESET;
 
-	imsg2[IPMI_MSG2_CMD_OFFSET] = IPMI_MSG_CMD_COLD_RESET;
+	imsg2[IPMI_MSG2_CMD_OFFSET] = cmd;
 
-	messageSize = ipmiMsgBuild( mchSess, message, IPMI_MSG_CMD_COLD_RESET, imsg2, imsg2Size, 0, 0, 0, 0 );
+	messageSize = ipmiMsgBuild( mchSess, message, cmd, imsg2, imsg2Size, 0, 0, 0, 0 );
 
-	return ipmiMsgWriteReadHelper( mchSess, message, messageSize, data, &responseSize );
+	return ipmiMsgWriteReadHelper( mchSess, message, messageSize, data, &responseSize, cmd, IPMI_MSG_NETFN_APP_REQUEST );
 }
 
 /* Chassis Control 
@@ -486,6 +788,8 @@ uint8_t  bmsg1[bmsg1Size];
 uint8_t  bmsg2[bmsg2Size];
 size_t   messageSize;
 size_t   responseSize = 0;
+uint8_t  cmd   = IPMI_MSG_CMD_CHAS_CTRL;
+uint8_t  netfn = IPMI_MSG_NETFN_CHASSIS;
 
 	memcpy( imsg2, SEND_MSG_MSG , imsg2Size );
 	memcpy( bmsg1, IPMI_MSG1    , bmsg1Size );
@@ -494,14 +798,14 @@ size_t   responseSize = 0;
 	imsg2[IPMI_MSG2_CHAN_OFFSET] = 0x40/*channel*/;
 
 	bmsg1[IPMI_MSG1_RSADDR_OFFSET]   = IPMI_MSG_ADDR_CM;
-	bmsg1[IPMI_MSG1_NETFNLUN_OFFSET] = IPMI_MSG_NETFN_CHASSIS << 2;
+	bmsg1[IPMI_MSG1_NETFNLUN_OFFSET] = netfn << 2;
 
-	bmsg2[IPMI_MSG2_CMD_OFFSET]    = IPMI_MSG_CMD_CHAS_CTRL;
+	bmsg2[IPMI_MSG2_CMD_OFFSET]    = cmd;
 	bmsg2[IPMI_MSG2_SENSOR_OFFSET] = parm;
 
-	messageSize = ipmiMsgBuild( mchSess, message, IPMI_MSG_CMD_CHAS_CTRL, imsg2, imsg2Size, bmsg1, bmsg1Size, bmsg2, bmsg2Size );
+	messageSize = ipmiMsgBuild( mchSess, message, cmd, imsg2, imsg2Size, bmsg1, bmsg1Size, bmsg2, bmsg2Size );
 
-	return ipmiMsgWriteReadHelper( mchSess, message, messageSize, data, &responseSize );
+	return ipmiMsgWriteReadHelper( mchSess, message, messageSize, data, &responseSize, cmd, netfn );
 }
 
 /* Get FRU Inventory Info 
@@ -522,6 +826,8 @@ uint8_t  bmsg1[bmsg1Size];
 uint8_t  bmsg2[bmsg2Size];
 size_t   messageSize;
 size_t   responseSize = IPMI_RPLY_GET_FRU_INFO_LENGTH;
+uint8_t  cmd   = IPMI_MSG_CMD_GET_FRU_INFO;
+uint8_t  netfn = IPMI_MSG_NETFN_STORAGE;
 
 	memcpy( imsg2, SEND_MSG_MSG , imsg2Size );
 	memcpy( bmsg1, IPMI_MSG1    , bmsg1Size );
@@ -530,14 +836,14 @@ size_t   responseSize = IPMI_RPLY_GET_FRU_INFO_LENGTH;
 	imsg2[IPMI_MSG2_CHAN_OFFSET] = 0x40/*channel*/;
 
 	bmsg1[IPMI_MSG1_RSADDR_OFFSET]   = IPMI_MSG_ADDR_CM;
-	bmsg1[IPMI_MSG1_NETFNLUN_OFFSET] = IPMI_MSG_NETFN_STORAGE << 2;
+	bmsg1[IPMI_MSG1_NETFNLUN_OFFSET] = netfn << 2;
 
-	bmsg2[IPMI_MSG2_CMD_OFFSET]    = IPMI_MSG_CMD_GET_FRU_INFO;
+	bmsg2[IPMI_MSG2_CMD_OFFSET]    = cmd;
 	bmsg2[IPMI_MSG2_SENSOR_OFFSET] = id;
 
-	messageSize = ipmiMsgBuild( mchSess, message, IPMI_MSG_CMD_GET_FRU_INFO, imsg2, imsg2Size, bmsg1, bmsg1Size, bmsg2, bmsg2Size );
+	messageSize = ipmiMsgBuild( mchSess, message, cmd, imsg2, imsg2Size, bmsg1, bmsg1Size, bmsg2, bmsg2Size );
 
-	return ipmiMsgWriteReadHelper( mchSess, message, messageSize, data, &responseSize );
+	return ipmiMsgWriteReadHelper( mchSess, message, messageSize, data, &responseSize, cmd, netfn );
 }
 
 /* Read FRU data 
@@ -558,6 +864,8 @@ uint8_t  bmsg1[bmsg1Size];
 uint8_t  bmsg2[bmsg2Size];
 size_t   messageSize;
 size_t   responseSize = IPMI_RPLY_READ_FRU_DATA_BASE_LENGTH + readSize;
+uint8_t  cmd   = IPMI_MSG_CMD_READ_FRU_DATA;
+uint8_t  netfn = IPMI_MSG_NETFN_STORAGE;
 
 	memcpy( imsg2, SEND_MSG_MSG , imsg2Size );
 	memcpy( bmsg1, IPMI_MSG1    , bmsg1Size );
@@ -566,17 +874,17 @@ size_t   responseSize = IPMI_RPLY_READ_FRU_DATA_BASE_LENGTH + readSize;
 	imsg2[IPMI_MSG2_CHAN_OFFSET] = 0x40/*channel*/;
 
 	bmsg1[IPMI_MSG1_RSADDR_OFFSET]   = IPMI_MSG_ADDR_CM;
-	bmsg1[IPMI_MSG1_NETFNLUN_OFFSET] = IPMI_MSG_NETFN_STORAGE << 2;
+	bmsg1[IPMI_MSG1_NETFNLUN_OFFSET] = netfn << 2;
 
-	bmsg2[IPMI_MSG2_CMD_OFFSET]          = IPMI_MSG_CMD_READ_FRU_DATA;
+	bmsg2[IPMI_MSG2_CMD_OFFSET]          = cmd;
 	bmsg2[IPMI_MSG2_READ_FRU_ID_OFFSET]  = id;
 	bmsg2[IPMI_MSG2_READ_FRU_LSB_OFFSET] = readOffset[0];
 	bmsg2[IPMI_MSG2_READ_FRU_MSB_OFFSET] = readOffset[1];
 	bmsg2[IPMI_MSG2_READ_FRU_CNT_OFFSET] = readSize;
 
-	messageSize = ipmiMsgBuild( mchSess, message, IPMI_MSG_CMD_READ_FRU_DATA, imsg2, imsg2Size, bmsg1, bmsg1Size, bmsg2, bmsg2Size );
+	messageSize = ipmiMsgBuild( mchSess, message, cmd, imsg2, imsg2Size, bmsg1, bmsg1Size, bmsg2, bmsg2Size );
 
-	return ipmiMsgWriteReadHelper( mchSess, message, messageSize, data, &responseSize );
+	return ipmiMsgWriteReadHelper( mchSess, message, messageSize, data, &responseSize, cmd, netfn );
 }
 
 /* Get SDR (Sensor Data Record) Repository Info 
@@ -597,6 +905,8 @@ uint8_t  bmsg1[bmsg1Size];
 uint8_t  bmsg2[bmsg2Size];
 size_t   messageSize;
 size_t   responseSize = IPMI_RPLY_GET_SDRREP_INFO_LENGTH;
+uint8_t  cmd   = IPMI_MSG_CMD_GET_SDRREP_INFO;
+uint8_t  netfn = IPMI_MSG_NETFN_STORAGE;
 
 	memcpy( imsg2, SEND_MSG_MSG , imsg2Size );
 	memcpy( bmsg1, IPMI_MSG1    , bmsg1Size );
@@ -605,14 +915,14 @@ size_t   responseSize = IPMI_RPLY_GET_SDRREP_INFO_LENGTH;
 	imsg2[IPMI_MSG2_CHAN_OFFSET] = 0x40/*channel*/;
 
 	bmsg1[IPMI_MSG1_RSADDR_OFFSET]   = IPMI_MSG_ADDR_CM;
-	bmsg1[IPMI_MSG1_NETFNLUN_OFFSET] = IPMI_MSG_NETFN_STORAGE << 2;
+	bmsg1[IPMI_MSG1_NETFNLUN_OFFSET] = netfn << 2;
 
 	bmsg2[IPMI_MSG2_RSADDR_OFFSET] = IPMI_MSG_ADDR_BMC;
-	bmsg2[IPMI_MSG2_CMD_OFFSET]    = IPMI_MSG_CMD_GET_SDRREP_INFO;
+	bmsg2[IPMI_MSG2_CMD_OFFSET]    = cmd;
 
-	messageSize = ipmiMsgBuild( mchSess, message, IPMI_MSG_CMD_GET_SDRREP_INFO, imsg2, imsg2Size, bmsg1, bmsg1Size, bmsg2, bmsg2Size );
+	messageSize = ipmiMsgBuild( mchSess, message, cmd, imsg2, imsg2Size, bmsg1, bmsg1Size, bmsg2, bmsg2Size );
 
-	return ipmiMsgWriteReadHelper( mchSess, message, messageSize, data, &responseSize );
+	return ipmiMsgWriteReadHelper( mchSess, message, messageSize, data, &responseSize, cmd, netfn );
 }
 
 /* 
@@ -640,7 +950,8 @@ uint8_t  bmsg1[bmsg1Size];
 uint8_t  bmsg2[bmsg2Size];
 size_t   messageSize;
 size_t   responseSize = 0;
-uint8_t  cmd = parm ? IPMI_MSG_CMD_GET_DEV_SDR : IPMI_MSG_CMD_GET_SDR;
+uint8_t  cmd   = parm ? IPMI_MSG_CMD_GET_DEV_SDR    : IPMI_MSG_CMD_GET_SDR;
+uint8_t  netfn = parm ? IPMI_MSG_NETFN_SENSOR_EVENT : IPMI_MSG_NETFN_STORAGE;
 
 	memcpy( imsg2, SEND_MSG_MSG , imsg2Size );
 	memcpy( bmsg1, IPMI_MSG1    , bmsg1Size );
@@ -649,7 +960,7 @@ uint8_t  cmd = parm ? IPMI_MSG_CMD_GET_DEV_SDR : IPMI_MSG_CMD_GET_SDR;
 	imsg2[IPMI_MSG2_CHAN_OFFSET] = 0x40/*channel*/;
 
 	bmsg1[IPMI_MSG1_RSADDR_OFFSET]   = IPMI_MSG_ADDR_CM;
-	bmsg1[IPMI_MSG1_NETFNLUN_OFFSET] = parm? (IPMI_MSG_NETFN_SENSOR_EVENT << 2) : (IPMI_MSG_NETFN_STORAGE << 2);
+	bmsg1[IPMI_MSG1_NETFNLUN_OFFSET] = netfn << 2;
 
 	bmsg2[IPMI_MSG2_CMD_OFFSET] = cmd;
 	bmsg2[IPMI_MSG2_GET_SDR_RES_LSB_OFFSET] = res[0];
@@ -661,7 +972,7 @@ uint8_t  cmd = parm ? IPMI_MSG_CMD_GET_DEV_SDR : IPMI_MSG_CMD_GET_SDR;
 
 	messageSize = ipmiMsgBuild( mchSess, message, cmd, imsg2, imsg2Size, bmsg1, bmsg1Size, bmsg2, bmsg2Size );
 
-	return ipmiMsgWriteReadHelper( mchSess, message, messageSize, data, &responseSize );
+	return ipmiMsgWriteReadHelper( mchSess, message, messageSize, data, &responseSize, cmd, netfn );
 }
 
 /* Get Device Sensor Data Record (SDR) Info 
@@ -682,6 +993,8 @@ uint8_t  bmsg1[bmsg1Size];
 uint8_t  bmsg2[bmsg2Size];
 size_t   messageSize;
 size_t   responseSize = 0;
+uint8_t  cmd = IPMI_MSG_CMD_GET_DEV_SDR_INFO;
+uint8_t  netfn = IPMI_MSG_NETFN_SENSOR_EVENT;
 
 	memcpy( imsg2, SEND_MSG_MSG        , imsg2Size );
 	memcpy( bmsg1, IPMI_MSG1           , bmsg1Size );
@@ -690,15 +1003,15 @@ size_t   responseSize = 0;
 	imsg2[IPMI_MSG2_CHAN_OFFSET] = 0x40/*channel*/;
 
 	bmsg1[IPMI_MSG1_RSADDR_OFFSET]   = IPMI_MSG_ADDR_CM;
-	bmsg1[IPMI_MSG1_NETFNLUN_OFFSET] = IPMI_MSG_NETFN_SENSOR_EVENT << 2;
+	bmsg1[IPMI_MSG1_NETFNLUN_OFFSET] = netfn << 2;
 
 	bmsg2[IPMI_MSG2_RSADDR_OFFSET] = IPMI_MSG_ADDR_BMC;
-	bmsg2[IPMI_MSG2_CMD_OFFSET]    = IPMI_MSG_CMD_GET_DEV_SDR_INFO;
+	bmsg2[IPMI_MSG2_CMD_OFFSET]    = cmd;
         bmsg2[IPMI_MSG2_GET_DEV_SDR_INFO_OP_OFFSET] = parm;
 
-	messageSize = ipmiMsgBuild( mchSess, message, IPMI_MSG_CMD_GET_DEV_SDR_INFO, imsg2, imsg2Size, bmsg1, bmsg1Size, bmsg2, bmsg2Size );
+	messageSize = ipmiMsgBuild( mchSess, message, cmd, imsg2, imsg2Size, bmsg1, bmsg1Size, bmsg2, bmsg2Size );
 
-	return ipmiMsgWriteReadHelper( mchSess, message, messageSize, data, &responseSize );
+	return ipmiMsgWriteReadHelper( mchSess, message, messageSize, data, &responseSize, cmd, netfn );
 }
 	
 /* Get Sensor Reading. Caller specifies expected message response length. 
@@ -718,22 +1031,24 @@ uint8_t  imsg2[imsg2Size];
 uint8_t  bmsg1[bmsg1Size];
 uint8_t  bmsg2[bmsg2Size];
 size_t   messageSize;
+uint8_t  cmd   = IPMI_MSG_CMD_SENSOR_READ;
+uint8_t  netfn = IPMI_MSG_NETFN_SENSOR_EVENT;
 
 	memcpy( imsg2, SEND_MSG_MSG , imsg2Size );
 	memcpy( bmsg1, IPMI_MSG1    , bmsg1Size );
 	memcpy( bmsg2, SENS_READ_MSG, bmsg2Size );
 
-	imsg2[IPMI_MSG2_CHAN_OFFSET] = 0x40/*channel*/;
+	imsg2[IPMI_MSG2_CHAN_OFFSET]   = 0x40/*channel*/;
        	imsg2[IPMI_MSG2_SEQLUN_OFFSET] = lun;
 
 	bmsg1[IPMI_MSG1_RSADDR_OFFSET]   = IPMI_MSG_ADDR_CM;
-	bmsg1[IPMI_MSG1_NETFNLUN_OFFSET] = IPMI_MSG_NETFN_SENSOR_EVENT << 2;
+	bmsg1[IPMI_MSG1_NETFNLUN_OFFSET] = netfn << 2;
 
 	bmsg2[IPMI_MSG2_SENSOR_OFFSET] = sens;
 
-	messageSize = ipmiMsgBuild( mchSess, message, IPMI_MSG_CMD_SENSOR_READ, imsg2, imsg2Size, bmsg1, bmsg1Size, bmsg2, bmsg2Size );
+	messageSize = ipmiMsgBuild( mchSess, message, cmd, imsg2, imsg2Size, bmsg1, bmsg1Size, bmsg2, bmsg2Size );
 
-	return ipmiMsgWriteReadHelper( mchSess, message, messageSize, data, responseSize );
+	return ipmiMsgWriteReadHelper( mchSess, message, messageSize, data, responseSize, cmd, netfn );
 }
 
 /* Set FRU Activation 
@@ -754,6 +1069,8 @@ uint8_t  bmsg1[bmsg1Size];
 uint8_t  bmsg2[bmsg2Size];
 size_t   messageSize;
 size_t   responseSize = IPMI_RPLY_SET_FRU_POLICY_LENGTH;
+uint8_t  cmd   = IPMI_MSG_CMD_SET_FRU_ACT;
+uint8_t  netfn = IPMI_MSG_NETFN_PICMG;
 
 	memcpy( imsg2, SEND_MSG_MSG   , imsg2Size );
 	memcpy( bmsg1, IPMI_MSG1      , bmsg1Size );
@@ -762,14 +1079,14 @@ size_t   responseSize = IPMI_RPLY_SET_FRU_POLICY_LENGTH;
 	imsg2[IPMI_MSG2_CHAN_OFFSET] = 0x40/*channel*/;
 
 	bmsg1[IPMI_MSG1_RSADDR_OFFSET]   = IPMI_MSG_ADDR_CM;
-	bmsg1[IPMI_MSG1_NETFNLUN_OFFSET] = IPMI_MSG_NETFN_PICMG << 2;
+	bmsg1[IPMI_MSG1_NETFNLUN_OFFSET] = netfn << 2;
 
 	bmsg2[IPMI_MSG2_SET_FRU_ACT_FRU_OFFSET] = fru;
 	bmsg2[IPMI_MSG2_SET_FRU_ACT_CMD_OFFSET] = parm;
 
-	messageSize = ipmiMsgBuild( mchSess, message, IPMI_MSG_CMD_SET_FRU_ACT, imsg2, imsg2Size, bmsg1, bmsg1Size, bmsg2, bmsg2Size );
+	messageSize = ipmiMsgBuild( mchSess, message, cmd, imsg2, imsg2Size, bmsg1, bmsg1Size, bmsg2, bmsg2Size );
 
-	return ipmiMsgWriteReadHelper( mchSess, message, messageSize, data, &responseSize );
+	return ipmiMsgWriteReadHelper( mchSess, message, messageSize, data, &responseSize, cmd, netfn );
 }
 
 /* Set FRU Activation Policy
@@ -795,6 +1112,8 @@ uint8_t  bmsg1[bmsg1Size];
 uint8_t  bmsg2[bmsg2Size];
 size_t   messageSize;
 size_t   responseSize = 0;
+uint8_t  cmd   = IPMI_MSG_CMD_SET_FRU_POLICY;
+uint8_t  netfn = IPMI_MSG_NETFN_PICMG;
 
 	memcpy( imsg2, SEND_MSG_MSG   , imsg2Size );
 	memcpy( bmsg1, IPMI_MSG1      , bmsg1Size );
@@ -803,15 +1122,15 @@ size_t   responseSize = 0;
 	imsg2[IPMI_MSG2_CHAN_OFFSET] = 0x40/*channel*/;
 
 	bmsg1[IPMI_MSG1_RSADDR_OFFSET]   = IPMI_MSG_ADDR_CM;
-	bmsg1[IPMI_MSG1_NETFNLUN_OFFSET] = IPMI_MSG_NETFN_PICMG << 2;
+	bmsg1[IPMI_MSG1_NETFNLUN_OFFSET] = netfn << 2;
 
 	bmsg2[IPMI_MSG2_SET_FRU_ACT_FRU_OFFSET] = fru;
 	bmsg2[IPMI_MSG2_SET_FRU_POLICY_MASK_OFFSET] = mask;
 	bmsg2[IPMI_MSG2_SET_FRU_POLICY_BITS_OFFSET] = bits;
 
-	messageSize = ipmiMsgBuild( mchSess, message, IPMI_MSG_CMD_SET_FRU_POLICY, imsg2, imsg2Size, bmsg1, bmsg1Size, bmsg2, bmsg2Size );
+	messageSize = ipmiMsgBuild( mchSess, message, cmd, imsg2, imsg2Size, bmsg1, bmsg1Size, bmsg2, bmsg2Size );
 
-	return ipmiMsgWriteReadHelper( mchSess, message, messageSize, data, &responseSize );
+	return ipmiMsgWriteReadHelper( mchSess, message, messageSize, data, &responseSize, cmd, netfn );
 }
 
 /* 
@@ -860,6 +1179,8 @@ uint8_t  bmsg1[bmsg1Size];
 uint8_t  bmsg2[bmsg2Size];
 size_t   messageSize;
 size_t   responseSize = 0;
+uint8_t  cmd   = IPMI_MSG_CMD_GET_DEVICE_ID;
+uint8_t  netfn = IPMI_MSG_NETFN_APP_REQUEST;
 
 	memcpy( imsg2, SEND_MSG_MSG, imsg2Size );
 	memcpy( bmsg1, IPMI_MSG1,    bmsg1Size );
@@ -868,13 +1189,13 @@ size_t   responseSize = 0;
 	imsg2[IPMI_MSG2_CHAN_OFFSET] = 0x40/*channel*/;
 
 	bmsg1[IPMI_MSG1_RSADDR_OFFSET]   = rsAddr ? rsAddr : IPMI_MSG_ADDR_CM;
-	bmsg1[IPMI_MSG1_NETFNLUN_OFFSET] = IPMI_MSG_NETFN_APP_REQUEST << 2;
+	bmsg1[IPMI_MSG1_NETFNLUN_OFFSET] = netfn << 2;
 
-	bmsg2[IPMI_MSG2_CMD_OFFSET] = IPMI_MSG_CMD_GET_DEVICE_ID;
+	bmsg2[IPMI_MSG2_CMD_OFFSET] = cmd;
                                                                           
-	messageSize = ipmiMsgBuild( mchSess, message, 0/*IPMI_MSG_CMD_GET_DEVICE_ID*/, imsg2, imsg2Size, bmsg1, bmsg1Size, bmsg2, bmsg2Size );
+	messageSize = ipmiMsgBuild( mchSess, message, cmd, imsg2, imsg2Size, bmsg1, bmsg1Size, bmsg2, bmsg2Size );
 
-	return ipmiMsgWriteReadHelper( mchSess, message, messageSize, data, &responseSize );
+	return ipmiMsgWriteReadHelper( mchSess, message, messageSize, data, &responseSize, cmd, netfn );
 }
 
 /* Get Fan Speed Properties  
@@ -895,6 +1216,8 @@ uint8_t  bmsg1[bmsg1Size];
 uint8_t  bmsg2[bmsg2Size];
 size_t   messageSize;
 size_t   responseSize = IPMI_RPLY_GET_FAN_PROP_LENGTH;
+uint8_t  cmd   = IPMI_MSG_CMD_GET_FAN_PROP;
+uint8_t  netfn = IPMI_MSG_NETFN_PICMG;
 
 	memcpy( imsg2, SEND_MSG_MSG    , imsg2Size );
 	memcpy( bmsg1, IPMI_MSG1       , bmsg1Size );
@@ -903,13 +1226,13 @@ size_t   responseSize = IPMI_RPLY_GET_FAN_PROP_LENGTH;
 	imsg2[IPMI_MSG2_CHAN_OFFSET] = 0x40/*channel*/;
 
 	bmsg1[IPMI_MSG1_RSADDR_OFFSET]   = IPMI_MSG_ADDR_CM;
-	bmsg1[IPMI_MSG1_NETFNLUN_OFFSET] = IPMI_MSG_NETFN_PICMG << 2;
+	bmsg1[IPMI_MSG1_NETFNLUN_OFFSET] = netfn << 2;
 
 	bmsg2[IPMI_MSG2_SET_FRU_ACT_FRU_OFFSET] = fru;
 
-	messageSize = ipmiMsgBuild( mchSess, message, IPMI_MSG_CMD_GET_FAN_PROP, imsg2, imsg2Size, bmsg1, bmsg1Size, bmsg2, bmsg2Size );
+	messageSize = ipmiMsgBuild( mchSess, message, cmd, imsg2, imsg2Size, bmsg1, bmsg1Size, bmsg2, bmsg2Size );
 
-	return ipmiMsgWriteReadHelper( mchSess, message, messageSize, data, &responseSize );
+	return ipmiMsgWriteReadHelper( mchSess, message, messageSize, data, &responseSize, cmd, netfn );
 }
 
 /* Get Fan Level 
@@ -930,6 +1253,8 @@ uint8_t  bmsg1[bmsg1Size];
 uint8_t  bmsg2[bmsg2Size];
 size_t   messageSize;
 size_t   responseSize = IPMI_RPLY_GET_FAN_LEVEL_LENGTH;
+uint8_t  cmd = IPMI_MSG_CMD_GET_FAN_LEVEL;
+uint8_t  netfn = IPMI_MSG_NETFN_PICMG;
 
 	memcpy( imsg2, SEND_MSG_MSG     , imsg2Size );
 	memcpy( bmsg1, IPMI_MSG1        , bmsg1Size );
@@ -938,13 +1263,13 @@ size_t   responseSize = IPMI_RPLY_GET_FAN_LEVEL_LENGTH;
 	imsg2[IPMI_MSG2_CHAN_OFFSET] = 0x40/*channel*/;
 
 	bmsg1[IPMI_MSG1_RSADDR_OFFSET]   = IPMI_MSG_ADDR_CM;
-	bmsg1[IPMI_MSG1_NETFNLUN_OFFSET] = IPMI_MSG_NETFN_PICMG << 2;
+	bmsg1[IPMI_MSG1_NETFNLUN_OFFSET] = netfn << 2;
 
 	bmsg2[IPMI_MSG2_SET_FRU_ACT_FRU_OFFSET] = fru;
 
-	messageSize = ipmiMsgBuild( mchSess, message, IPMI_MSG_CMD_GET_FAN_LEVEL, imsg2, imsg2Size, bmsg1, bmsg1Size, bmsg2, bmsg2Size );
+	messageSize = ipmiMsgBuild( mchSess, message, cmd, imsg2, imsg2Size, bmsg1, bmsg1Size, bmsg2, bmsg2Size );
 
-	return ipmiMsgWriteReadHelper( mchSess, message, messageSize, data, &responseSize );
+	return ipmiMsgWriteReadHelper( mchSess, message, messageSize, data, &responseSize, cmd, netfn );
 }
 
 /* Set Fan Level 
@@ -965,6 +1290,8 @@ uint8_t  bmsg1[bmsg1Size];
 uint8_t  bmsg2[bmsg2Size];
 size_t   messageSize;
 size_t   responseSize = IPMI_RPLY_SET_FAN_LEVEL_LENGTH;
+uint8_t  cmd   = IPMI_MSG_CMD_SET_FAN_LEVEL;
+uint8_t  netfn = IPMI_MSG_NETFN_PICMG;
 
 	memcpy( imsg2, SEND_MSG_MSG     , imsg2Size );
 	memcpy( bmsg1, IPMI_MSG1        , bmsg1Size );
@@ -973,14 +1300,52 @@ size_t   responseSize = IPMI_RPLY_SET_FAN_LEVEL_LENGTH;
 	imsg2[IPMI_MSG2_CHAN_OFFSET] = 0x40/*channel*/;
 
 	bmsg1[IPMI_MSG1_RSADDR_OFFSET]   = IPMI_MSG_ADDR_CM;
-	bmsg1[IPMI_MSG1_NETFNLUN_OFFSET] = IPMI_MSG_NETFN_PICMG << 2;
+	bmsg1[IPMI_MSG1_NETFNLUN_OFFSET] = netfn << 2;
 
 	bmsg2[IPMI_MSG2_SET_FRU_ACT_FRU_OFFSET] = fru;
 	bmsg2[IPMI_MSG2_SET_FAN_LEVEL_LEVEL_OFFSET] = level;
 
-	messageSize = ipmiMsgBuild( mchSess, message, IPMI_MSG_CMD_SET_FAN_LEVEL, imsg2, imsg2Size, bmsg1, bmsg1Size, bmsg2, bmsg2Size );
+	messageSize = ipmiMsgBuild( mchSess, message, cmd, imsg2, imsg2Size, bmsg1, bmsg1Size, bmsg2, bmsg2Size );
 
-	return ipmiMsgWriteReadHelper( mchSess, message, messageSize, data, &responseSize );
+	return ipmiMsgWriteReadHelper( mchSess, message, messageSize, data, &responseSize, cmd, netfn );
+}
+
+/* Get FRU Power Level 
+ *
+ *   RETURNS: status from ipmiMsgWriteReadHelper
+ *            0 on success
+ *            non-zero for error
+ */
+int
+ipmiMsgGetPowerLevel(MchSess mchSess, uint8_t *data, uint8_t fru, uint8_t parm)
+{
+uint8_t  message[MSG_MAX_LENGTH] = { 0 };
+size_t   imsg2Size   = sizeof( SEND_MSG_MSG );
+size_t   bmsg1Size   = sizeof( IPMI_MSG1 );
+size_t   bmsg2Size   = sizeof( GET_POWER_LEVEL_MSG );
+uint8_t  imsg2[imsg2Size];
+uint8_t  bmsg1[bmsg1Size];
+uint8_t  bmsg2[bmsg2Size];
+size_t   messageSize;
+size_t   responseSize = 0;
+uint8_t  cmd = IPMI_MSG_CMD_GET_POWER_LEVEL;
+uint8_t  netfn = IPMI_MSG_NETFN_PICMG;
+
+	memcpy( imsg2, SEND_MSG_MSG       , imsg2Size );
+	memcpy( bmsg1, IPMI_MSG1          , bmsg1Size );
+	memcpy( bmsg2, GET_POWER_LEVEL_MSG, bmsg2Size );
+
+	imsg2[IPMI_MSG2_CHAN_OFFSET] = 0x40/*channel*/;
+
+	bmsg1[IPMI_MSG1_RSADDR_OFFSET]   = IPMI_MSG_ADDR_CM;
+	bmsg1[IPMI_MSG1_NETFNLUN_OFFSET] = netfn << 2;
+
+	bmsg2[IPMI_MSG2_SET_FRU_ACT_FRU_OFFSET] = fru;
+	bmsg2[IPMI_MSG2_GET_POWER_LEVEL_TYPE_OFFSET] = parm;
+
+	messageSize = ipmiMsgBuild( mchSess, message, cmd, imsg2, imsg2Size, bmsg1, bmsg1Size, bmsg2, bmsg2Size );
+
+	return ipmiMsgWriteReadHelper( mchSess, message, messageSize, data, &responseSize, cmd, netfn );
 }
 
 /* Set debug message flag; 0 = off, multiple levels of verbosity */

@@ -364,9 +364,7 @@ unsigned   nread;    /* Number of FRU data reads */
 unsigned   offset;
 
 	/* Get FRU Inventory Info */
-	ipmiMsgGetFruInfo( mchSess, response, id );
-
-	if ( response[IPMI_RPLY_COMPLETION_CODE_OFFSET] )
+	if ( ipmiMsgGetFruInfo( mchSess, response, id ) > 0 )
 		return;
 
 	fru->size[0] = response[IPMI_RPLY_FRU_AREA_SIZE_LSB_OFFSET];
@@ -375,6 +373,9 @@ unsigned   offset;
 
 	if ( 0 == (sizeInt = arrayToUint16( fru->size )) )
 		return;
+
+	if ( IPMICOMM_DEBUG )
+		printf("mchFruDataGet: FRU %i inventory info size %i\n", id, sizeInt);
 
 	if ( !(raw = calloc( sizeInt ,1 ) ) ) {
 		errlogPrintf("mchFruDataGet: No memory for FRU %i data\n",id);
@@ -389,10 +390,11 @@ unsigned   offset;
 	for ( i = 0; i < sizeof( fru->readOffset ); i ++ )
 		fru->readOffset[i] = 0;
 
-	/* Read FRU data, store in raw, increment our read offset for next read */
+	/* Read FRU data, store in raw, increment our read offset for next read. If error returned for requested FRU ID, abort */
 	for ( i = 0; i < nread; i++ ) {
 		fru->read = i;
-		ipmiMsgReadFru( mchSess, response, id, fru->readOffset, MSG_FRU_DATA_READ_SIZE );
+		if ( (IPMI_COMP_CODE_REQUESTED_DATA == ipmiMsgReadFru( mchSess, response, id, fru->readOffset, MSG_FRU_DATA_READ_SIZE )) )
+			break;
 		memcpy( raw + i*MSG_FRU_DATA_READ_SIZE, response + IPMI_RPLY_FRU_DATA_READ_OFFSET, MSG_FRU_DATA_READ_SIZE );
 		incr2Uint8Array( fru->readOffset, MSG_FRU_DATA_READ_SIZE );
 	}
@@ -428,7 +430,6 @@ mchFruGetDataAll(MchSess mchSess, MchSys mchSys)
 uint8_t response[MSG_MAX_LENGTH] = { 0 };
 uint8_t i;
 Fru fru;
-
 	for ( i = 0; i < MAX_FRU ; i++ ) {
 
 	       	fru = &mchSys->fru[i];
@@ -648,6 +649,7 @@ uint8_t  type   = 0, addr = 0;
 uint8_t *raw    = 0;
 int      i, iFull = 0, iFru = 0, fruId;
 size_t   responseSize;
+int rval = -1;
 
 	if ( mchSdrRepGetInfo( mchSess, mchSys ) )
 		return -1;
@@ -742,8 +744,11 @@ for ( i = 0; i < MAX_FRU; i++ ) {
 }
 #endif
 
+	rval = 0;
+
 bail:
 	free( raw );
+	return rval;
 }
 
 /* 

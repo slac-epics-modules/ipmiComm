@@ -84,6 +84,7 @@ extern uint8_t SET_FRU_POLICY_MSG[8];
 extern uint8_t GET_FAN_PROP_MSG[6];
 extern uint8_t GET_FAN_LEVEL_MSG[6];
 extern uint8_t SET_FAN_LEVEL_MSG[8];
+extern uint8_t GET_POWER_LEVEL_MSG[7];
 
 /* Convert 2-element array (which stores LS byte first) to integer */
 uint16_t arrayToUint16(uint8_t *data );
@@ -99,7 +100,7 @@ void ipmiMsgSetSeqId(MchSess mchSess, uint8_t *message, uint8_t cmd);
 
 int ipmiMsgWriteRead(const char *name, uint8_t *message, size_t messageSize, uint8_t *response, size_t *responseSize, double timeout);
 
-int ipmiMsgWriteReadHelper(MchSess mchSess, uint8_t *message, size_t messageSize, uint8_t *response, size_t *responseSize);
+int ipmiMsgWriteReadHelper(MchSess mchSess, uint8_t *message, size_t messageSize, uint8_t *response, size_t *responseSize, uint8_t cmd, uint8_t netfn);
 
 int ipmiMsgGetChanAuth(MchSess mchSess, uint8_t *data);
 
