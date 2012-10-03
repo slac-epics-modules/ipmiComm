@@ -1,6 +1,10 @@
 02Oct2012 (SH)
 Add PICMG Get Power Level message
   Changes to ipmiMsg.c/.h, ipmiDef.c/.h
+Add records and device support to get FRU power levels and info
+  Changes to src/devMch.c and Db/module.db
+Revive module_cu.db 
+Set FRU ID in devSup INP field Card number (not Signal)
 Print non-zero completion code information
   Changes to ipmiMsg.c, ipmiDef.h
   New routine ipmiCompletionCode
