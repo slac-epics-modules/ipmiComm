@@ -24,56 +24,56 @@ record(ai, "$(dev):$(code)$(inst)_FRUID") {
 record(stringin, "$(dev):$(code)$(inst)_BMANUF") {
   field(DESC, "Board manufacturer")
   field(DTYP, "FRUinfo")
-  field(INP, "#C0 S$(index) @$(link)+BMF")
+  field(INP, "#C$(fruid) S0 @$(link)+BMF")
   field(PINI, "YES")
 }
 
 record(stringin, "$(dev):$(code)$(inst)_BPRODNAME") {
   field(DESC, "Board product name")
   field(DTYP, "FRUinfo")
-  field(INP, "#C0 S$(index) @$(link)+BP")
+  field(INP, "#C$(fruid) S0 @$(link)+BP")
   field(PINI, "YES")
 }
 
 record(stringin, "$(dev):$(code)$(inst)_BSN") {
   field(DESC, "Board serial number")
   field(DTYP, "FRUinfo")
-  field(INP, "#C0 S$(index) @$(link)+BSN")
+  field(INP, "#C$(fruid) S0 @$(link)+BSN")
   field(PINI, "YES")
 }
 
 record(stringin, "$(dev):$(code)$(inst)_BPARTNUMBER") {
   field(DESC, "Board part number")
   field(DTYP, "FRUinfo")
-  field(INP, "#C0 S$(index) @$(link)+BPN")
+  field(INP, "#C$(fruid) S0 @$(link)+BPN")
   field(PINI, "YES")
 }
 
 record(stringin, "$(dev):$(code)$(inst)_PMANUF") {
   field(DESC, "Product manufacturer")
   field(DTYP, "FRUinfo")
-  field(INP, "#C0 S$(index) @$(link)+PMF")
+  field(INP, "#C$(fruid) S0 @$(link)+PMF")
   field(PINI, "YES")
 }
 
 record(stringin, "$(dev):$(code)$(inst)_PPRODNAME") {
   field(DESC, "Product product name")
   field(DTYP, "FRUinfo")
-  field(INP, "#C0 S$(index) @$(link)+PP")
+  field(INP, "#C$(fruid) S0 @$(link)+PP")
   field(PINI, "YES")
 }
 
 record(stringin, "$(dev):$(code)$(inst)_PSN") {
   field(DESC, "Product serial number")
   field(DTYP, "FRUinfo")
-  field(INP, "#C0 S$(index) @$(link)+PSN")
+  field(INP, "#C$(fruid) S0 @$(link)+PSN")
   field(PINI, "YES")
 }
 
 record(stringin, "$(dev):$(code)$(inst)_PPARTNUMBER") {
   field(DESC, "Product part number")
   field(DTYP, "FRUinfo")
-  field(INP, "#C0 S$(index) @$(link)+PPN")
+  field(INP, "#C$(fruid) S0 @$(link)+PPN")
   field(PINI, "YES")
 }
 
@@ -81,10 +81,61 @@ record(mbbo, "$(dev):$(code)$(inst)_POWERCTL") {
   field(DESC, "Payload power control")
   field(DTYP, "MCHsensor")
   field(OMSL, "supervisory")
-  field(OUT, "#C0 S$(fruid) @$(link)+FRU")
+  field(OUT, "#C$(fruid) S0 @$(link)+FRU")
   field(ZRST, "Power off")
   field(ONST, "Power on")
   field(TWST, "Hard reset")
+}
+
+record(ai, "$(dev):$(code)$(inst)_PWR") {
+  field(DESC, "Steady state power draw")
+  field(SCAN, "10 second")
+  field(DTYP, "FRUinfo")
+  field(INP, "#C$(fruid) S0 @$(link)+PWR")
+  field(EGU, "W")
+  field(FLNK, "$(dev):$(code)$(inst)_PWRDES")
+}
+
+record(ai, "$(dev):$(code)$(inst)_PWRDES") {
+  field(DESC, "Desired steady state power draw")
+  field(DTYP, "FRUinfo")
+  field(INP, "#C$(fruid) S1 @$(link)+PWR")
+  field(EGU, "W")
+  field(FLNK, "$(dev):$(code)$(inst)_EPWR")
+}
+
+record(ai, "$(dev):$(code)$(inst)_EPWR") {
+  field(DESC, "Early power draw")
+  field(DTYP, "FRUinfo")
+  field(INP, "#C$(fruid) S2 @$(link)+PWR")
+  field(EGU, "W")
+  field(FLNK, "$(dev):$(code)$(inst)_EPWRDES")
+}
+
+record(ai, "$(dev):$(code)$(inst)_EPWRDES") {
+  field(DESC, "Desired early power draw")
+  field(DTYP, "FRUinfo")
+  field(INP, "#C$(fruid) S3 @$(link)+PWR")
+  field(EGU, "W")
+  field(FLNK, "$(dev):$(code)$(inst)_PWRDLY")
+}
+
+record(ai, "$(dev):$(code)$(inst)_PWRDLY") {
+  field(DESC, "FRU delay to stable power")
+  field(DTYP, "FRUinfo")
+  field(INP, "#C$(fruid) S4 @$(link)+PWR")
+  field(EGU, "s")
+  field(FLNK, "$(dev):$(code)$(inst)_PWRDYN")
+}
+
+record(mbbi, "$(dev):$(code)$(inst)_PWRDYN") {
+  field(DESC, "FRU supports dynamic pwr reconfig")
+  field(DTYP, "MCHsensor")
+  field(INP,  "#C$(fruid) S0 @$(link)+PWR")
+  field(ZRST, "No")
+  field(ZRVL, "0")
+  field(ONST, "Yes")
+  field(ONVL, "1")
 }
 
 # The following record fields are overloaded

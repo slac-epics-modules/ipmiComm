@@ -30,7 +30,7 @@ DB += module_cu_default.db
 DB += module_amc_rtm_default.db
 
 DB += module.db
-#DB += module_cu.db
+DB += module_cu.db
 DB += sensor_temp.db
 DB += sensor_voltage.db
 DB += sensor_current.db

@@ -146,6 +146,8 @@ typedef struct FruRec_ {
 	int          tempCnt;       /* Number of temperature sensors associated with this FRU */         
 	int          fanCnt;        /* Number of fan sensors associated with this FRU */         
 	int          vCnt;          /* Number of v sensors associated with this FRU */ 
+	uint8_t      pwrDyn;        /* 1 if FRU supports dynamic reconfiguration of power, otherwise 0 */
+	uint8_t      pwrDly;        /* Delay to stable power */
 /* Following used only by cooling unit FRUs */
         uint8_t      fanMin;        /* Fan minimum level */          
         uint8_t      fanMax;        /* Fan maximum level */          

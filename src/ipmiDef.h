@@ -171,6 +171,10 @@
 #define IPMI_RPLY_GET_FAN_PROP_NOM_OFFSET    46     /* Fan tray nominal fan level */
 #define IPMI_RPLY_GET_FAN_PROP_PROP_OFFSET   47     /* Fan tray properties */
 #define IPMI_RPLY_GET_FAN_LEVEL_OFFSET       44     /* Current fan level */
+#define IPMI_RPLY_GET_POWER_LEVEL_PROP_OFFSET   44    /* FRU power properties */
+#define IPMI_RPLY_GET_POWER_LEVEL_DELAY_OFFSET  45    /* Delay to stable power */
+#define IPMI_RPLY_GET_POWER_LEVEL_MULT_OFFSET   46    /* Power multiplier */
+#define IPMI_RPLY_GET_POWER_LEVEL_DRAW_OFFSET   47    /* Draw of first level (optional: next levels follow this, up to 25 total) */
 
 /* For responses to bridged messages (returns 2 messages which we read as 1); offset from beginning of first message */
 #define IPMI_RPLY_BRIDGED_SEQ_OFFSET         27     /* From-MCH sequence number */
@@ -527,6 +531,14 @@
 #define FRU_DATA_CHASSIS_TYPE_RACKMOUNT        0x17
 
 /* More to come... */
+
+/* PICMG */
+#define FRU_PWR_DYNAMIC(x) x & (1 << 7)
+#define FRU_PWR_LEVEL(x)   x & 0xF
+#define FRU_PWR_STEADY_STATE     0
+#define FRU_PWR_STEADY_STATE_DES 1
+#define FRU_PWR_EARLY            2
+#define FRU_PWR_EARLY_DES        3
 
 /* MicroTCA */
 #define UTCA_FRU_TYPE_CARRIER                0

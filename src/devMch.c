@@ -33,9 +33,9 @@
 
 	   Supported operations:
 
-             * "FAN" : read fan level
-             * "BSN" : FRU board serial number
-             * "PSN" : FRU product serial number	   
+             * "FAN"     : Get fan level
+             * "PWR"     : Get FRU power levels (steady state and early, 
+                                                 desired and actual)
 
          Binary Output Device Support:
          -------------------------------------------------------
@@ -845,7 +845,7 @@ char     str[40];
         node = strtok( pmbbi->inp.value.vmeio.parm, "+" );
         if ( (p = strtok( NULL, "+")) ) {
                 task = p;
-                if ( strcmp( task, "HS") && strcmp( task, "FAN") && strcmp( task, "INIT" ) ) {
+                if ( strcmp( task, "HS") && strcmp( task, "FAN") && strcmp( task, "INIT" ) && strcmp( task, "PWR") ) {
 			sprintf( str, "Unknown task parameter %s", task);
 			status = S_dev_badSignal;
 		}
@@ -882,9 +882,11 @@ MchData  mchData;
 MchSess  mchSess;
 MchSys   mchSys;
 char    *task;
+Fru      fru;
 uint8_t  value = 0, sensor, bits;
 uint16_t addr = 0; /* get addr */
-short    index  = pmbbi->inp.value.vmeio.signal; /* Sensor index or FRU id */
+short    id     = pmbbi->inp.value.vmeio.card;   /* FRU id */
+short    index  = pmbbi->inp.value.vmeio.signal; /* Sensor index */
 long     status = 0;
 int      s = 0;
 size_t   responseSize;
@@ -898,14 +900,17 @@ size_t   responseSize;
 	mchSys  = mchSysData[mchSess->instance];
 
 	task    = recPvt->task;
+	fru     = &mchSys->fru[id];
 
 	if ( task ) {
 
-		if ( !(strcmp( task, "FAN" )) ) {
+		if ( !(strcmp( task, "FAN" )) )
 
-			value = ( mchSys->fru[index].fanProp & (1<<7) ) ? 1 : 0;
-			pmbbi->rval = value;
-		}
+			pmbbi->rval = ( fru->fanProp & (1<<7) ) ? 1 : 0;
+
+		else if ( !(strcmp( task, "PWR" )) )
+
+			pmbbi->rval = fru->pwrDyn;
 
 		else if ( !(strcmp( task, "INIT" )) )
 
@@ -1138,7 +1143,7 @@ char    str[40];
 	node = strtok( pai->inp.value.vmeio.parm, "+" );
 	if ( (p = strtok( NULL, "+" )) ) {
 		task = p;
-		if ( strcmp( task, "TYPE" ) && strcmp( task, "FAN")  ) {
+		if ( strcmp( task, "TYPE" ) && strcmp( task, "FAN") && strcmp( task, "PWR")  ) {
 			sprintf( str, "Unknown task parameter %s", task);
 			status = S_dev_badSignal;
 		}
@@ -1175,10 +1180,12 @@ MchData  mchData;
 MchSess  mchSess;
 MchSys   mchSys;
 char    *task;
-int      id   = pai->inp.value.vmeio.signal;
+int      id     = pai->inp.value.vmeio.card;
+int      parm   = pai->inp.value.vmeio.signal;
 long     status = NO_CONVERT;
 Fru      fru;
 int      s = 0;
+uint8_t  prop, level, draw, mult;
 
 	if ( !recPvt )
 		return status;
@@ -1191,7 +1198,7 @@ int      s = 0;
 	task    = recPvt->task;
 	fru     = &mchSys->fru[id];
 
-	if ( mchInitDone[mchSess->instance] ) {
+	if ( mchInitDone[mchSess->instance] && mchIsAlive[mchSess->instance] && mchSess->session ) {
 
 		if ( !(strcmp( task, "FAN")) ) {
 
@@ -1203,17 +1210,61 @@ int      s = 0;
 					pai->rval = data[IPMI_RPLY_GET_FAN_LEVEL_OFFSET];
 
 				epicsMutexUnlock( mch->mutex );
+			}
+		}
 
-				if ( s ) {
-					recGblSetSevr( pai, READ_ALARM, INVALID_ALARM );
-					return ERROR;
+		/* Check for FRU IDs that support this query (Vadatech CLI manual 5.7.9) */
+		else if ( !(strcmp( task, "PWR")) && ( (id >=3 && id <=16) || (id >= 40 && id <= 41) || (id >= 50 && id <= 53) )  ) {
+
+				epicsMutexLock( mch->mutex );
+
+				if ( parm < 4 ) {
+
+					if ( !(s = ipmiMsgGetPowerLevel( mchSess, data, id, parm )) ) {
+
+
+							prop  = data[IPMI_RPLY_GET_POWER_LEVEL_PROP_OFFSET];
+
+							if ( (level = FRU_PWR_LEVEL( prop )) ) {
+								draw  = data[IPMI_RPLY_GET_POWER_LEVEL_DRAW_OFFSET + (level -1)];
+								mult  = data[IPMI_RPLY_GET_POWER_LEVEL_MULT_OFFSET];
+								pai->rval = draw * mult * 0.1; /* Convert from 0.1 Watts to Watts */
+							}
+else
+printf("requested %i power level: 0; must be in other level\n", parm);
+
+							/* If these don't change, consider moving this section to drvMch.c
+                                                           and don't scan PWRDYN and PWRDELAY */
+							switch ( parm ) {
+
+								default: 
+									break;
+
+								case FRU_PWR_STEADY_STATE:
+									fru->pwrDyn = FRU_PWR_DYNAMIC( prop ) ? 1 : 0;
+									break;
+
+								case FRU_PWR_EARLY:
+									fru->pwrDly = data[IPMI_RPLY_GET_POWER_LEVEL_DELAY_OFFSET];
+									break;
+							}
+				       	}
+
 				}
 
-				pai->val  = pai->rval;
+				else if ( parm == 4 )
+						pai->rval = fru->pwrDly * 0.1; /* Convert from 0.1 seconds to seconds */
+
+
+				epicsMutexUnlock( mch->mutex );
 			}
 
-			pai->udf = FALSE;
-		}
+		       	if ( s ) {
+		       		recGblSetSevr( pai, READ_ALARM, INVALID_ALARM );
+		       		return ERROR;
+		       	}
+
+		       	pai->val  = pai->rval;
 
 #ifdef DEBUG
 printf("read_fru_ai: %s FRU id is %i, value is %.0f\n",pai->name, id, pai->val);
@@ -1312,7 +1363,7 @@ MchData  mchData;
 MchSess  mchSess;
 MchSys   mchSys;
 char    *task;
-short    id = pstringin->inp.value.vmeio.signal;   /* FRU ID */
+short    id = pstringin->inp.value.vmeio.card;     /* FRU ID */
 int      i;
 long     status = NO_CONVERT;
 Fru      fru;
@@ -1479,7 +1530,7 @@ MchData  mchData;
 MchSess  mchSess;
 MchSys   mchSys;
 char    *task;
-int      id      = plongout->out.value.vmeio.signal; /* FRU ID */
+int      id      = plongout->out.value.vmeio.card; /* FRU ID */
 long     status  = NO_CONVERT;
 Fru      fru;
 uint8_t  data[MSG_MAX_LENGTH] = { 0 };

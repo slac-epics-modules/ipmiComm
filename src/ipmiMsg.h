@@ -136,6 +136,8 @@ int ipmiMsgGetFanLevel(MchSess mchSess, uint8_t *data, uint8_t fru);
 
 int ipmiMsgSetFanLevel(MchSess mchSess, uint8_t *data, uint8_t fru, uint8_t level);
 
+int ipmiMsgGetPowerLevel(MchSess mchSess, uint8_t *data, uint8_t fru, uint8_t parm);
+
 #ifdef __cplusplus
 };
 #endif
