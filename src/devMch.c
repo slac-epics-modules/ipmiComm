@@ -1030,7 +1030,7 @@ MchSys   mchSys;
 char    *task;
 long     status = NO_CONVERT;
 int      cmd;
-int      id     = pmbbo->out.value.vmeio.signal;
+int      id     = pmbbo->out.value.vmeio.card;
 int      index, i = 0, s = 0;
 volatile uint8_t val;
 
