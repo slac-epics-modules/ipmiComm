@@ -1,3 +1,8 @@
+ipmiComm-R1-4-0:  Add PICMG Get Power Level message and related EPICS records
+                  If system was offline, set flag to "not initialized" 
+                    (sensor addresses can change with no HW change)
+                  Misc changes other changes; see Changelog for details
+
 ipmiComm-R1-3-3:  Check sensor 'reading/state available' before copying
                     sensor reading to PV. Changes to src/devMch.c and src/ipmiDef.c
 
