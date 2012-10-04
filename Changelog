@@ -1,3 +1,5 @@
+Release: ipmiComm-R1-4-0
+
 02Oct2012 (SH)
 Add PICMG Get Power Level message
   Changes to ipmiMsg.c/.h, ipmiDef.c/.h
