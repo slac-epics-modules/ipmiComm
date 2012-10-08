@@ -1,3 +1,6 @@
+ipmiComm-R1-4-1:  Check sensor 'scanning enabled' before copying
+                    sensor reading to PV. Changes to src/devMch.c and src/ipmiDef.c
+
 ipmiComm-R1-4-0:  Add PICMG Get Power Level message and related EPICS records
                   If system was offline, set flag to "not initialized" 
                     (sensor addresses can change with no HW change)
