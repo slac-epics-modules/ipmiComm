@@ -27,9 +27,19 @@ typedef struct FruFieldRec_ {
 	uint8_t    *data;
 } FruFieldRec, *FruField;
 
+typedef struct FruChassisRec_ {
+	uint8_t      offset;       /* Offset into FRU storage */
+	uint8_t      ver;          /* Format version (0x01) */
+	uint8_t      length;       /* Length of FRU area */
+	uint8_t      type;         /* Chassis type */
+	FruFieldRec  part;         /* Part number */
+	FruFieldRec  sn;           /* Serial number */
+        /* optional custom fields */	
+} FruChassisRec, *FruChassis;
+
 typedef struct FruBoardRec_ {
 	uint8_t      offset;       /* Offset into FRU storage */
-	uint8_t      version;      /* Format version (0x01) */
+	uint8_t      ver;          /* Format version (0x01) */
 	uint8_t      length;       /* Length of FRU area */
 	uint8_t      lang;         /* Language code */
 	uint8_t      date;         /* Manufacturer date/time (minutes from 00:00 1/1/96) */
@@ -42,13 +52,13 @@ typedef struct FruBoardRec_ {
 
 typedef struct FruProdRec_ {
 	uint8_t      offset;       /* Offset into FRU storage */
-	uint8_t      version;      /* Format version (0x01) */
+	uint8_t      ver;          /* Format version (0x01) */
 	uint8_t      length;       /* Length of FRU area */
         uint8_t      lang;         /* Language code */
 	FruFieldRec  manuf;        /* Manufacturer */
 	FruFieldRec  prod;         /* Product name */
 	FruFieldRec  part;         /* Part number */
-	FruFieldRec  ver;          /* Version number */
+	FruFieldRec  version;      /* Version number */
 	FruFieldRec  sn;           /* Serial number */
         /* more */	
 } FruProdRec, *FruProd;
@@ -138,6 +148,7 @@ typedef struct FruRec_ {
 	uint8_t      access;        /* Access FRU data by words or bytes */
 	uint8_t      readOffset[2];  
 	uint16_t     read;          /* Read number */
+	FruChassisRec chassis;
 	FruBoardRec  board;
 	FruProdRec   prod;
 	SdrFruRec    sdr;

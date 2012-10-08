@@ -477,9 +477,9 @@ uint8_t  lun;
 
 		if ( !(s = ipmiMsgReadSensor( mchSess, data, sensor, lun, &responseSize )) ) {
 			bits = data[IPMI_RPLY_SENSOR_ENABLE_BITS_OFFSET];
-			if ( IPMI_SENSOR_READING_DISABLED(bits) ) {
+			if ( IPMI_SENSOR_READING_DISABLED(bits) || IPMI_SENSOR_SCANNING_DISABLED(bits) ) {
 				if ( IPMICOMM_DEBUG )
-					printf("%s sensor reading/state unavailable. Bits: %02x\n",pai->name, bits);
+					printf("%s sensor reading/state unavailable or scanning disabled. Bits: %02x\n",pai->name, bits);
 				s = ERROR;
 			}
 			else {
@@ -927,9 +927,9 @@ size_t   responseSize;
 
 				if ( !(s = ipmiMsgReadSensor( mchSess, data, sensor, addr, &responseSize )) ) {	
 					bits = data[IPMI_RPLY_SENSOR_ENABLE_BITS_OFFSET];
-					if ( IPMI_SENSOR_READING_DISABLED(bits) ) {
+					if ( IPMI_SENSOR_READING_DISABLED(bits)  || IPMI_SENSOR_SCANNING_DISABLED(bits) ) {
 						if ( IPMICOMM_DEBUG )
-						    printf("%s sensor reading/state unavailable. Bits: %02x\n", pmbbi->name, bits);
+						    printf("%s sensor reading/state unavailable or scanning disabled. Bits: %02x\n", pmbbi->name, bits);
 						s = ERROR;
 					}
 					else {
