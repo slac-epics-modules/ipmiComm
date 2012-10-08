@@ -1,3 +1,11 @@
+Release: ipmiComm-R1-4-1
+
+08Oct2012 (SH)
+devMch.c: When reading sensor value, check that scanning is enabled.
+  Else, set record READ/INVALID.
+ipmiDef.h: Fix IPMI_SENSOR_SCANNING_DISABLED(x) macro
+drvMch.h: Add FRU chassis struct
+
 Release: ipmiComm-R1-4-0
 
 02Oct2012 (SH)
