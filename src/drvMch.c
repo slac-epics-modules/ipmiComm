@@ -294,31 +294,6 @@ int i;
 }
 
 /* 
- * Copy FRU chassis area data to chassis structure
- *
- * Caller must perform locking.
- */
-void
-mchFruChassisDataGet(FruChassis chassis, uint8_t *raw, unsigned *offset)
-{
-	if ( 0 != (*offset = chassis->offset = 8*raw[FRU_DATA_COMMON_HEADER_OFFSET + FRU_DATA_COMMON_HEADER_CHASSIS_AREA_OFFSET] ) ) {
-
-		chassis->ver     = raw[*offset + FRU_DATA_CHASSIS_AREA_VERSION_OFFSET];
-		chassis->length  = raw[*offset + FRU_DATA_CHASSIS_AREA_LENGTH_OFFSET];
-		chassis->type    = raw[*offset + FRU_DATA_CHASSIS_TYPE_OFFSET];
-
-		*offset += FRU_DATA_CHASSIS_AREA_PART_LENGTH_OFFSET;
-
-		if ( mchFruFieldGet( &(chassis->part),  raw, offset ) )
-			(*offset)++;
-		if ( mchFruFieldGet( &(chassis->sn),    raw, offset ) )
-			(*offset)++;
-
-printf("chassis part %s sn %s\n", chassis->part.data, chassis->sn.data); 
-	}
-}
-
-/* 
  * Copy FRU product area data to product structure
  *
  * Caller must perform locking.
@@ -328,9 +303,7 @@ mchFruProdDataGet(FruProd prod, uint8_t *raw, unsigned *offset)
 {
 	if ( 0 != (*offset = prod->offset = 8*raw[FRU_DATA_COMMON_HEADER_OFFSET + FRU_DATA_COMMON_HEADER_PROD_AREA_OFFSET] ) ) {
 
-		prod->ver    = raw[*offset + FRU_DATA_PROD_AREA_VERSION_OFFSET];
-		prod->length = raw[*offset + FRU_DATA_PROD_AREA_LENGTH_OFFSET];
-		prod->lang   = raw[*offset + FRU_DATA_BOARD_AREA_LANG_OFFSET];
+		prod->lang = raw[*offset + FRU_DATA_BOARD_AREA_LANG_OFFSET];
 
 		*offset += FRU_DATA_PROD_AREA_MANUF_LENGTH_OFFSET;
 
@@ -340,7 +313,7 @@ mchFruProdDataGet(FruProd prod, uint8_t *raw, unsigned *offset)
 			(*offset)++;
 		if ( mchFruFieldGet( &(prod->part),  raw, offset ) )
 			(*offset)++;
-		if ( mchFruFieldGet( &(prod->version), raw, offset ) )
+		if ( mchFruFieldGet( &(prod->ver),   raw, offset ) )
 			(*offset)++;
 		if ( mchFruFieldGet( &(prod->sn),    raw, offset ) )
 			(*offset)++;
@@ -357,9 +330,7 @@ mchFruBoardDataGet(FruBoard board, uint8_t *raw, unsigned *offset)
 {
 	if ( 0 != (*offset = board->offset = 8*raw[FRU_DATA_COMMON_HEADER_OFFSET + FRU_DATA_COMMON_HEADER_BOARD_AREA_OFFSET] ) ) {
 
-		board->ver    = raw[*offset + FRU_DATA_BOARD_AREA_VERSION_OFFSET];
-		board->length = raw[*offset + FRU_DATA_BOARD_AREA_LENGTH_OFFSET];
-		board->lang   = raw[*offset + FRU_DATA_BOARD_AREA_LANG_OFFSET];
+		board->lang = raw[*offset + FRU_DATA_BOARD_AREA_LANG_OFFSET];
 
 		*offset += FRU_DATA_BOARD_AREA_MANUF_LENGTH_OFFSET;
 
@@ -388,8 +359,8 @@ mchFruDataGet(MchSess mchSess, MchSys mchSys, Fru fru, uint8_t id)
 uint8_t    response[MSG_MAX_LENGTH] = { 0 };
 uint8_t   *raw; 
 int        i;
-uint16_t   sizeInt;   /* Size of FRU data area in bytes */
-unsigned   nread;     /* Number of FRU data reads */
+uint16_t   sizeInt;  /* Size of FRU data area in bytes */
+unsigned   nread;    /* Number of FRU data reads */
 unsigned   offset;
 
 	/* Get FRU Inventory Info */
@@ -426,30 +397,20 @@ unsigned   offset;
 			break;
 		memcpy( raw + i*MSG_FRU_DATA_READ_SIZE, response + IPMI_RPLY_FRU_DATA_READ_OFFSET, MSG_FRU_DATA_READ_SIZE );
 		incr2Uint8Array( fru->readOffset, MSG_FRU_DATA_READ_SIZE );
-
-		/*
-		if ( (arrayToUint16( fru->readOffset ) > 1 ) ) {
-			chassis->offset = 8*raw[FRU_DATA_COMMON_HEADER_OFFSET + FRU_DATA_COMMON_HEADER_CHASSIS_AREA_OFFSET];
-			board->offset = 8*raw[FRU_DATA_COMMON_HEADER_OFFSET + FRU_DATA_COMMON_HEADER_BOARD_AREA_OFFSET];
-			prod->offset = 8*raw[FRU_DATA_COMMON_HEADER_OFFSET + FRU_DATA_COMMON_HEADER_PROD_AREA_OFFSET];
-		}
-		*/
-
 	}
 
-/*#ifdef DEBUG*/
+#ifdef DEBUG
 printf("FRU %i raw data, size %i: \n",id, sizeInt);
 for ( i = 0; i < sizeInt; i++)
 	printf("%u ",raw[i]);
 printf("\n");
-/*#endif*/
+#endif
 
 /* filter out FRUs with no data so that we don't load records for them */
 
 	/* Add chassis data get */
-	mchFruChassisDataGet( &(fru->chassis), raw, &offset );
 	mchFruBoardDataGet( &(fru->board), raw, &offset );
-	mchFruProdDataGet( &(fru->prod) , raw, &offset );
+	mchFruProdDataGet(  &(fru->prod) , raw, &offset );
 
 	free( raw );
 }
@@ -760,10 +721,6 @@ int rval = -1;
 
 			mchSys->sens[iFull].readMsgLength = responseSize;
 
-if ( mchSys->sens[iFull].sdr.sensType == 0x25 )
-printf("entity presence sensor: entity id %02x inst %02x reading %02x\n", mchSys->sens[iFull].sdr.entityId, mchSys->sens[iFull].sdr.entityInst, response[IPMI_RPLY_SENSOR_READING_OFFSET]);
-
-
 			iFull++;
 		}
 	        else if ( type == SDR_TYPE_FRU_DEV ) {
@@ -774,7 +731,7 @@ printf("entity presence sensor: entity id %02x inst %02x reading %02x\n", mchSys
 		}
 	}
 
-/*#ifdef DEBUG*/
+#ifdef DEBUG
 printf("mchSdrGetDataAll Sumary:\n");
 for ( i = 0; i < iFull; i++ ) {
 	sens = &mchSys->sens[i];
@@ -785,7 +742,7 @@ for ( i = 0; i < MAX_FRU; i++ ) {
 	if ( fru->sdr.entityInst )
 		printf("SDR %i, entity ID %02x, entity inst %02x, FRU id %02x, %s\n", i, fru->sdr.entityId, fru->sdr.entityInst, fru->sdr.fruId, fru->sdr.str);
 }
-/*#endif*/
+#endif
 
 	rval = 0;
 
