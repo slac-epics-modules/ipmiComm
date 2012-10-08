@@ -181,7 +181,7 @@
 #define IPMI_RPLY_BRIDGED_SEQLUN_OFFSET      41     /* MS 6 bits: IPMI sequence, LS 2 bits: LUN */
 
 #define IPMI_SENSOR_READING_DISABLED(x)  x & 1<<5
-#define IPMI_SENSOR_SCANNING_DISABLED(x) x & 1<<6
+#define IPMI_SENSOR_SCANNING_DISABLED(x) ~x & 1<<6
 
 #define IPMI_DATA_TYPE(x)          x & 3<<6
 #define IPMI_DATA_LENGTH(x)        x & 0x3F
@@ -438,7 +438,7 @@
 #define FRU_DATA_INTERNAL_AREA_VERSION_OFFSET       0
 #define FRU_DATA_INTERNAL_DATA_OFFSET               1
 
-/* Chassis area (optional) */
+/* Chassis area (optional); language always english */
 #define FRU_DATA_CHASSIS_AREA_VERSION_OFFSET        0
 #define FRU_DATA_CHASSIS_AREA_LENGTH_OFFSET         1
 #define FRU_DATA_CHASSIS_TYPE_OFFSET                2
