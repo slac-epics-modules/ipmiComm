@@ -84,7 +84,8 @@ record(mbbo, "$(dev):$(code)$(inst)_POWERCTL") {
   field(OUT, "#C$(fruid) S0 @$(link)+FRU")
   field(ZRST, "Power off")
   field(ONST, "Power on")
-  field(TWST, "Hard reset")
+#  reset not supported yet
+#  field(TWST, "Hard reset")
 }
 
 record(ai, "$(dev):$(code)$(inst)_PWR") {
