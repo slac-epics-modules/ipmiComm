@@ -35,7 +35,8 @@ DB += sensor_temp.db
 DB += sensor_voltage.db
 DB += sensor_current.db
 DB += sensor_fan.db
-DB += sensor_hotswap.db
+DB += sensor_hotswap_nat.db
+DB += sensor_hotswap_vt.db
 DB += shelf.db
 
 #----------------------------------------------------
