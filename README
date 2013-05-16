@@ -4,7 +4,7 @@
 #
 #	Auth: Sonya Hoobler
 #
-#	Last updated: 27 August 2012
+#	Last updated: 16 May 2013
 #
 ############################################################
 
@@ -26,18 +26,18 @@ DB_INSTALLS += $(IPMICOMM)/db/shelf.db
 DB_INSTALLS += $(IPMICOMM)/db/module.db
 DB_INSTALLS += $(IPMICOMM)/db/sensor_temp.db
 DB_INSTALLS += $(IPMICOMM)/db/sensor_fan.db
-DB_INSTALLS += $(IPMICOMM)/db/sensor_hotswap.db
+DB_INSTALLS += $(IPMICOMM)/db/sensor_hotswap_vt.db
+DB_INSTALLS += $(IPMICOMM)/db/sensor_hotswap_nat.db
 DB_INSTALLS += $(IPMICOMM)/db/sensor_voltage.db
 DB_INSTALLS += $(IPMICOMM)/db/sensor_current.db
 
 4. Add these lines to st.cmd for each MCH/shelf before iocInit. *Order is important*
 
-Example for crat-b34-cd38, whose DNS node name is actually mch-b34-cd38:
+Example for mch-b34-cd38:
 
-drvAsynIPPortConfigure ("crat-b34-cd38","mch-b34-cd38:623 udp",0,0,0)
-mchCreateFile("st.crat-b34-cd38.cmd")
-mchInit("crat-b34-cd38")
-< st.crat-b34-cd38.cmd
+drvAsynIPPortConfigure ("mch-b34-cd38","mch-b34-cd38:623 udp",0,0,0)
+mchInit("mch-b34-cd38")
+< st.mch-b34-cd38.cmd
 
 
 NOTES ON THIS RELEASE
@@ -45,6 +45,8 @@ NOTES ON THIS RELEASE
 
 (below, 'ioc' refers to the managment ioc using ipmiComm to communicate 
  with a remote crate. at LCLS, this ioc is a soft ioc called IOCManager.)
+
+-This release supports NAT and Vadatech MCHs
 
 -During ioc boot, the ioc will discover which modules/sensors exist
  for each carrier defined in st.cmd. It will then build a script to 
