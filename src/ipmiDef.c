@@ -19,7 +19,7 @@ uint8_t IPMI_HEADER[] = { IPMI_MSG_AUTH_TYPE_NONE,/* Auth type none */
                           0 };                    /* Number of bytes in message */
 
 /* IPMI message part 1 */
-uint8_t IPMI_MSG1[]   = { IPMI_MSG_ADDR_BMC,	           /* Responder's address */
+uint8_t IPMI_MSG1[]   = { IPMI_MSG_ADDR_BMC,	           /* Responder's address */ /*-------------should this be 0x81? */
 		          IPMI_MSG_NETFN_APP_REQUEST << 2, /* Network function code/LUN */
 		          0 };                             /* For checksum */
 
@@ -40,7 +40,7 @@ uint8_t GET_SESS_MSG[] = { IPMI_MSG_ADDR_SW,	               /* Requester's addre
 			   0,			               /* Message sequence number */	    
 			   IPMI_MSG_CMD_GET_SESSION_CHALLENGE, /* Command code */	   
 			   IPMI_MSG_AUTH_TYPE_NONE,            /* Authentication type */   
-			   'a', 'd', 'm', 'i', 'n', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, /* User name */
+			   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, /* Null user name */
                            0 };                                /* For checksum */
 
 /* Activate Session */
@@ -132,7 +132,7 @@ uint8_t SET_FRU_ACT_MSG[] = { IPMI_MSG_ADDR_BMC,           /* Requester's addres
                               0,                           /* Message sequence number */         
                               IPMI_MSG_CMD_SET_FRU_ACT,    /* Command code */         
 			      0,                           /* PICMG Identifier, 0x00 is used */
-                              0,                           /* FRU ID */	
+                              0,                           /* FRU device ID */	
                               0,                           /* Command value, 0x00 deactivate, 0x01 activate */         
                               0 };                         /* For checksum */
 
@@ -141,9 +141,17 @@ uint8_t SET_FRU_POLICY_MSG[] = { IPMI_MSG_ADDR_BMC,           /* Requester's add
                                  0,                           /* Message sequence number */         
                                  IPMI_MSG_CMD_SET_FRU_POLICY, /* Command code */         
 			         0,                           /* PICMG Identifier, 0x00 is used */
-                                 0,                           /* FRU ID */	
+                                 0,                           /* FRU device ID */	
                                  0,                           /* FRU activation policy mask bits */
                                  0,                           /* FRU activation policy set bits */         
+                                 0 };                         /* For checksum */
+
+/* Get FRU Activation Policy */
+uint8_t GET_FRU_POLICY_MSG[] = { IPMI_MSG_ADDR_BMC,           /* Requester's address */            
+                                 0,                           /* Message sequence number */         
+                                 IPMI_MSG_CMD_GET_FRU_POLICY, /* Command code */         
+			         0,                           /* PICMG Identifier, 0x00 is used */
+                                 0,                           /* FRU device ID */	
                                  0 };                         /* For checksum */
 
 /* Get Fan Speed Properties */
@@ -180,3 +188,70 @@ uint8_t GET_POWER_LEVEL_MSG[] = {  IPMI_MSG_ADDR_BMC,         /* Requester's add
                                  0,                           /* FRU ID */	
                                  0,                           /* Power type: steady state, desired, early, desired early */	
                                  0 };                         /* For checksum */
+
+/* I2C addresses, compiled by NAT 
+ * Indexed by FRU ID
+ * (last 150-ish addresses are unused,
+ *  so left these out of the array)
+ */
+
+uint8_t FRU_I2C_ADDR[102] = {
+
+       0,	/* carrier manager */
+       0,	/* physical Shelf FRU Info 1 */
+       0,	/* physical Shelf FRU Info 2 */
+    0x10,	/* MCMC1 */
+    0x12,	/* MCMC2 */
+    0x72,	/* AMC1  */
+    0x74,	/* AMC2  */
+    0x76,	/* AMC3  */
+    0x78,	/* AMC4	 */
+    0x7A,	/* AMC5	 */
+    0x7C,	/* AMC6	 */
+    0x7E,	/* AMC7  */
+    0x80,	/* AMC8	 */
+    0x82,	/* AMC9	 */
+    0x84,	/* AMC10 */
+    0x86,	/* AMC11 */
+    0x88,	/* AMC12 */
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,	 /* 17-28 reserved for AMC */
+    0xA2,	/* AMC13 */
+    0xA4,	/* AMC13 */
+    0, 0, 0, 0, 0, 0, 0, 0, 0,           /* 31-39 reserved for AMC */
+    0xA8,	/* CU1   */
+    0xAA,	/* CU2   */
+    0, 0, 0, 0, 0, 0, 0, 0,              /* 42-49 reserved for CU  */
+    0xC2,	/* PM1   */
+    0xC4,	/* PM2   */
+    0xC6,	/* PM3   */
+    0xC8,	/* PM4   */
+    0, 0, 0, 0, 0, 0,                    /* 54-59 reserved for PM  */
+    0x14,	/* ClkMod1 */
+    0x16,	/* HubMod1 */
+    0x14,	/* ClkMod2 */
+    0x16,	/* HubMod2 */
+    0x1C,	/* MCH RTM 1 */
+    0x1E,	/* MCH RTM 2 */
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, /* 66-78 reserved for OEM modules */
+    0,          /* Telco Alarm Function */
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0,          /* 80-89 implementation defined */
+    0x72,	/* RTM1  */
+    0x74,	/* RTM2  */
+    0x76,	/* RTM3  */
+    0x78,	/* RTM4  */
+    0x7A,	/* RTM5  */
+    0x7C,	/* RTM6  */
+    0x7E,	/* RTM7  */
+    0x80,	/* RTM8  */
+    0x82,	/* RTM9  */
+    0x84,	/* RTM10 */
+    0x86,	/* RTM11 */
+    0x88	/* RTM12 */
+		/* 102-124 reserved for RTM 
+		 * 125-127 reserved
+		 * 128 local ShM (blank)
+		 * 129-252 reserved (blank)
+		 * 253 logical CM (backplane FRU-Info) (blank)
+		 * 254 logical ShM (backplane FRU-Info) (blank)
+		 */
+};

@@ -48,7 +48,7 @@
 
 	   Supported operations:
 
-             * "RESET": perform cold reset (reboots MCH)
+             * "RESET": perform IPMI cold reset
              * "SESS":  close/open session with MCH
              * "INIT":  override 'MCH communication initialized' bit
 
@@ -83,6 +83,7 @@
              * "INIT": communication with crate initialized
              * "FAN":  read fan auto-adjustment
              * "HS":   read FRU hot-swap sensor 
+	     * "MCH":  MCH vendor
 
 
          Multibit-Binary Output Device Support:
@@ -288,7 +289,7 @@ printf("devMchFind: name is %s\n",name);
 
 /*--- end stolen ---*/
 
-float 
+static float 
 sensorConversion(SdrFull sdr, uint8_t raw)
 {
 int l, units, m, b, rexp, bexp;
@@ -306,28 +307,30 @@ float value;
 
 	if ( l == SENSOR_CONV_LINEAR )
 		value = value;
-	if ( l == SENSOR_CONV_LN )
+	else if ( l == SENSOR_CONV_LN )
 		value = log( value );
-	if ( l == SENSOR_CONV_LOG10 )
+	else if ( l == SENSOR_CONV_LOG10 )
 		value = log10( value );
-	if ( l == SENSOR_CONV_LOG2 )
+	else if ( l == SENSOR_CONV_LOG2 )
 		value = log( value )/log( 2 );
-	if ( l == SENSOR_CONV_E )
+	else if ( l == SENSOR_CONV_E )
 		value = exp( value );
-	if ( l == SENSOR_CONV_EXP10 )
+	else if ( l == SENSOR_CONV_EXP10 )
 		value = pow( value, 10 );
-	if ( l == SENSOR_CONV_EXP2 )
+	else if ( l == SENSOR_CONV_EXP2 )
 		value = pow( value, 2 );
-	if ( l == SENSOR_CONV_1_X )
+	else if ( l == SENSOR_CONV_1_X )
 		value = 1/value;
-	if ( l == SENSOR_CONV_SQR )
+	else if ( l == SENSOR_CONV_SQR )
 		value = pow( value, 2);
-	if ( l == SENSOR_CONV_CUBE )
+	else if ( l == SENSOR_CONV_CUBE )
 		value = pow( value, 1/3 );
-	if ( l == SENSOR_CONV_SQRT )
+	else if ( l == SENSOR_CONV_SQRT )
 		value = sqrt( value );
-	if ( l == SENSOR_CONV_CUBE_NEG1 )
+	else if ( l == SENSOR_CONV_CUBE_NEG1 )
 		value = pow( value, -1/3 );
+	else
+		printf("unknown sensor conversion algorithm\n");
 
 	return value;
 }
@@ -457,6 +460,7 @@ int      units, s = 0;
 float    value = 0;
 size_t   responseSize;
 uint8_t  lun;
+int      offs; 
 
 	if ( !recPvt )
 		return status;
@@ -467,6 +471,8 @@ uint8_t  lun;
 	mchSys  = mchSysData[mchSess->instance];
 	task    = recPvt->task;
 
+	offs = ( mchSess->type == MCH_TYPE_NAT ) ? IPMI_RPLY_OFFSET_NAT : 0;
+
 	if ( mchIsAlive[mchSess->instance] && mchSess->session && mchInitDone[mchSess->instance] ) {
 
 		responseSize = mchSys->sens[index].readMsgLength;
@@ -476,14 +482,15 @@ uint8_t  lun;
 		epicsMutexLock( mch->mutex );
 
 		if ( !(s = ipmiMsgReadSensor( mchSess, data, sensor, lun, &responseSize )) ) {
-			bits = data[IPMI_RPLY_SENSOR_ENABLE_BITS_OFFSET];
+			bits = data[IPMI_RPLY_SENSOR_ENABLE_BITS_OFFSET + offs];
+
 			if ( IPMI_SENSOR_READING_DISABLED(bits) || IPMI_SENSOR_SCANNING_DISABLED(bits) ) {
 				if ( IPMICOMM_DEBUG )
 					printf("%s sensor reading/state unavailable or scanning disabled. Bits: %02x\n",pai->name, bits);
 				s = ERROR;
 			}
 			else {
-				raw = data[IPMI_RPLY_SENSOR_READING_OFFSET];
+				raw = data[IPMI_RPLY_SENSOR_READING_OFFSET + offs];
 				mchSys->sens[index].val = raw;
 			}
 		}
@@ -619,7 +626,7 @@ MchData  mchData;
 MchSess  mchSess;
 MchSys   mchSys;
 char    *task;
-long     status = NO_CONVERT;
+long     status = 0;
 int      s = 0;
 
 	if ( !recPvt )
@@ -845,7 +852,7 @@ char     str[40];
         node = strtok( pmbbi->inp.value.vmeio.parm, "+" );
         if ( (p = strtok( NULL, "+")) ) {
                 task = p;
-                if ( strcmp( task, "HS") && strcmp( task, "FAN") && strcmp( task, "INIT" ) && strcmp( task, "PWR") ) {
+                if ( strcmp( task, "HS") && strcmp( task, "FAN") && strcmp( task, "INIT" ) && strcmp( task, "PWR") && strcmp( task, "MCH" ) ) {
 			sprintf( str, "Unknown task parameter %s", task);
 			status = S_dev_badSignal;
 		}
@@ -890,6 +897,7 @@ short    index  = pmbbi->inp.value.vmeio.signal; /* Sensor index */
 long     status = 0;
 int      s = 0;
 size_t   responseSize;
+int      offs;
 
 	if ( !recPvt )
 		return status;
@@ -901,6 +909,8 @@ size_t   responseSize;
 
 	task    = recPvt->task;
 	fru     = &mchSys->fru[id];
+
+	offs = ( mchSess->type == MCH_TYPE_NAT ) ? IPMI_RPLY_OFFSET_NAT : 0;
 
 	if ( task ) {
 
@@ -916,6 +926,10 @@ size_t   responseSize;
 
 			pmbbi->rval = mchInitDone[mchSess->instance];
 
+		else if ( !(strcmp( task, "MCH" )) )
+
+			pmbbi->rval = mchSess->type;
+
 		else if ( !(strcmp( task, "HS")) && mchSess->session && mchInitDone[mchSess->instance] ) {
 
 			if ( mchIsAlive[mchSess->instance] ) {
@@ -926,7 +940,7 @@ size_t   responseSize;
 				epicsMutexLock( mch->mutex );
 
 				if ( !(s = ipmiMsgReadSensor( mchSess, data, sensor, addr, &responseSize )) ) {	
-					bits = data[IPMI_RPLY_SENSOR_ENABLE_BITS_OFFSET];
+					bits = data[IPMI_RPLY_SENSOR_ENABLE_BITS_OFFSET + offs];
 					if ( IPMI_SENSOR_READING_DISABLED(bits)  || IPMI_SENSOR_SCANNING_DISABLED(bits) ) {
 						if ( IPMICOMM_DEBUG )
 						    printf("%s sensor reading/state unavailable or scanning disabled. Bits: %02x\n", pmbbi->name, bits);
@@ -934,7 +948,7 @@ size_t   responseSize;
 					}
 					else {
 						/* Store raw sensor reading */
-						value = data[IPMI_RPLY_HS_SENSOR_READING_OFFSET];
+						value = data[IPMI_RPLY_HS_SENSOR_READING_OFFSET + offs];
 						mchSys->sens[index].val = value;
 					}
 				}
@@ -1028,11 +1042,13 @@ MchData  mchData;
 MchSess  mchSess;
 MchSys   mchSys;
 char    *task;
-long     status = NO_CONVERT;
+long     status = 0;
 int      cmd;
 int      id     = pmbbo->out.value.vmeio.card;
-int      index, i = 0, s = 0;
-volatile uint8_t val;
+int      s = 0;
+
+/*int      index, i = 0;
+volatile uint8_t val;*/
 
 	if ( !recPvt )
 		return status;
@@ -1062,10 +1078,11 @@ volatile uint8_t val;
 
 			epicsMutexLock( mch->mutex );
 
-			ipmiMsgSetFruActPolicyHelper( mchSess, data, id, cmd );
+			ipmiMsgSetFruActHelper( mchSess, data, id, cmd );
 
 			epicsMutexUnlock( mch->mutex );
 	      
+/*			reset not supported yet
 			if ( pmbbo->val == 2 ) {
 
 				index = mchSys->fru[id].hotswap;
@@ -1076,16 +1093,17 @@ volatile uint8_t val;
 					i++;
 					if (i > RESET_TIMEOUT ) {
 						recGblSetSevr( pmbbo, TIMEOUT_ALARM, MAJOR_ALARM );
-						return ERROR; /* also set FRU status */
+						return ERROR; /* also set FRU status 
 					}
 				}
 
 				epicsMutexLock( mch->mutex );
 
-				s = ipmiMsgSetFruActPolicyHelper( mchSess, data, id, 1 );
+				s = ipmiMsgSetFruActHelper( mchSess, data, id, 1 );
 
 				epicsMutexUnlock( mch->mutex );
-			 }	    
+			 }
+*/	    
 		}
 
 
@@ -1186,6 +1204,7 @@ long     status = NO_CONVERT;
 Fru      fru;
 int      s = 0;
 uint8_t  prop, level, draw, mult;
+int      offs;
 
 	if ( !recPvt )
 		return status;
@@ -1198,6 +1217,8 @@ uint8_t  prop, level, draw, mult;
 	task    = recPvt->task;
 	fru     = &mchSys->fru[id];
 
+	offs = ( mchSess->type == MCH_TYPE_NAT ) ? IPMI_RPLY_2ND_BRIDGED_OFFSET_NAT : 0;
+
 	if ( mchInitDone[mchSess->instance] && mchIsAlive[mchSess->instance] && mchSess->session ) {
 
 		if ( !(strcmp( task, "FAN")) ) {
@@ -1206,15 +1227,15 @@ uint8_t  prop, level, draw, mult;
 
 				epicsMutexLock( mch->mutex );
 
-				if ( !(s = ipmiMsgGetFanLevel( mchSess, data, id )) ) 
-					pai->rval = data[IPMI_RPLY_GET_FAN_LEVEL_OFFSET];
+				if ( !(s = ipmiMsgGetFanLevelHelper( mchSess, data, id )) ) 
+					pai->rval = data[IPMI_RPLY_GET_FAN_LEVEL_OFFSET + offs];
 
 				epicsMutexUnlock( mch->mutex );
 			}
 		}
 
-		/* Check for FRU IDs that support this query (Vadatech CLI manual 5.7.9) */
-		else if ( !(strcmp( task, "PWR")) && ( (id >=3 && id <=16) || (id >= 40 && id <= 41) || (id >= 50 && id <= 53) )  ) {
+		/* Check for systems and FRU IDs that support this query (Vadatech CLI manual 5.7.9) */
+		else if ( !(strcmp( task, "PWR")) && (mchSess->type != MCH_TYPE_NAT) && ( (id >=3 && id <=16) || (id >= 40 && id <= 41) || (id >= 50 && id <= 53) )  ) {
 
 				epicsMutexLock( mch->mutex );
 
@@ -1223,15 +1244,13 @@ uint8_t  prop, level, draw, mult;
 					if ( !(s = ipmiMsgGetPowerLevel( mchSess, data, id, parm )) ) {
 
 
-							prop  = data[IPMI_RPLY_GET_POWER_LEVEL_PROP_OFFSET];
+							prop  = data[IPMI_RPLY_GET_POWER_LEVEL_PROP_OFFSET + offs];
 
 							if ( (level = FRU_PWR_LEVEL( prop )) ) {
 								draw  = data[IPMI_RPLY_GET_POWER_LEVEL_DRAW_OFFSET + (level -1)];
 								mult  = data[IPMI_RPLY_GET_POWER_LEVEL_MULT_OFFSET];
 								pai->rval = draw * mult * 0.1; /* Convert from 0.1 Watts to Watts */
 							}
-else
-printf("requested %i power level: 0; must be in other level\n", parm);
 
 							/* If these don't change, consider moving this section to drvMch.c
                                                            and don't scan PWRDYN and PWRDELAY */
@@ -1406,16 +1425,15 @@ uint8_t  l = 0, *d = 0; /* FRU data length and raw */
 			d = fru->prod.part.data;
 			l = fru->prod.part.length;
 		}
-		else if ( !(strcmp( task, "BSN" )) ) {/* && fru->board.sn.data )*/
+		else if ( !(strcmp( task, "BSN" )) ) {
 			d = fru->board.sn.data;
 			l = fru->board.sn.length;
-		}       			/*pai->val = (epicsFloat64)(*fru->board.sn.data);*/
+		} 
 
-		else if ( !(strcmp( task, "PSN" )) ) {/*&& fru->prod.sn.data )*/
+		else if ( !(strcmp( task, "PSN" )) ) {
 			d = fru->prod.sn.data;
 			l = fru->prod.sn.length;
 		}
-       			/*pai->val = (epicsFloat64)(*fru->prod.sn.data);*/
 
 		if ( d ) {
 
@@ -1467,8 +1485,8 @@ char    str[40];
 		goto bail;
 	}
 
-        c = plongout->out.value.vmeio.card;
-        s = plongout->out.value.vmeio.signal; /* FRU ID */
+        c = plongout->out.value.vmeio.card;   /* FRU ID */
+        s = plongout->out.value.vmeio.signal;
 
         if ( c < 0 )
 		status = S_dev_badCard;
@@ -1508,8 +1526,8 @@ char    str[40];
 		mchData = mch->udata;
 		mchSess = mchData->mchSess;
 		mchSys  = mchSysData[mchSess->instance];
-       		plongout->drvl = plongout->lopr = mchSys->fru[s].fanMin;
-	       	plongout->drvh = plongout->hopr = mchSys->fru[s].fanMax;
+       		plongout->drvl = plongout->lopr = mchSys->fru[c].fanMin;
+	       	plongout->drvh = plongout->hopr = mchSys->fru[c].fanMax;
 	}
 
 bail:
@@ -1531,7 +1549,7 @@ MchSess  mchSess;
 MchSys   mchSys;
 char    *task;
 int      id      = plongout->out.value.vmeio.card; /* FRU ID */
-long     status  = NO_CONVERT;
+long     status  = 0;
 Fru      fru;
 uint8_t  data[MSG_MAX_LENGTH] = { 0 };
 int      s = 0;
@@ -1556,7 +1574,7 @@ printf("write_fru_longout: %s FRU id is %i, value is %.0f\n",plongout->name, id,
 
 			epicsMutexLock( mch->mutex );
 
-			s = ipmiMsgSetFanLevel( mchSess, data, id, plongout->val );
+			s = ipmiMsgSetFanLevelHelper( mchSess, data, id, plongout->val );
 
 			epicsMutexUnlock( mch->mutex );
 

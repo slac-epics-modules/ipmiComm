@@ -1,3 +1,18 @@
+16May2013 (SH)
+Many changes, primarily to add support for NAT MCH.
+NAT and Vadatech use different message protocols, so:
+-Added MCH type (vendor) to data structure and Db
+-Determine MCH type using node name and MAC address from /proc/net/arp
+-Added type-specific defines, message routines, helper routines
+-When reading from MCH, use type-specific offsets into message
+-Add support for second-bridged messages (used by some NAT PICMG msgs)
+-Replace sensor_hotswap.db with sensor_hotswap_vt.db and sensor_hotswap_nat.db
+
+Other changes:
+ipmiMsg.c: Have all msg routines call ipmiWriteReadHelper (even outside 
+  of a session); augment ipmiCompletionCode
+ipmiDef.c: Change user name to null from 'admin' because latest VT FW
+  no longer supports 'admin'
 Release: ipmiComm-R1-4-1
 
 08Oct2012 (SH)

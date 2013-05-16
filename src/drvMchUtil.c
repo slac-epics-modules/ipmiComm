@@ -5,6 +5,9 @@
 #include <string.h>  /* strcpy, memset */
 #include <ctype.h>   /* toupper */
 
+#include <unistd.h>  /* gethostname */
+#include <osiSock.h>
+
 #include <drvMch.h>
 #include <ipmiDef.h>
 
@@ -13,6 +16,107 @@
 #ifndef MAX
 	#define MAX( a, b ) ( ((a) > (b)) ? (a) : (b) )
 #endif
+
+#define PROC_FILE       "/proc/net/arp"
+#define MCH_NAT_MAC_OUI "00:40:42"
+#define MCH_VT_MAC_OUI  "00:13:3A"
+#define MAC_OUI_LENGTH  8
+
+extern int IPMICOMM_DEBUG;
+
+/* Stolen from fcomUtil */
+char *
+mchUtilGethostbyname(const char *name, unsigned port)
+{
+char           *rval;
+union {
+        struct in_addr ina;
+        uint8_t        oct[4];
+}               a;
+int             len;
+
+        /* xxx.xxx.xxx.xxx:yyyyy\0 */
+        if ( !name || hostToIPAddr(name, &a.ina) || ! (rval=malloc(4*4+5+1)) )
+                return 0;
+
+        len = sprintf(rval, "%u.%u.%u.%u", a.oct[0], a.oct[1], a.oct[2], a.oct[3]);
+        if ( 0 != port )
+                sprintf(rval+len,":%u",port);
+        return rval;
+}
+
+/* See ipmiDef.h for descriptions of these parameters
+   This relies on syntax of proc/net/arp
+ */
+int
+mchIdentify(MchSess mchSess)
+{
+FILE *file;
+char  filename[50], dev[25];
+char  str[200], *port, mac[MAC_OUI_LENGTH +1];
+int   found = 0;
+char *p = 0;
+int   i, l;
+
+        if ( mchSess->name )
+                strncpy( dev, mchSess->name, l = strlen( mchSess->name ) );
+        else {
+                errlogPrintf("mchIdentify: ERROR; null device name\n");
+                return -1;
+        }
+
+	if ( !(port = mchUtilGethostbyname( mchSess->name, 0 )) ) {
+		errlogPrintf("mchIdentify: Failed to get IP address\n");
+		return -1;
+	}
+		
+        /* Search ARP file for our IP address */
+        file = fopen( PROC_FILE, "r" );
+
+        if ( !file ) {
+                errlogPrintf("mchIdentify: Failed to read %s\n", PROC_FILE);
+                return -1;
+        }
+
+	printf("Searching for %s IP address %s in %s\n", dev, p, filename);
+
+        sprintf( port, "%s ", port ); /* Add space after IP address so that we don't match a subset of our string */ 
+        p = 0;
+
+        while ( fgets( str, sizeof( str ), file ) != NULL ) {
+
+                if ( (p = strstr( str, port )) ) {
+                        p = strtok( str, " " );
+                        for ( i = 0; i < 3; i++ )
+                                p = strtok( NULL, " " );
+                        strncpy( mac, p, MAC_OUI_LENGTH );
+                        mac[MAC_OUI_LENGTH] = '\0';
+                        found = 1;
+                        break;
+                }
+        }
+
+        if ( !found ) {
+                errlogPrintf("mchIdentify: failed to find IP address in %s\n", filename);
+                return -1;
+        }
+
+        if ( !strcmp( mac, MCH_VT_MAC_OUI ) ) {
+		printf("Identified %s to be Vadatech\n", mchSess->name);
+                mchSess->type = MCH_TYPE_VT;
+        }
+        else if ( !strcmp( mac, MCH_NAT_MAC_OUI ) ) {
+		printf("Identified %s to be NAT\n", mchSess->name);
+                mchSess->type = MCH_TYPE_NAT;
+        }
+        else {
+                errlogPrintf("mchIdentify: Unknown type of MCH, MAC OUI is %s\n", mac);
+                mchSess->type = MCH_TYPE_UNKNOWN;
+                return -1;
+        }
+
+        return 0;
+}
 
 void
 mchCreateFile( const char *filename )
@@ -144,12 +248,12 @@ sensorFruRecordScript(MchSys mchSys, int p)
 {
 FILE    *file;
 uint8_t  i, fruIndex;
-char     dev[30];
+char     dev[30], str[30];
 char     stFile[50], dbFile[50];
 char     code[10], desc[40];
 Fru      fru;
 Sensor   sens;
-int      found, inst;
+int      found, inst,  n;
 
 	/* Convert node name to PV device name */
 	for ( i = 0; i < sizeof( dev ); i++ ) {
@@ -163,9 +267,13 @@ int      found, inst;
 	}
 	dev[i] = '\0';
 
+        /* Replace first part of name with "CRAT" to match PV naming conventions */
+        n = strcspn( dev, ":" );
+        memcpy( str, dev + n, sizeof(dev) - n);  
+        sprintf( dev, "CRAT%s", str );
 	sprintf( stFile, "st.%s.cmd", mchSys->name );
 
-	errlogPrintf("Creating %s...\n", stFile);
+	errlogPrintf("Creating %s file\n", stFile);
 
 	file = fopen( stFile, "w" ); 
 
@@ -230,8 +338,13 @@ int      found, inst;
 							found = 1;
 							break;
 
-						case SENSOR_TYPE_HOT_SWAP:
-							sprintf( dbFile, "sensor_hotswap.db" ); 
+						case SENSOR_TYPE_HOTSWAP_VT:
+							sprintf( dbFile, "sensor_hotswap_vt.db" ); 
+							found = 1;
+							break;
+
+						case SENSOR_TYPE_HOTSWAP_NAT:
+							sprintf( dbFile, "sensor_hotswap_nat.db" ); 
 							found = 1;
 							break;
 					}

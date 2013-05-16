@@ -307,15 +307,15 @@ mchFruProdDataGet(FruProd prod, uint8_t *raw, unsigned *offset)
 
 		*offset += FRU_DATA_PROD_AREA_MANUF_LENGTH_OFFSET;
 
-		if ( mchFruFieldGet( &(prod->manuf), raw, offset ) )
+		if ( mchFruFieldGet( &(prod->manuf),   raw, offset ) )
 			(*offset)++;
-		if ( mchFruFieldGet( &(prod->prod),  raw, offset ) )
+		if ( mchFruFieldGet( &(prod->prod),    raw, offset ) )
 			(*offset)++;
-		if ( mchFruFieldGet( &(prod->part),  raw, offset ) )
+		if ( mchFruFieldGet( &(prod->part),    raw, offset ) )
 			(*offset)++;
-		if ( mchFruFieldGet( &(prod->ver),   raw, offset ) )
+		if ( mchFruFieldGet( &(prod->version), raw, offset ) )
 			(*offset)++;
-		if ( mchFruFieldGet( &(prod->sn),    raw, offset ) )
+		if ( mchFruFieldGet( &(prod->sn),      raw, offset ) )
 			(*offset)++;
 	}
 }
@@ -361,15 +361,16 @@ uint8_t   *raw;
 int        i;
 uint16_t   sizeInt;  /* Size of FRU data area in bytes */
 unsigned   nread;    /* Number of FRU data reads */
-unsigned   offset;
+unsigned   offset;   /* Offset into FRU data */
+int        offs = ( mchSess->type == MCH_TYPE_NAT ) ? IPMI_RPLY_OFFSET_NAT : 0; /* Offset into reply message */
 
 	/* Get FRU Inventory Info */
 	if ( ipmiMsgGetFruInfo( mchSess, response, id ) > 0 )
 		return;
 
-	fru->size[0] = response[IPMI_RPLY_FRU_AREA_SIZE_LSB_OFFSET];
-	fru->size[1] = response[IPMI_RPLY_FRU_AREA_SIZE_MSB_OFFSET];
-	fru->access  = response[IPMI_RPLY_FRU_AREA_ACCESS_OFFSET];  
+	fru->size[0] = response[IPMI_RPLY_FRU_AREA_SIZE_LSB_OFFSET + offs];
+	fru->size[1] = response[IPMI_RPLY_FRU_AREA_SIZE_MSB_OFFSET + offs];
+	fru->access  = response[IPMI_RPLY_FRU_AREA_ACCESS_OFFSET   + offs];  
 
 	if ( 0 == (sizeInt = arrayToUint16( fru->size )) )
 		return;
@@ -395,7 +396,7 @@ unsigned   offset;
 		fru->read = i;
 		if ( (IPMI_COMP_CODE_REQUESTED_DATA == ipmiMsgReadFru( mchSess, response, id, fru->readOffset, MSG_FRU_DATA_READ_SIZE )) )
 			break;
-		memcpy( raw + i*MSG_FRU_DATA_READ_SIZE, response + IPMI_RPLY_FRU_DATA_READ_OFFSET, MSG_FRU_DATA_READ_SIZE );
+		memcpy( raw + i*MSG_FRU_DATA_READ_SIZE, response + IPMI_RPLY_FRU_DATA_READ_OFFSET + offs, MSG_FRU_DATA_READ_SIZE );
 		incr2Uint8Array( fru->readOffset, MSG_FRU_DATA_READ_SIZE );
 	}
 
@@ -430,6 +431,8 @@ mchFruGetDataAll(MchSess mchSess, MchSys mchSys)
 uint8_t response[MSG_MAX_LENGTH] = { 0 };
 uint8_t i;
 Fru fru;
+int offs = ( mchSess->type == MCH_TYPE_NAT ) ? IPMI_RPLY_2ND_BRIDGED_OFFSET_NAT : 0;;
+
 	for ( i = 0; i < MAX_FRU ; i++ ) {
 
 	       	fru = &mchSys->fru[i];
@@ -439,11 +442,12 @@ Fru fru;
 			mchFruDataGet( mchSess, mchSys, fru , i );
 
 			if ( (i >= UTCA_FRU_TYPE_CU_MIN) && (i <= UTCA_FRU_TYPE_CU_MAX) ) {
-				ipmiMsgGetFanProp( mchSess, response, fru->sdr.fruId );
-				fru->fanMin  = response[IPMI_RPLY_GET_FAN_PROP_MIN_OFFSET];
-				fru->fanMax  = response[IPMI_RPLY_GET_FAN_PROP_MAX_OFFSET];
-				fru->fanNom  = response[IPMI_RPLY_GET_FAN_PROP_NOM_OFFSET];
-				fru->fanProp = response[IPMI_RPLY_GET_FAN_PROP_PROP_OFFSET];
+
+				ipmiMsgGetFanPropHelper( mchSess, response, fru->sdr.fruId );
+				fru->fanMin  = response[IPMI_RPLY_GET_FAN_PROP_MIN_OFFSET  + offs];
+				fru->fanMax  = response[IPMI_RPLY_GET_FAN_PROP_MAX_OFFSET  + offs];
+				fru->fanNom  = response[IPMI_RPLY_GET_FAN_PROP_NOM_OFFSET  + offs];
+				fru->fanProp = response[IPMI_RPLY_GET_FAN_PROP_PROP_OFFSET + offs];
 			}
 		}			
 	}
@@ -453,7 +457,7 @@ printf("mchFruGetDataAll: FRU Summary:\n");
 for ( i = 0; i < MAX_FRU  ; i++) {
 	fru = &mchSys->fru[i];
 	if ( fru->sdr.fruId )
-		printf("FRU %i %s was found, id %02x instance %02x\n", fru->sdr.fruId, fru->board.prod.data, fru->sdr.entityId, fru->sdr.entityInst);
+		printf("FRU %i %s was found, id %02x instance %02x, addr %02x dev %02x lun %02x\n", fru->sdr.fruId, fru->board.prod.data, fru->sdr.entityId, fru->sdr.entityInst, fru->sdr.addr, fru->sdr.fruId, fru->sdr.lun);
 }
 #endif
 }
@@ -499,7 +503,7 @@ Sensor sens = &mchSys->sens[index];
 	sens->fruIndex = id;
 	
 	/* Save hotswap sensor index to FRU structure (used by devSup) */
-	if ( (id != 0 ) && (sens->sdr.sensType == SENSOR_TYPE_HOT_SWAP) )
+	if ( (id != 0 ) && ((sens->sdr.sensType == SENSOR_TYPE_HOTSWAP_VT) || (sens->sdr.sensType == SENSOR_TYPE_HOTSWAP_NAT) ) )
        		mchSys->fru[id].hotswap = index;
 }
 
@@ -514,25 +518,26 @@ mchSdrRepGetInfo(MchSess mchSess, MchSys mchSys)
 {
 uint8_t response[MSG_MAX_LENGTH] = { 0 };
 uint8_t flags;
+int     offs = ( mchSess->type == MCH_TYPE_NAT ) ? IPMI_RPLY_OFFSET_NAT : 0;
 
 	ipmiMsgGetSdrRepInfo( mchSess, response );
 
-	if ( response[IPMI_RPLY_COMPLETION_CODE_OFFSET] ) {
+	if ( response[IPMI_RPLY_COMPLETION_CODE_OFFSET + offs] ) {
 		errlogPrintf("mchSdrRepGetInfo: Error reading SDR Repository info for %s\n", mchSess->name);
 		return -1;
 	}
 
-	mchSys->sdrRep.ver     = response[IPMI_RPLY_SDRREP_VER_OFFSET];
-	mchSys->sdrRep.size[0] = response[IPMI_RPLY_SDRREP_CNT_LSB_OFFSET];
-	mchSys->sdrRep.size[1] = response[IPMI_RPLY_SDRREP_CNT_MSB_OFFSET];
+	mchSys->sdrRep.ver     = response[IPMI_RPLY_SDRREP_VER_OFFSET     + offs];
+	mchSys->sdrRep.size[0] = response[IPMI_RPLY_SDRREP_CNT_LSB_OFFSET + offs];
+	mchSys->sdrRep.size[1] = response[IPMI_RPLY_SDRREP_CNT_MSB_OFFSET + offs];
 
 	ipmiMsgGetDevSdrInfo( mchSess, response, 1 );
 
-	if ( response[IPMI_RPLY_COMPLETION_CODE_OFFSET] )
+	if ( response[IPMI_RPLY_COMPLETION_CODE_OFFSET + offs] )
 		return 0; /* We don't currently use dev sdr, so don't return error */
 
-       	mchSys->sdrRep.devSdrSize = response[IPMI_RPLY_DEV_SDR_CNT_OFFSET];
-	flags = response[IPMI_RPLY_DEV_SDR_FLAGS_OFFSET];
+       	mchSys->sdrRep.devSdrSize = response[IPMI_RPLY_DEV_SDR_CNT_OFFSET + offs];
+	flags = response[IPMI_RPLY_DEV_SDR_FLAGS_OFFSET + offs];
        	mchSys->sdrRep.devSdrDyn  = DEV_SENSOR_DYNAMIC(flags);
        	mchSys->sdrRep.lun0       = DEV_SENSOR_LUN0(flags);
        	mchSys->sdrRep.lun1       = DEV_SENSOR_LUN1(flags);
@@ -553,11 +558,6 @@ mchSdrFruDev(SdrFru sdr, uint8_t *raw)
 int n, l, i;
 	n = SDR_HEADER_LENGTH + raw[SDR_LENGTH_OFFSET];
 
-	sdr->id[0]      = raw[SDR_ID_LSB_OFFSET];
-	sdr->id[1]      = raw[SDR_ID_MSB_OFFSET];
-	sdr->ver        = raw[SDR_VER_OFFSET];
-	sdr->recType    = raw[SDR_REC_TYPE_OFFSET];
-	sdr->length     = raw[SDR_LENGTH_OFFSET];
 	sdr->id[0]      = raw[SDR_ID_LSB_OFFSET];
 	sdr->id[1]      = raw[SDR_ID_MSB_OFFSET];
 	sdr->ver        = raw[SDR_VER_OFFSET];
@@ -649,7 +649,8 @@ uint8_t  type   = 0, addr = 0;
 uint8_t *raw    = 0;
 int      i, iFull = 0, iFru = 0, fruId;
 size_t   responseSize;
-int rval = -1;
+int      rval = -1;
+int      offs = ( mchSess->type == MCH_TYPE_NAT ) ? IPMI_RPLY_OFFSET_NAT : 0;
 
 	if ( mchSdrRepGetInfo( mchSess, mchSys ) )
 		return -1;
@@ -667,9 +668,9 @@ int rval = -1;
 			i--;
 
 		else {
-			memcpy( raw + (i*SDR_MAX_LENGTH), response + IPMI_RPLY_GET_SDR_DATA_OFFSET, SDR_MAX_LENGTH );
+			memcpy( raw + (i*SDR_MAX_LENGTH), response + IPMI_RPLY_GET_SDR_DATA_OFFSET + offs, SDR_MAX_LENGTH );
 
-			switch ( response[IPMI_RPLY_GET_SDR_DATA_OFFSET + SDR_REC_TYPE_OFFSET] ) {
+			switch ( response[IPMI_RPLY_GET_SDR_DATA_OFFSET + offs + SDR_REC_TYPE_OFFSET] ) {
 
 				default:
 					break;
@@ -686,8 +687,8 @@ int rval = -1;
 					mchSys->fruCount++;
 					break;
 			}
-			id[0]  = response[IPMI_RPLY_GET_SDR_NEXT_ID_LSB_OFFSET];
-			id[1]  = response[IPMI_RPLY_GET_SDR_NEXT_ID_MSB_OFFSET];
+			id[0]  = response[IPMI_RPLY_GET_SDR_NEXT_ID_LSB_OFFSET + offs];
+			id[1]  = response[IPMI_RPLY_GET_SDR_NEXT_ID_MSB_OFFSET + offs];
 
 			if ( arrayToUint16( id ) == 0xFFFF )
 				break;
@@ -875,30 +876,41 @@ char    taskName[50];
 
 		epicsMutexLock( mch->mutex );
 
+                /* Determine MCH type */
+                mchIdentify( mchSess );
+
 		/* Initiate communication session with MCH */
-		mchCommStart( mchSess );
+		if ( !mchCommStart( mchSess ) ) {
 
-		/* Get SDR data */
-		if ( !mchSdrGetDataAll( mchSess, mchSys ) ) {
+			/* Get SDR data */
+			if ( !mchSdrGetDataAll( mchSess, mchSys ) ) {
 
-			/* Get FRU data */
-			mchFruGetDataAll( mchSess, mchSys );
+				/* Get FRU data */
+				mchFruGetDataAll( mchSess, mchSys );
 
-			/* Get Sensor/FRU association */
-			for ( i = 0; i < mchSys->sensCount; i++ )
-				mchSensorGetFru( mchSys, i );
+				/* Get Sensor/FRU association */
+				for ( i = 0; i < mchSys->sensCount; i++ )
+					mchSensorGetFru( mchSys, i );
 
-			mchSensorFruGetInstance( mchSys );
+				mchSensorFruGetInstance( mchSys );
 
-			mchInitDone[mchSess->instance] = MCH_INIT_DONE;
+				mchInitDone[mchSess->instance] = MCH_INIT_DONE;
+			}
+			else {
+				errlogPrintf("Failed to read %s SDR; cannot complete initialization\n",mch->name);
+			}
+
 		}
-		else
-			errlogPrintf("Failed to read %s SDR; cannot complete initialization\n",mch->name);
+		else {
+			errlogPrintf("Error initiating session with %s; cannot complete initialization\n",mch->name);
+		}
+
 
 		epicsMutexUnlock( mch->mutex );
 	}
-	else
+	else {
 		errlogPrintf("No response from %s; cannot complete initialization\n",mch->name);
+	}
 
        	/* Create script to load records; done at init with no other threads modifying mchData, so need to lock */
        	sensorFruRecordScript( mchSys, mchInitDone[mchSess->instance] );

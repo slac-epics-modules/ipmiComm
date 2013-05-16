@@ -188,7 +188,8 @@ typedef struct MchSessRec_ {
 	uint8_t       seq;           /* IPMI sequence (6-bit number); used to confirm reply is for correct request */
 	double        timeout;       /* Asyn read timeout */
 	int           session;       /* Enable session with MCH */
-	int           err;           /* Count of sequential message errors */
+	int           err;           /* Count of sequential message errors */         
+	int           type;          /* MCH vendor, Vadatech, NAT, etc. */
 } MchSessRec, *MchSess;
 
 /* Struct for MCH system information */
