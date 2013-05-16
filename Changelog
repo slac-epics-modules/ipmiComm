@@ -1,3 +1,5 @@
+Release: ipmiComm-R1-5-0
+
 16May2013 (SH)
 Many changes, primarily to add support for NAT MCH.
 NAT and Vadatech use different message protocols, so:
@@ -13,6 +15,7 @@ ipmiMsg.c: Have all msg routines call ipmiWriteReadHelper (even outside
   of a session); augment ipmiCompletionCode
 ipmiDef.c: Change user name to null from 'admin' because latest VT FW
   no longer supports 'admin'
+
 Release: ipmiComm-R1-4-1
 
 08Oct2012 (SH)

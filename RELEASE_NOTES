@@ -1,3 +1,6 @@
+ipmiComm-R1-5-0:  Many changes to support NAT MCH (in addition to Vadatech)
+                    See Changelog for more detail
+
 ipmiComm-R1-4-1:  Check sensor 'scanning enabled' before copying
                     sensor reading to PV. Changes to src/devMch.c and src/ipmiDef.c
 
