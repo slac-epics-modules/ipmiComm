@@ -78,8 +78,6 @@ int   i, l;
                 return -1;
         }
 
-	printf("Searching for %s IP address %s in %s\n", dev, p, filename);
-
         sprintf( port, "%s ", port ); /* Add space after IP address so that we don't match a subset of our string */ 
         p = 0;
 
