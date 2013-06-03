@@ -19,7 +19,7 @@ uint8_t IPMI_HEADER[] = { IPMI_MSG_AUTH_TYPE_NONE,/* Auth type none */
                           0 };                    /* Number of bytes in message */
 
 /* IPMI message part 1 */
-uint8_t IPMI_MSG1[]   = { IPMI_MSG_ADDR_BMC,	           /* Responder's address */ /*-------------should this be 0x81? */
+uint8_t IPMI_MSG1[]   = { IPMI_MSG_ADDR_BMC,	           /* Responder's address */
 		          IPMI_MSG_NETFN_APP_REQUEST << 2, /* Network function code/LUN */
 		          0 };                             /* For checksum */
 

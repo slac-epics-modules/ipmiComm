@@ -5,11 +5,9 @@
 #include <string.h>  /* strcpy, memset */
 #include <ctype.h>   /* toupper */
 
-#include <unistd.h>  /* gethostname */
-#include <osiSock.h>
-
 #include <drvMch.h>
 #include <ipmiDef.h>
+#include <ipmiMsg.h>
 
 #undef DEBUG
 
@@ -17,98 +15,45 @@
 	#define MAX( a, b ) ( ((a) > (b)) ? (a) : (b) )
 #endif
 
-#define PROC_FILE       "/proc/net/arp"
-#define MCH_NAT_MAC_OUI "00:40:42"
-#define MCH_VT_MAC_OUI  "00:13:3A"
-#define MAC_OUI_LENGTH  8
-
-extern int IPMICOMM_DEBUG;
-
-/* Stolen from fcomUtil */
-char *
-mchUtilGethostbyname(const char *name, unsigned port)
-{
-char           *rval;
-union {
-        struct in_addr ina;
-        uint8_t        oct[4];
-}               a;
-int             len;
-
-        /* xxx.xxx.xxx.xxx:yyyyy\0 */
-        if ( !name || hostToIPAddr(name, &a.ina) || ! (rval=malloc(4*4+5+1)) )
-                return 0;
-
-        len = sprintf(rval, "%u.%u.%u.%u", a.oct[0], a.oct[1], a.oct[2], a.oct[3]);
-        if ( 0 != port )
-                sprintf(rval+len,":%u",port);
-        return rval;
-}
-
-/* See ipmiDef.h for descriptions of these parameters
-   This relies on syntax of proc/net/arp
+/* 
+ * Use Manufacturer ID (from Get Device ID command)
+ * to determine MCH type
  */
 int
 mchIdentify(MchSess mchSess)
 {
-FILE *file;
-char  filename[50], dev[25];
-char  str[200], *port, mac[MAC_OUI_LENGTH +1];
-int   found = 0;
-char *p = 0;
-int   i, l;
+int      i;
+uint8_t  response[MSG_MAX_LENGTH] = { 0 };
+uint8_t  tmpvt[4] = { 0 }, tmpnat[4] = { 0 };
+uint32_t mfvt, mfnat;
 
-        if ( mchSess->name )
-                strncpy( dev, mchSess->name, l = strlen( mchSess->name ) );
-        else {
-                errlogPrintf("mchIdentify: ERROR; null device name\n");
+	if ( ipmiMsgGetDeviceId( mchSess, response, IPMI_MSG_ADDR_CM ) ) {
+                errlogPrintf("mchIdentify: Error from Get Device ID command\n");
                 return -1;
-        }
-
-	if ( !(port = mchUtilGethostbyname( mchSess->name, 0 )) ) {
-		errlogPrintf("mchIdentify: Failed to get IP address\n");
-		return -1;
 	}
-		
-        /* Search ARP file for our IP address */
-        file = fopen( PROC_FILE, "r" );
 
-        if ( !file ) {
-                errlogPrintf("mchIdentify: Failed to read %s\n", PROC_FILE);
-                return -1;
-        }
+        /* Extract Manufacturer ID */
+        for ( i = 0; i < IPMI_RPLY_MANUF_ID_LENGTH ; i++)
+		tmpvt[i] = response[IPMI_RPLY_MANUF_ID_OFFSET + i];
+        for ( i = 0; i < IPMI_RPLY_MANUF_ID_LENGTH ; i++)
+		tmpnat[i] = response[IPMI_RPLY_MANUF_ID_OFFSET + i + IPMI_RPLY_OFFSET_NAT];
 
-        sprintf( port, "%s ", port ); /* Add space after IP address so that we don't match a subset of our string */ 
-        p = 0;
+	mfvt  = arrayToUint32( tmpvt  );
+	mfnat = arrayToUint32( tmpnat );
 
-        while ( fgets( str, sizeof( str ), file ) != NULL ) {
+	mfvt  = IPMI_MANUF_ID( mfvt  );
+	mfnat = IPMI_MANUF_ID( mfnat );
 
-                if ( (p = strstr( str, port )) ) {
-                        p = strtok( str, " " );
-                        for ( i = 0; i < 3; i++ )
-                                p = strtok( NULL, " " );
-                        strncpy( mac, p, MAC_OUI_LENGTH );
-                        mac[MAC_OUI_LENGTH] = '\0';
-                        found = 1;
-                        break;
-                }
-        }
-
-        if ( !found ) {
-                errlogPrintf("mchIdentify: failed to find IP address in %s\n", filename);
-                return -1;
-        }
-
-        if ( !strcmp( mac, MCH_VT_MAC_OUI ) ) {
+        if ( mfvt == MCH_MANUF_ID_VT ) {
 		printf("Identified %s to be Vadatech\n", mchSess->name);
                 mchSess->type = MCH_TYPE_VT;
         }
-        else if ( !strcmp( mac, MCH_NAT_MAC_OUI ) ) {
+        else if ( mfnat == MCH_MANUF_ID_NAT ) {
 		printf("Identified %s to be NAT\n", mchSess->name);
                 mchSess->type = MCH_TYPE_NAT;
         }
         else {
-                errlogPrintf("mchIdentify: Unknown type of MCH, MAC OUI is %s\n", mac);
+                errlogPrintf("mchIdentify: Unknown type of MCH, Manufacturer ID 0x%08x or 0x%08x?\n", mfvt, mfnat);
                 mchSess->type = MCH_TYPE_UNKNOWN;
                 return -1;
         }

@@ -1463,7 +1463,7 @@ ipmiMsgGetFruActPolicyHelper(MchSess mchSess, uint8_t *data, uint8_t fru)
 
 }
 
-/* Get Device ID; need to determine reply lengths and offsets for VT & NAT 
+/* Get Device ID 
  *
  *   RETURNS: status from ipmiMsgWriteReadHelper
  *            0 on success
@@ -1480,24 +1480,25 @@ uint8_t  imsg2[imsg2Size];
 uint8_t  b1msg1[b1msg1Size];
 uint8_t  b1msg2[b1msg2Size];
 size_t   messageSize;
-size_t   responseSize = 0;
+size_t   responseSize = ( mchSess->type == MCH_TYPE_NAT ) ? IPMI_RPLY_GET_DEVICE_ID_LENGTH_NAT : IPMI_RPLY_GET_DEVICE_ID_LENGTH_VT;
 uint8_t  cmd   = IPMI_MSG_CMD_GET_DEVICE_ID;
 uint8_t  netfn = IPMI_MSG_NETFN_APP_REQUEST;
+int      offs  = ( mchSess->type == MCH_TYPE_NAT ) ? IPMI_RPLY_OFFSET_NAT : 0;
 
-	memcpy( imsg2, SEND_MSG_MSG, imsg2Size );
+	memcpy( imsg2, SEND_MSG_MSG,  imsg2Size  );
 	memcpy( b1msg1, IPMI_MSG1,    b1msg1Size );
 	memcpy( b1msg2, BASIC_MSG,    b1msg2Size );
 
 	imsg2[IPMI_MSG2_CHAN_OFFSET] = IPMI_MSG_CHAN_IPMB0 + IPMI_MSG_TRACKING;
 
-	b1msg1[IPMI_MSG1_RSADDR_OFFSET]   = rsAddr ? rsAddr : IPMI_MSG_ADDR_CM;
+	b1msg1[IPMI_MSG1_RSADDR_OFFSET]   = rsAddr;/* ? rsAddr : IPMI_MSG_ADDR_CM;*/
 	b1msg1[IPMI_MSG1_NETFNLUN_OFFSET] = netfn << 2;
 
 	b1msg2[IPMI_MSG2_CMD_OFFSET] = cmd;
                                                                           
 	messageSize = ipmiMsgBuild( mchSess, message, cmd, 0, imsg2, imsg2Size, b1msg1, b1msg2, b1msg2Size, 0, 0, 0 );
 
-	return ipmiMsgWriteReadHelper( mchSess, message, messageSize, data, &responseSize, cmd, netfn, 0, 0 );
+	return ipmiMsgWriteReadHelper( mchSess, message, messageSize, data, &responseSize, cmd, netfn, offs, 1 );
 }
 
 /* Get Fan Speed Properties using Vadatech MCH; message contains 1 bridged message

@@ -76,6 +76,9 @@ extern volatile int IPMICOMM_DEBUG;
 /* Convert 2-element array (which stores LS byte first) to integer */
 uint16_t arrayToUint16(uint8_t *data );
 
+/* Convert 4-element array (which stores LS byte first) to integer */
+uint32_t arrayToUint32(uint8_t *data);
+
 /* Increment value of 2-element uint8_t array (which stores LS byte first)
  * Roll over to 0 when max possible value is reached.
  */
@@ -86,6 +89,8 @@ void incr2Uint8Array(uint8_t *data, int incr);
 void ipmiMsgSetSeqId(MchSess mchSess, uint8_t *message, uint8_t cmd);
 
 int ipmiMsgWriteRead(const char *name, uint8_t *message, size_t messageSize, uint8_t *response, size_t *responseSize, double timeout);
+
+int ipmiMsgGetDeviceId(MchSess mchSess, uint8_t *data, uint8_t rsAddr);
 
 int ipmiMsgGetChanAuth(MchSess mchSess, uint8_t *data);
 

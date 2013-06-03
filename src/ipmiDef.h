@@ -188,7 +188,7 @@ extern uint8_t FRU_I2C_ADDR[102];
 #define IPMI_RPLY_SET_FRU_POLICY_LENGTH_NAT          29
 #define IPMI_RPLY_GET_FRU_POLICY_LENGTH_NAT          39
 #define IPMI_RPLY_SET_FRU_ACT_LENGTH_NAT             45
-#define IPMI_RPLY_GET_DEVICE_ID_LENGTH_NAT           59 /* includes optional bytes */
+#define IPMI_RPLY_GET_DEVICE_ID_LENGTH_NAT           44 /* includes optional bytes */
 #define IPMI_RPLY_GET_FAN_PROP_LENGTH_NAT            43
 #define IPMI_RPLY_GET_FAN_LEVEL_LENGTH_NAT           42
 #define IPMI_RPLY_SET_FAN_LEVEL_LENGTH_NAT           41
@@ -216,6 +216,8 @@ extern uint8_t FRU_I2C_ADDR[102];
 #define IPMI_RPLY_SEQ_LENGTH                 4
 #define IPMI_RPLY_SEQLUN_OFFSET              18     /* MS 6 bits: IPMI sequence, LS 2 bits: LUN */
 #define IPMI_RPLY_COMPLETION_CODE_OFFSET     42
+#define IPMI_RPLY_MANUF_ID_OFFSET            49     /* Returned from Get Device ID Command */
+#define IPMI_RPLY_MANUF_ID_LENGTH            3    
 #define IPMI_RPLY_SENSOR_READING_OFFSET      43     /* Sensor reading (1 byte) */
 #define IPMI_RPLY_SENSOR_ENABLE_BITS_OFFSET  44     /* Sensor enable bits: event msgs; scanning; reading/state */
 #define IPMI_RPLY_HS_SENSOR_READING_OFFSET   45     /* Hot swap sensor reading (1 byte) */
@@ -254,6 +256,8 @@ extern uint8_t FRU_I2C_ADDR[102];
 #define IPMI_DATA_TYPE(x)          x & 3<<6
 #define IPMI_DATA_LENGTH(x)        x & 0x3F
 #define IPMI_DATA_LANG_ENGLISH(x)  x==0 || x==25                 
+
+#define IPMI_MANUF_ID(x) x & 0x0FFFFF
 
 /* Completion codes, IPMI spec Table 5-2 */
 #define IPMI_COMP_CODE_NORMAL                   0x00
@@ -629,6 +633,10 @@ extern uint8_t FRU_I2C_ADDR[102];
 #define MCH_TYPE_UNKNOWN  0
 #define MCH_TYPE_VT       1
 #define MCH_TYPE_NAT      2
+
+/* Manufacturer ID */
+#define MCH_MANUF_ID_VT   0x5D32
+#define MCH_MANUF_ID_NAT  0x6C78
 
 /* Vadatech */
 #define VT_ENTITY_ID_MCH      0xC2 

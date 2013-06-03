@@ -877,7 +877,10 @@ char    taskName[50];
 		epicsMutexLock( mch->mutex );
 
                 /* Determine MCH type */
-                mchIdentify( mchSess );
+                if ( mchIdentify( mchSess ) ) {
+		       	errlogPrintf("Failed to identify MCH type; cannot complete initialization\n",mch->name);			
+			return;
+		}
 
 		/* Initiate communication session with MCH */
 		if ( !mchCommStart( mchSess ) ) {
