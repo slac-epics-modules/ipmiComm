@@ -285,11 +285,13 @@ int      found, inst,  n;
 							sprintf( dbFile, "sensor_hotswap_vt.db" ); 
 							found = 1;
 							break;
-
+						/* Hot swap sensor implementation under NAT is not 
+                                                 * consistent; do not load NAT hot swap sensor database
 						case SENSOR_TYPE_HOTSWAP_NAT:
 							sprintf( dbFile, "sensor_hotswap_nat.db" ); 
 							found = 1;
 							break;
+						*/
 					}
 
 					if ( sens->sdr.recType == SDR_TYPE_FULL_SENSOR )

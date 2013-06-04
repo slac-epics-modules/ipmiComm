@@ -950,6 +950,9 @@ int      offs;
 						/* Store raw sensor reading */
 						value = data[IPMI_RPLY_HS_SENSOR_READING_OFFSET + offs];
 						mchSys->sens[index].val = value;
+
+						if ( IPMICOMM_DEBUG > 2 )
+							printf("%s: value %02x, sensor %02x, owner %i, lun %i, index %i, value %.1f\n",pmbbi->name, value, sensor, mchSys->sens[index].sdr.owner, mchSys->sens[index].sdr.lun, index);
 					}
 				}
 
