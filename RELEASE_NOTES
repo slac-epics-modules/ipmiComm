@@ -1,3 +1,8 @@
+ipmiComm-R1-5-1:  Use manufacturer ID to distinguish NAT and Vadatech MCHs
+                  No longer implement hot swap sensors for NAT, as they
+                    are not implemented consistently among modules
+		  See Changelog for more detail
+
 ipmiComm-R1-5-0:  Many changes to support NAT MCH (in addition to Vadatech)
                     See Changelog for more detail
 
