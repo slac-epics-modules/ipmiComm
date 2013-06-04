@@ -1,3 +1,14 @@
+Release: ipmiComm-R1-6-0
+
+04Jun2013 (SH)
+Reduce time to initialize MCH, mostly by reducing number of read timeouts:
+  drvMch.c: mchSdrGetDataAll: call ipmiMsgGetSdr twice, first to get
+    record length, second to read only that length (eliminates those read timeouts)
+  Define 'max' sensor read timeout and use that first time calling 'get
+    sensor reading' for each sensor (reduces read timeouts)
+  ipmiDef.h, ipmiMsg.h, ipmiMsg.c, drvMchUtil.c: misc changes to support above
+Abort mchSdrGetDataAll for excessive read errors 
+
 Release: ipmiComm-R1-5-1
 
 04Jun2013 (SH)

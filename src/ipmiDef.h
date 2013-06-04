@@ -151,7 +151,7 @@ extern uint8_t FRU_I2C_ADDR[102];
 
 /* Response message lengths using Vadatech MCH (0s for those that can vary) */ 
 #define IPMI_RPLY_CLOSE_SESSION_LENGTH_VT           22
-#define IPMI_RPLY_SENSOR_READ_LENGTH_VT             0  /* varies */
+#define IPMI_RPLY_SENSOR_READ_MAX_LENGTH_VT         48 /* length varies */
 #define IPMI_RPLY_GET_CHAS_STATUS_LENGTH_VT         47 /* does NOT include optional byte */
 #define IPMI_RPLY_CHAS_CTRL_LENGTH_VT               44
 #define IPMI_RPLY_GET_FRU_INFO_LENGTH_VT            47
@@ -159,6 +159,7 @@ extern uint8_t FRU_I2C_ADDR[102];
 #define IPMI_RPLY_WRITE_FRU_DATA_LENGTH_VT          45
 #define IPMI_RPLY_GET_SDRREP_INFO_LENGTH_VT         58
 #define IPMI_RPLY_RESERVE_SDRREP_LENGTH_VT          46
+#define IPMI_RPLY_GET_SDR_BASE_LENGTH_VT            50 /* get sdr message length is this + remaining data bytes */
 #define IPMI_RPLY_GET_SDR_LENGTH_VT                 0  /* varies */
 #define IPMI_RPLY_GET_DEV_SDR_INFO_LENGTH_VT        50
 #define IPMI_RPLY_GET_DEV_SDR_LENGTH_VT             0  /* varies */
@@ -173,14 +174,15 @@ extern uint8_t FRU_I2C_ADDR[102];
 
 /* Response message lengths using NAT MCH (0s for those we haven't figured out yet) */
 #define IPMI_RPLY_CLOSE_SESSION_LENGTH_NAT           22 /* UPDATE THIS */
-#define IPMI_RPLY_SENSOR_READ_LENGTH_NAT             0  /* varies */
+#define IPMI_RPLY_SENSOR_READ_MAX_LENGTH_NAT         34 /* length varies */
 #define IPMI_RPLY_GET_CHAS_STATUS_LENGTH_NAT         47 /* does NOT include optional byte */
 #define IPMI_RPLY_CHAS_CTRL_LENGTH_NAT               44
 #define IPMI_RPLY_GET_FRU_INFO_LENGTH_NAT            32
 #define IPMI_RPLY_READ_FRU_DATA_BASE_LENGTH_NAT      30
 #define IPMI_RPLY_WRITE_FRU_DATA_LENGTH_NAT          45
 #define IPMI_RPLY_GET_SDRREP_INFO_LENGTH_NAT         43
-#define IPMI_RPLY_RESERVE_SDRREP_LENGTH_NAT          46
+#define IPMI_RPLY_RESERVE_SDRREP_LENGTH_NAT          31
+#define IPMI_RPLY_GET_SDR_BASE_LENGTH_NAT            35 /* get sdr message length is this + remaining data bytes */
 #define IPMI_RPLY_GET_SDR_LENGTH_NAT                 0  /* varies */
 #define IPMI_RPLY_GET_DEV_SDR_INFO_LENGTH_NAT        50
 #define IPMI_RPLY_GET_DEV_SDR_LENGTH_NAT             0  /* varies */

@@ -47,6 +47,8 @@ uint32_t mfvt, mfnat;
         if ( mfvt == MCH_MANUF_ID_VT ) {
 		printf("Identified %s to be Vadatech\n", mchSess->name);
                 mchSess->type = MCH_TYPE_VT;
+		mchSess->timeout = RPLY_TIMEOUT_VT;
+
         }
         else if ( mfnat == MCH_MANUF_ID_NAT ) {
 		printf("Identified %s to be NAT\n", mchSess->name);

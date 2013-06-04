@@ -8,7 +8,9 @@ extern "C" {
 /*#include <ipmiDef.h>*/
 #include <drvMch.h>
 
-#define RPLY_TIMEOUT   1.0
+/* Vadatech typically sends 2 replies; NAT sends 1 */
+#define RPLY_TIMEOUT_VT    0.50
+#define RPLY_TIMEOUT_NAT   0.25
 
 extern volatile int IPMICOMM_DEBUG; 
 
@@ -114,7 +116,7 @@ int ipmiMsgGetSdrRepInfo(MchSess mchSess, uint8_t *data);
 
 int ipmiMsgGetDevSdrInfo(MchSess mchSess, uint8_t *data, uint8_t parm);
 
-int ipmiMsgGetSdr(MchSess mchSess, uint8_t *data, uint8_t *id, uint8_t *res, uint8_t offset, uint8_t readSize, uint8_t parm);
+int ipmiMsgGetSdr(MchSess mchSess, uint8_t *data, uint8_t *id, uint8_t *res, uint8_t offset, uint8_t readSize, uint8_t parm, uint8_t recordSize);
 				
 int ipmiMsgReadSensor(MchSess mchSess, uint8_t *data, uint8_t sens, uint8_t lun, size_t *responseSize);
 

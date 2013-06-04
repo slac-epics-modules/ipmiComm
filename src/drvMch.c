@@ -634,6 +634,10 @@ int n, l, i;
 /*
  *
  * Caller must perform locking.
+ * 
+ * Read sensor data records. Call ipmiMsgGetSdr twice per record;
+ * once to get record length, then to read record. This prevents timeouts,
+ * saving much delay
  */				  
 int				  
 mchSdrGetDataAll(MchSess mchSess, MchSys mchSys)
@@ -648,9 +652,12 @@ uint8_t  offset = 0;
 uint8_t  type   = 0, addr = 0;
 uint8_t *raw    = 0;
 int      i, iFull = 0, iFru = 0, fruId;
+int      *err; /* Error count when reading SDR */
+int      size; /* SDR record size (after header) */
 size_t   responseSize;
 int      rval = -1;
 int      offs = ( mchSess->type == MCH_TYPE_NAT ) ? IPMI_RPLY_OFFSET_NAT : 0;
+int      base = ( mchSess->type == MCH_TYPE_NAT ) ? IPMI_RPLY_GET_SDR_BASE_LENGTH_NAT : IPMI_RPLY_GET_SDR_BASE_LENGTH_VT;
 
 	if ( mchSdrRepGetInfo( mchSess, mchSys ) )
 		return -1;
@@ -661,39 +668,59 @@ int      offs = ( mchSess->type == MCH_TYPE_NAT ) ? IPMI_RPLY_OFFSET_NAT : 0;
 		errlogPrintf("mchSdrGetDataAll: No memory for raw SDR data for %s\n", mchSess->name);
 		goto bail;
 	}
-    
+
+	if ( !(err = malloc( sdrCount ) ) ) {
+		errlogPrintf("mchSdrGetDataAll: No memory for error count array for %s\n", mchSess->name);
+		goto bail;
+	}
+
        	for ( i = 0; i < sdrCount; i++) {
 		       
-       		if ( ipmiMsgGetSdr( mchSess, response, id, res, offset, 0xFF, 0 ) )
+		/* readSize = 5 because 5th byte is remaining record length; 0xFF reads entire record */
+       		if ( ipmiMsgGetSdr( mchSess, response, id, res, offset, 5, 0, 0 ) ) {
 			i--;
-
+			if ( err[i]++ > 5 ) {
+			        errlogPrintf("mchSdrGetDataAll: too many errors reading SDR for %s", mchSess->name);
+				goto bail;
+			}
+		}
 		else {
-			memcpy( raw + (i*SDR_MAX_LENGTH), response + IPMI_RPLY_GET_SDR_DATA_OFFSET + offs, SDR_MAX_LENGTH );
+			size = response[base - 1];
+			if ( ipmiMsgGetSdr( mchSess, response, id, res, offset, 0xFF, 0, size ) ) {
+				i--;
+				if ( err[i]++ > 5 ) {
+					errlogPrintf("mchSdrGetDataAll: too many errors reading SDR for %s", mchSess->name);
+					goto bail;
+				}
+			}
 
-			switch ( response[IPMI_RPLY_GET_SDR_DATA_OFFSET + offs + SDR_REC_TYPE_OFFSET] ) {
+			else {
+				memcpy( raw + (i*SDR_MAX_LENGTH), response + IPMI_RPLY_GET_SDR_DATA_OFFSET + offs, SDR_MAX_LENGTH );
 
-				default:
-					break;
+				switch ( response[IPMI_RPLY_GET_SDR_DATA_OFFSET + offs + SDR_REC_TYPE_OFFSET] ) {
+
+					default:
+						break;
 	
-				case SDR_TYPE_FULL_SENSOR:
-					mchSys->sensCount++;
-					break;
+					case SDR_TYPE_FULL_SENSOR:
+						mchSys->sensCount++;
+						break;
 
-				case SDR_TYPE_COMPACT_SENSOR:
-					mchSys->sensCount++;
-					break;
+					case SDR_TYPE_COMPACT_SENSOR:
+						mchSys->sensCount++;
+						break;
 
-				case SDR_TYPE_FRU_DEV:
-					mchSys->fruCount++;
+					case SDR_TYPE_FRU_DEV:
+						mchSys->fruCount++;
+						break;
+				}
+				id[0]  = response[IPMI_RPLY_GET_SDR_NEXT_ID_LSB_OFFSET + offs];
+				id[1]  = response[IPMI_RPLY_GET_SDR_NEXT_ID_MSB_OFFSET + offs];
+
+				if ( arrayToUint16( id ) == 0xFFFF )
 					break;
 			}
-			id[0]  = response[IPMI_RPLY_GET_SDR_NEXT_ID_LSB_OFFSET + offs];
-			id[1]  = response[IPMI_RPLY_GET_SDR_NEXT_ID_MSB_OFFSET + offs];
-
-			if ( arrayToUint16( id ) == 0xFFFF )
-				break;
 		}
-
        	}
 
 	sdrCount = i;
@@ -717,7 +744,7 @@ int      offs = ( mchSess->type == MCH_TYPE_NAT ) ? IPMI_RPLY_OFFSET_NAT : 0;
 			mchSys->sens[iFull].instance = 0; /* Initialize instance to 0 */
 
 			/* Save sensor reading response length for future reads (response length varies per sensor) */
-			responseSize = mchSys->sens[iFull].readMsgLength = 0;
+			responseSize = mchSys->sens[iFull].readMsgLength = ( mchSess->type == MCH_TYPE_NAT ) ? IPMI_RPLY_SENSOR_READ_MAX_LENGTH_NAT : IPMI_RPLY_SENSOR_READ_MAX_LENGTH_VT;
 			ipmiMsgReadSensor( mchSess, response, mchSys->sens[iFull].sdr.number, addr, &responseSize );	
 
 			mchSys->sens[iFull].readMsgLength = responseSize;
@@ -729,6 +756,9 @@ int      offs = ( mchSess->type == MCH_TYPE_NAT ) ? IPMI_RPLY_OFFSET_NAT : 0;
 			mchSdrFruDev( &(mchSys->fru[fruId].sdr), raw + i*SDR_MAX_LENGTH );
 			mchSys->fru[iFru].instance = 0;     /* Initialize instance to 0 */
 			iFru++;
+		}
+		else {
+		    mchSdrFullSens( &(mchSys->sens[iFull].sdr) , raw + i*SDR_MAX_LENGTH, type );
 		}
 	}
 
@@ -749,6 +779,7 @@ for ( i = 0; i < MAX_FRU; i++ ) {
 
 bail:
 	free( raw );
+	free( err );
 	return rval;
 }
 
@@ -789,7 +820,7 @@ int     cos;
 		cos = 0;
 		responseSize = IPMI_RPLY_PONG_LENGTH;
 
-		ipmiMsgWriteRead( mchSess->name, message, sizeof( RMCP_HEADER ) + sizeof( ASF_MSG ), response, &responseSize, RPLY_TIMEOUT );
+		ipmiMsgWriteRead( mchSess->name, message, sizeof( RMCP_HEADER ) + sizeof( ASF_MSG ), response, &responseSize, RPLY_TIMEOUT_NAT );
 
        		epicsMutexLock( mch->mutex );
 
@@ -862,7 +893,7 @@ char    taskName[50];
        	mchSys->name  = mch->name;
        	mch->udata = mchData;
 
-       	mchSess->timeout = RPLY_TIMEOUT;
+       	mchSess->timeout = RPLY_TIMEOUT_NAT; /* Default */
 	mchSess->session = 1;   /* Default: enable session with MCH */
 
 	/* Start task to periodically ping MCH */

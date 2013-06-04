@@ -1057,7 +1057,7 @@ int offs = ( mchSess->type == MCH_TYPE_NAT ) ? IPMI_RPLY_OFFSET_NAT : 0;
  *            non-zero for error
  */
 int
-ipmiMsgGetSdr(MchSess mchSess, uint8_t *data, uint8_t *id, uint8_t *res, uint8_t offset, uint8_t readSize, uint8_t parm)
+ipmiMsgGetSdr(MchSess mchSess, uint8_t *data, uint8_t *id, uint8_t *res, uint8_t offset, uint8_t readSize, uint8_t parm, uint8_t recordSize)
 {
 uint8_t  message[MSG_MAX_LENGTH] = { 0 };
 size_t   imsg2Size   = sizeof( SEND_MSG_MSG );
@@ -1067,7 +1067,7 @@ uint8_t  imsg2[imsg2Size];
 uint8_t  b1msg1[b1msg1Size];
 uint8_t  b1msg2[b1msg2Size];
 size_t   messageSize;
-size_t   responseSize = 0;
+size_t   responseSize = (( mchSess->type == MCH_TYPE_NAT ) ? IPMI_RPLY_GET_SDR_BASE_LENGTH_NAT : IPMI_RPLY_GET_SDR_BASE_LENGTH_VT) + recordSize;
 uint8_t  cmd   = parm ? IPMI_MSG_CMD_GET_DEV_SDR    : IPMI_MSG_CMD_GET_SDR;
 uint8_t  netfn = parm ? IPMI_MSG_NETFN_SENSOR_EVENT : IPMI_MSG_NETFN_STORAGE;
 int  offs  = ( mchSess->type == MCH_TYPE_NAT ) ? IPMI_RPLY_OFFSET_NAT : 0;
