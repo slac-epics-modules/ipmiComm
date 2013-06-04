@@ -1,3 +1,20 @@
+Release: ipmiComm-R1-5-1
+
+04Jun2013 (SH)
+Hot swap sensor implementation under NAT is not consistent among modules;
+  no longer load hot swap sensor database. Changes:
+  drvMchUtil.c, devMch.c
+
+03Jun2013 (SH)
+Use manufacturer ID from Get Device ID command to distinguish NAT and Vadatech 
+  MCHs; no longer use MAC address. Changes:
+    ipimDef.h, ipmiMsg.h: Add definitions for Get Device ID command and for
+      vendor manufacturer ID values
+    ipmiMsg.c: Test/fix Get Device ID command (previously unused)
+    drvMchUtil.c: Change mchIdentify to use manufacturer ID instead of MAC 
+      address to identify MCH vendor
+    drvMch.c: mchInit: Abort MCH initialization if mchIdentify returns error
+    
 Release: ipmiComm-R1-5-0
 
 16May2013 (SH)
