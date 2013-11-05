@@ -22,21 +22,9 @@ include $(TOP)/configure/CONFIG
 #  Optimization of db files using dbst (DEFAULT: NO)
 #DB_OPT = YES.
 
-# Default PVs that may be overloaded during ioc boot
-DB += module_basic_default.db
-DB += module_mch_default.db
-DB += module_pm_default.db
-DB += module_cu_default.db
-DB += module_amc_rtm_default.db
-
-DB += module.db
+DB += module_basic.db
+DB += module_pm.db
 DB += module_cu.db
-DB += sensor_temp.db
-DB += sensor_voltage.db
-DB += sensor_current.db
-DB += sensor_fan.db
-DB += sensor_hotswap_nat.db
-DB += sensor_hotswap_vt.db
 DB += shelf.db
 
 #----------------------------------------------------
