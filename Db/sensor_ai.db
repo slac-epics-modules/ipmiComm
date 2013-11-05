@@ -1,18 +1,21 @@
-# These records overload dummy default sensor PVs
-
-record(ai, "$(dev):$(code)$(inst)_$(signal)$(sensInst)") {
-  field(DESC, "$(desc)")
-  field(SCAN, "$(scan)")
+# ai sensor record
+# DESC, EGU set by device support
+record(ai, "$(dev):$(code)$(inst)_$(attr)$(sensinst)") {
+  field(DESC, "")
+  field(SCAN, "10 second")
   field(DTYP, "MCHsensor")
-  field(INP, "#C0 S$(sens) @$(link)+$(task)")
-  field(PREC, "0")
-  field(EGU, "$(egu)")
+  field(INP, "#B$(fru) C$(type) N$(sensinst) @$(link)+sens")
+  field(PREC, "1")
 }
 
-record(bi, "$(dev):$(code)$(inst)_$(signal)$(sensInst)P") {
+# sensor 'presence' record to indicate whether sensor 
+# is active; used by edm visibility rules
+record(bi, "$(dev):$(code)$(inst)_$(attr)$(sensinst)P") {
   field(DESC, "Sensor presence")
-  field(ZVAL, "Not present")
-  field(OVAL, "Present")
-  field(VAL,  "1")
+  field(SCAN, "I/O Intr")
+  field(DTYP, "MCHsensor")
+  field(INP, "#B$(fru) C$(type) N$(sensinst) @$(link)+spres")
+  field(ZNAM, "Not present")
+  field(ONAM, "Present")
   field(PINI, "YES")
 }
