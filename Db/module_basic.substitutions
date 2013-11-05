@@ -1,0 +1,66 @@
+#==============================================================================
+#
+# Abs:  MCH module and sensor PVs
+#
+# Name:  module_basic_default.substitutions
+#
+# Macros in:
+#	dev      Shelf name, for example CRAT:LI28:RF01
+#	code     String identifier, for example 'CU' for cooling unit
+#       inst     Instance of this type of module, for example 2 for the second MCH in a carrier
+#       attr	 Used in PV attribute, for example FAN1SPEED or TEMP2
+#       sensinst Instance of this type of sensor on this module
+#       type     Sensor type code, defined in IPMI spec (and src/ipmiDef.h)
+#       fruid    FRU ID according to MicroTCA spec
+#
+# Macros out:
+#
+#       crat     Shelf Name, for example CRAT:LI28:RF01
+#	id       String identifier, for example 'CU' for cooling unit
+#       unit     Instance of this type of module, for example 2 for the second MCH in a carrier
+#	fru      FRU ID according to MicroTCA spec
+#
+#
+#==============================================================================
+#
+
+file module_common.db
+{
+   pattern { code	,  inst		}
+           { $(id)	,  $(unit)  	}
+}
+
+file sensor_ai.db
+{
+   pattern { code	,  inst		,  attr		, sensinst	, type	, fru 		}
+           { $(id)	,  $(unit)  	,  TEMP		, 1		, 1	, $(fruid)	}
+           { $(id)	,  $(unit)  	,  TEMP		, 2		, 1	, $(fruid)	}
+           { $(id)	,  $(unit)  	,  TEMP		, 3		, 1	, $(fruid)	}
+           { $(id)	,  $(unit)  	,  TEMP		, 4		, 1	, $(fruid)	}
+           { $(id)	,  $(unit)  	,  TEMP		, 5		, 1	, $(fruid)	}
+           { $(id)	,  $(unit)  	,  TEMP		, 6		, 1	, $(fruid)	}
+           { $(id)	,  $(unit)  	,  TEMP		, 7		, 1	, $(fruid)	}
+           { $(id)	,  $(unit)  	,  TEMP		, 8		, 1	, $(fruid)	}
+           { $(id)	,  $(unit)  	,  TEMP		, 9		, 1	, $(fruid)	}
+           { $(id)	,  $(unit)  	,  TEMP		, 10		, 1	, $(fruid)	}
+           { $(id)	,  $(unit)  	,  V		, 1		, 2	, $(fruid)	}
+           { $(id)	,  $(unit)  	,  V		, 2		, 2	, $(fruid)	}
+           { $(id)	,  $(unit)  	,  V		, 3		, 2	, $(fruid)	}
+           { $(id)	,  $(unit)  	,  V		, 4		, 2	, $(fruid)	}
+           { $(id)	,  $(unit)  	,  V		, 5		, 2	, $(fruid)	}
+           { $(id)	,  $(unit)  	,  V		, 6		, 2	, $(fruid)	}
+           { $(id)	,  $(unit)  	,  V		, 7		, 2	, $(fruid)	}
+           { $(id)	,  $(unit)  	,  V		, 8		, 2	, $(fruid)	}
+           { $(id)	,  $(unit)  	,  V		, 9		, 2	, $(fruid)	}
+           { $(id)	,  $(unit)  	,  V		, 10		, 2	, $(fruid)	}
+           { $(id)	,  $(unit)  	,  I		, 1		, 3	, $(fruid)	}
+           { $(id)	,  $(unit)  	,  I		, 2		, 3	, $(fruid)	}
+           { $(id)	,  $(unit)  	,  I		, 3		, 3	, $(fruid)	}
+           { $(id)	,  $(unit)  	,  I		, 4		, 3	, $(fruid)	}
+           { $(id)	,  $(unit)  	,  I		, 5		, 3	, $(fruid)	}
+           { $(id)	,  $(unit)  	,  I		, 6		, 3	, $(fruid)	}
+           { $(id)	,  $(unit)  	,  I		, 7		, 3	, $(fruid)	}
+           { $(id)	,  $(unit)  	,  I		, 8		, 3	, $(fruid)	}
+           { $(id)	,  $(unit)  	,  I		, 9		, 3	, $(fruid)	}
+           { $(id)	,  $(unit)  	,  I		, 10		, 3	, $(fruid)	}
+}
