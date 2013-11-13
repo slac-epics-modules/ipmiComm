@@ -77,14 +77,14 @@ record(bo, "$(dev):INITBYP") {
 }
 
 # Enable or disable session with MCH
-record(bo, "$(dev):SESSENBL") {
- field(DESC, "MCH session enable")
+record(bo, "$(dev):ACCESS") {
+ field(DESC, "Enable comm with MCH")
  field(DTYP, "MCHsensor")
  field(OMSL, "supervisory")
  field(OUT, "#B0 C0 N0 @$(node)+sess")
- field(ZNAM, "Disabled")
+ field(ZNAM, "Disable")
  field(ZSV, "MAJOR")
- field(ONAM, "Enabled")
+ field(ONAM, "Enable")
  field(OSV, "NO_ALARM")
  field(RVAL, "1")
  field(PINI, "YES")
