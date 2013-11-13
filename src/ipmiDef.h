@@ -5,6 +5,34 @@
 
 #define MSG_MAX_LENGTH  200
 
+typedef struct IpmiSessRec_ *IpmiSess;
+
+/*   Callback helper function to write/read IPMI messages
+ *
+ *   device   - Pointer to device data structure (see driver)
+ *   sess     - Pointer to IPMI data structure (see ipmiDef.h)
+ *   msg      - Pointer to outgoing message array
+ *   msg_n    - Size of outgoing message
+ *   rply     - Pointer to response array
+ *   rply_n   - Response size, 0 if unknown
+ *   cmd      - IPMI command code
+ *   netfn    - IPMI network function
+ *   offs     - Offset from IPMI_RPLY_COMPLETION_CODE_OFFSET to read comp code (see ipmiDef.h)
+ *   outsess  - 1 if outside a session; 0 if in a session
+ */
+typedef int
+(*IpmiWriteReadHelper)(void *device, IpmiSess sess, uint8_t *msg, size_t msg_n, uint8_t *rply, size_t *rply_n, uint8_t cmd, uint8_t netfn, int offs, int outsess);
+
+/* Struct for IPMI session information */
+typedef struct IpmiSessRec_ {
+	uint8_t       id[4];         /* Session ID */
+	uint8_t       str[16];       /* Session challenge string; used in establishing a session */
+        uint8_t       seqSend[4];    /* Message sequence number for messages to device, null until session activated; chosen by system software (us); rolls over at 0xFFFFFFFF */
+        uint8_t       seqRply[4];    /* Message sequence number for messages from device; rolls over at 0xFFFFFFFF */
+	uint8_t       seq;           /* IPMI sequence (6-bit number); used to confirm reply is for correct request */
+        IpmiWriteReadHelper wrf;     /* Callback to driver write/read function */
+} IpmiSessRec;
+
 extern uint8_t RMCP_HEADER[4];
 extern uint8_t ASF_MSG[8];
 extern uint8_t IPMI_HEADER[10];
@@ -142,111 +170,14 @@ extern uint8_t FRU_I2C_ADDR[102];
 #define IPMI_MSG_NETFN_STORAGE                0x0A
 #define IPMI_MSG_NETFN_PICMG                  0x2C
 
-/* Response message lengths using either Vadatech or NAT MCH */ 
+/* Response message lengths */ 
 #define IPMI_RPLY_PONG_LENGTH                    28
 #define IPMI_RPLY_GET_CHAN_AUTH_LENGTH           30
 #define IPMI_RPLY_GET_SESSION_CHALLENGE_LENGTH   42
 #define IPMI_RPLY_ACTIVATE_SESSION_LENGTH        32
 #define IPMI_RPLY_SET_PRIV_LEVEL_LENGTH          23
 
-/* Response message lengths using Vadatech MCH (0s for those that can vary) */ 
-#define IPMI_RPLY_CLOSE_SESSION_LENGTH_VT           22
-#define IPMI_RPLY_SENSOR_READ_MAX_LENGTH_VT         48 /* length varies */
-#define IPMI_RPLY_GET_CHAS_STATUS_LENGTH_VT         47 /* does NOT include optional byte */
-#define IPMI_RPLY_CHAS_CTRL_LENGTH_VT               44
-#define IPMI_RPLY_GET_FRU_INFO_LENGTH_VT            47
-#define IPMI_RPLY_READ_FRU_DATA_BASE_LENGTH_VT      45
-#define IPMI_RPLY_WRITE_FRU_DATA_LENGTH_VT          45
-#define IPMI_RPLY_GET_SDRREP_INFO_LENGTH_VT         58
-#define IPMI_RPLY_RESERVE_SDRREP_LENGTH_VT          46
-#define IPMI_RPLY_GET_SDR_BASE_LENGTH_VT            50 /* get sdr message length is this + remaining data bytes */
-#define IPMI_RPLY_GET_SDR_LENGTH_VT                 0  /* varies */
-#define IPMI_RPLY_GET_DEV_SDR_INFO_LENGTH_VT        50
-#define IPMI_RPLY_GET_DEV_SDR_LENGTH_VT             0  /* varies */
-#define IPMI_RPLY_COLD_RESET_LENGTH_VT              44
-#define IPMI_RPLY_SET_FRU_POLICY_LENGTH_VT          44
-#define IPMI_RPLY_GET_FRU_POLICY_LENGTH_VT          45
-#define IPMI_RPLY_SET_FRU_ACT_LENGTH_VT             45
-#define IPMI_RPLY_GET_DEVICE_ID_LENGTH_VT           59 /* includes optional bytes */
-#define IPMI_RPLY_GET_FAN_PROP_LENGTH_VT            49
-#define IPMI_RPLY_GET_FAN_LEVEL_LENGTH_VT           48
-#define IPMI_RPLY_SET_FAN_LEVEL_LENGTH_VT           45
-
-/* Response message lengths using NAT MCH (0s for those we haven't figured out yet) */
-#define IPMI_RPLY_CLOSE_SESSION_LENGTH_NAT           22 /* UPDATE THIS */
-#define IPMI_RPLY_SENSOR_READ_MAX_LENGTH_NAT         34 /* length varies */
-#define IPMI_RPLY_GET_CHAS_STATUS_LENGTH_NAT         47 /* does NOT include optional byte */
-#define IPMI_RPLY_CHAS_CTRL_LENGTH_NAT               44
-#define IPMI_RPLY_GET_FRU_INFO_LENGTH_NAT            32
-#define IPMI_RPLY_READ_FRU_DATA_BASE_LENGTH_NAT      30
-#define IPMI_RPLY_WRITE_FRU_DATA_LENGTH_NAT          45
-#define IPMI_RPLY_GET_SDRREP_INFO_LENGTH_NAT         43
-#define IPMI_RPLY_RESERVE_SDRREP_LENGTH_NAT          31
-#define IPMI_RPLY_GET_SDR_BASE_LENGTH_NAT            35 /* get sdr message length is this + remaining data bytes */
-#define IPMI_RPLY_GET_SDR_LENGTH_NAT                 0  /* varies */
-#define IPMI_RPLY_GET_DEV_SDR_INFO_LENGTH_NAT        50
-#define IPMI_RPLY_GET_DEV_SDR_LENGTH_NAT             0  /* varies */
-#define IPMI_RPLY_COLD_RESET_LENGTH_NAT              44
-#define IPMI_RPLY_SET_FRU_POLICY_LENGTH_NAT          29
-#define IPMI_RPLY_GET_FRU_POLICY_LENGTH_NAT          39
-#define IPMI_RPLY_SET_FRU_ACT_LENGTH_NAT             45
-#define IPMI_RPLY_GET_DEVICE_ID_LENGTH_NAT           44 /* includes optional bytes */
-#define IPMI_RPLY_GET_FAN_PROP_LENGTH_NAT            43
-#define IPMI_RPLY_GET_FAN_LEVEL_LENGTH_NAT           42
-#define IPMI_RPLY_SET_FAN_LEVEL_LENGTH_NAT           41
-#define IPMI_RPLY_OFFSET_NAT              -15
-#define IPMI_RPLY_2ND_BRIDGED_OFFSET_NAT  -8
-
-/* Response message data; offsets from beginning of message; 
- * These defaults work for single-bridged replies from Vadatech MCH.
- * None-bridged or NAT replies require different offsets
- *
- */
-#define IPMI_RPLY_TEMP_ID_OFFSET             21     /* Temporary session ID */
-#define IPMI_RPLY_TEMP_ID_LENGTH             4
-#define IPMI_RPLY_STR_OFFSET                 25     /* Challenge string */
-#define IPMI_RPLY_STR_LENGTH                 16
-#define IPMI_RPLY_AUTH_TYPE_OFFSET           21     /* Authentication type */
-#define IPMI_RPLY_AUTH_TYPE_LENGTH           1
-#define IPMI_RPLY_ID_OFFSET                  22     /* Session ID for remainder of session */
-#define IPMI_RPLY_ID_LENGTH                  4
-#define IPMI_RPLY_INIT_SEND_SEQ_OFFSET       26     /* Start sequence number for messages to MCH */
-#define IPMI_RPLY_INIT_SEND_SEQ_LENGTH       4
-#define IPMI_RPLY_MAX_PRIV_OFFSET            30     /* Maximum privilege level allowed for session */
-#define IPMI_RPLY_MAX_PRIV_LENGTH            1
-#define IPMI_RPLY_SEQ_OFFSET                 5      /* From-MCH sequence number (in reply to non-bridged message) */
-#define IPMI_RPLY_SEQ_LENGTH                 4
-#define IPMI_RPLY_SEQLUN_OFFSET              18     /* MS 6 bits: IPMI sequence, LS 2 bits: LUN */
-#define IPMI_RPLY_COMPLETION_CODE_OFFSET     42
-#define IPMI_RPLY_MANUF_ID_OFFSET            49     /* Returned from Get Device ID Command */
-#define IPMI_RPLY_MANUF_ID_LENGTH            3    
-#define IPMI_RPLY_SENSOR_READING_OFFSET      43     /* Sensor reading (1 byte) */
-#define IPMI_RPLY_SENSOR_ENABLE_BITS_OFFSET  44     /* Sensor enable bits: event msgs; scanning; reading/state */
-#define IPMI_RPLY_HS_SENSOR_READING_OFFSET   45     /* Hot swap sensor reading (1 byte) */
-#define IPMI_RPLY_FRU_AREA_SIZE_LSB_OFFSET   43     /* FRU inventory area size in bytes, LSB */
-#define IPMI_RPLY_FRU_AREA_SIZE_MSB_OFFSET   44     /* FRU inventory area size in bytes, MSB */
-#define IPMI_RPLY_FRU_AREA_ACCESS_OFFSET     45     /* Bit 0 indicates if device is accessed by bytes (0) or words (1) */
-#define IPMI_RPLY_FRU_DATA_READ_OFFSET       44     /* FRU data */
-#define IPMI_RPLY_SDRREP_VER_OFFSET          43     /* SDR Repository Info */    
-#define IPMI_RPLY_SDRREP_CNT_LSB_OFFSET      44     /* Number of records in repository, LSB */
-#define IPMI_RPLY_SDRREP_CNT_MSB_OFFSET      45     /* Number of records in repository, MSB */
-#define IPMI_RPLY_DEV_SDR_CNT_OFFSET         43     /* Number of SDRs for device */
-#define IPMI_RPLY_DEV_SDR_FLAGS_OFFSET       44     /* Number of SDRs for device */
-#define IPMI_RPLY_GET_SDR_NEXT_ID_LSB_OFFSET 43     /* ID of next sensor in repository, LSB */
-#define IPMI_RPLY_GET_SDR_NEXT_ID_MSB_OFFSET 44     /* ID of next sensor in repository, MSB */
-#define IPMI_RPLY_GET_SDR_DATA_OFFSET        45     /* ID of next sensor in repository, MSB */
-#define IPMI_RPLY_GET_FAN_PROP_MIN_OFFSET    44     /* Fan tray minimum fan level */
-#define IPMI_RPLY_GET_FAN_PROP_MAX_OFFSET    45     /* Fan tray maximum fan level */
-#define IPMI_RPLY_GET_FAN_PROP_NOM_OFFSET    46     /* Fan tray nominal fan level */
-#define IPMI_RPLY_GET_FAN_PROP_PROP_OFFSET   47     /* Fan tray properties */
-#define IPMI_RPLY_GET_FAN_LEVEL_OFFSET       44     /* Current fan level */
-#define IPMI_RPLY_GET_POWER_LEVEL_PROP_OFFSET   44    /* FRU power properties */
-#define IPMI_RPLY_GET_POWER_LEVEL_DELAY_OFFSET  45    /* Delay to stable power */
-#define IPMI_RPLY_GET_POWER_LEVEL_MULT_OFFSET   46    /* Power multiplier */
-#define IPMI_RPLY_GET_POWER_LEVEL_DRAW_OFFSET   47    /* Draw of first level (optional: next levels follow this, up to 25 total) */
-#define IPMI_RPLY_GET_FRU_POLICY_PROP_OFFSET    44    /* FRU activation policy properties */
-
-#define IPMI_RPLY_COMPLETION_CODE_UNBRIDGED_OFFSET 20
+#define IPMI_TS_LENGTH 4 /* Number of bytes in Timestamp */
 
 /* For responses to bridged messages (returns 2 messages which we read as 1); offset from beginning of first message */
 #define IPMI_RPLY_BRIDGED_SEQ_OFFSET         27     /* From-MCH sequence number */
@@ -435,8 +366,6 @@ extern uint8_t FRU_I2C_ADDR[102];
 #define SENSOR_TYPE_POST_MEMORY    0x0E
 #define SENSOR_TYPE_SYS_FW         0x0F
 #define SENSOR_TYPE_FRU_STATE      0x2C
-#define SENSOR_TYPE_HOTSWAP_VT     0xF0
-#define SENSOR_TYPE_HOTSWAP_NAT    0xF2
 /* more... */
 
 /* Entity IDs */
@@ -604,47 +533,6 @@ extern uint8_t FRU_I2C_ADDR[102];
 #define FRU_DATA_CHASSIS_TYPE_PERIPHERAL       0x15
 #define FRU_DATA_CHASSIS_TYPE_RAID             0x16
 #define FRU_DATA_CHASSIS_TYPE_RACKMOUNT        0x17
-
 /* More to come... */
-
-/* PICMG */
-#define FRU_PWR_DYNAMIC(x) x & (1 << 7)
-#define FRU_PWR_LEVEL(x)   x & 0xF
-#define FRU_PWR_STEADY_STATE     0
-#define FRU_PWR_STEADY_STATE_DES 1
-#define FRU_PWR_EARLY            2
-#define FRU_PWR_EARLY_DES        3
-
-/* MicroTCA */
-#define UTCA_FRU_TYPE_CARRIER                0
-#define UTCA_FRU_TYPE_SHELF_MIN              1
-#define UTCA_FRU_TYPE_SHELF_MAX              2
-#define UTCA_FRU_TYPE_MCH_MIN                3
-#define UTCA_FRU_TYPE_MCH_MAX                4
-#define UTCA_FRU_TYPE_AMC_MIN                5
-#define UTCA_FRU_TYPE_AMC_MAX                39
-#define UTCA_FRU_TYPE_CU_MIN                 40
-#define UTCA_FRU_TYPE_CU_MAX                 49
-#define UTCA_FRU_TYPE_PM_MIN                 50
-#define UTCA_FRU_TYPE_PM_MAX                 59
-#define UTCA_FRU_TYPE_RTM_MIN                90
-#define UTCA_FRU_TYPE_RTM_MAX                124
-#define UTCA_FRU_TYPE_LOG_CARRIER            253
-
-/* MCH vendors */
-#define MCH_TYPE_UNKNOWN  0
-#define MCH_TYPE_VT       1
-#define MCH_TYPE_NAT      2
-
-/* Manufacturer ID */
-#define MCH_MANUF_ID_VT   0x5D32
-#define MCH_MANUF_ID_NAT  0x6C78
-
-/* Vadatech */
-#define VT_ENTITY_ID_MCH      0xC2 
-#define VT_ENTITY_ID_AMC      0xC1
-#define VT_ENTITY_ID_CU       0x1E
-#define VT_ENTITY_ID_PM       0x0A
-#define VT_ENTITY_ID_RTM      0xC0  /* asked Vivek to verify */
 
 #endif

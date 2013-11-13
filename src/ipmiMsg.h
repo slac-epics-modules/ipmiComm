@@ -5,14 +5,24 @@
 extern "C" {
 #endif
 
-/*#include <ipmiDef.h>*/
 #include <drvMch.h>
 
-/* Vadatech typically sends 2 replies; NAT sends 1 */
-#define RPLY_TIMEOUT_VT    0.50
-#define RPLY_TIMEOUT_NAT   0.25
+/* Convert 2-element array (which stores LS byte first) to integer */
+uint16_t arrayToUint16(uint8_t *data );
 
-extern volatile int IPMICOMM_DEBUG; 
+/* Convert 4-element array (which stores LS byte first) to integer */
+uint32_t arrayToUint32(uint8_t *data);
+
+/* Increment value of 2-element uint8_t array (which stores LS byte first)
+ * Roll over to 0 when max possible value is reached.
+ */
+void incr2Uint8Array(uint8_t *data, int incr); 
+
+/* Increment value of 4-element uint8_t array (which stores LS byte first)
+ * Roll over to 0 when max possible value is reached.
+ */
+
+void  incr4Uint8Array(uint8_t *data, int incr); 
 
 /*
  * To-MCH IPMI message structure:
@@ -75,62 +85,41 @@ extern volatile int IPMICOMM_DEBUG;
  *   IPMI Message Part 2 Checksum - 2's complement checksum (1 byte)
  */
 
-/* Convert 2-element array (which stores LS byte first) to integer */
-uint16_t arrayToUint16(uint8_t *data );
-
-/* Convert 4-element array (which stores LS byte first) to integer */
-uint32_t arrayToUint32(uint8_t *data);
-
-/* Increment value of 2-element uint8_t array (which stores LS byte first)
- * Roll over to 0 when max possible value is reached.
- */
-void incr2Uint8Array(uint8_t *data, int incr); 
-
 /* IMPORTANT: For all routines below, caller must perform locking */
 
-void ipmiMsgSetSeqId(MchSess mchSess, uint8_t *message, uint8_t cmd);
+void ipmiCompletionCode(const char *name, uint8_t code, uint8_t cmd, uint8_t netfn);
 
-int ipmiMsgWriteRead(const char *name, uint8_t *message, size_t messageSize, uint8_t *response, size_t *responseSize, double timeout);
+int ipmiMsgBuild(IpmiSess sess, uint8_t *message, uint8_t cmd, uint8_t *imsg1netfn, uint8_t *imsg2, size_t imsg2Size, uint8_t *b1msg1, uint8_t *b1msg2, size_t b1msg2Size, uint8_t *b2msg1, uint8_t *b2msg2, size_t b2msg2Size);
 
-int ipmiMsgGetDeviceId(MchSess mchSess, uint8_t *data, uint8_t rsAddr);
+int ipmiMsgWriteRead(const char *name, uint8_t *message, size_t messageSize, uint8_t *response, size_t *responseSize, double timeout, size_t *responseLen);
 
-int ipmiMsgGetChanAuth(MchSess mchSess, uint8_t *data);
+int ipmiMsgGetDeviceId(void *device, IpmiSess sess, uint8_t *data, uint8_t rsAddr, size_t *responseSize, int offs);
 
-int ipmiMsgGetSess(MchSess mchSess, uint8_t *data);
+int ipmiMsgGetChanAuth(void *device, IpmiSess sess, uint8_t *data);
 
-int ipmiMsgActSess(MchSess mchSess, uint8_t *data);
+int ipmiMsgGetSess(void *device, IpmiSess sess, uint8_t *data);
 
-int ipmiMsgSetPriv(MchSess mchSess, uint8_t *data, uint8_t level);
+int ipmiMsgActSess(void *device, IpmiSess sess, uint8_t *data);
 
-int ipmiMsgCloseSess(MchSess mchSess, uint8_t *data);
+int ipmiMsgSetPriv(void *device, IpmiSess sess, uint8_t *data, uint8_t level);
 
-int ipmiMsgColdReset(MchSess mchSess, uint8_t *data);
+int ipmiMsgCloseSess(void *device, IpmiSess sess, uint8_t *data, size_t *responseSize);
 
-int ipmiMsgChassisControl(MchSess mchSess, uint8_t *data, uint8_t parm);
+int ipmiMsgColdReset(void *device, IpmiSess sess, uint8_t *data);
 
-int ipmiMsgGetFruInfo(MchSess mchSess, uint8_t *data, uint8_t id);
+int ipmiMsgChassisControl(void *device, IpmiSess sess, uint8_t *data, uint8_t parm, size_t *responseSize, int offs);
 
-int ipmiMsgReadFru(MchSess mchSess, uint8_t *data, uint8_t id, uint8_t *readOffset, uint8_t readSize);
+int ipmiMsgGetFruInfo(void *device, IpmiSess sess, uint8_t *data, uint8_t id, size_t *responseSize, int offs);
 
-int ipmiMsgGetSdrRepInfo(MchSess mchSess, uint8_t *data);
+int ipmiMsgReadFru(void *device, IpmiSess sess, uint8_t *data, uint8_t id, uint8_t *readOffset, uint8_t readSize, size_t *responseSize, int offs);
 
-int ipmiMsgGetDevSdrInfo(MchSess mchSess, uint8_t *data, uint8_t parm);
+int ipmiMsgGetSdrRepInfo(void *device, IpmiSess sess, uint8_t *data, size_t *responseSize, int offs);
 
-int ipmiMsgGetSdr(MchSess mchSess, uint8_t *data, uint8_t *id, uint8_t *res, uint8_t offset, uint8_t readSize, uint8_t parm, uint8_t recordSize);
+int ipmiMsgGetDevSdrInfo(void *device, IpmiSess sess, uint8_t *data, uint8_t parm, size_t *responseSize, int offs);
+
+int ipmiMsgGetSdr(void *device, IpmiSess sess, uint8_t *data, uint8_t *id, uint8_t *res, uint8_t offset, uint8_t readSize, uint8_t parm, uint8_t recordSize, size_t *responseSize, int offs);
 				
-int ipmiMsgReadSensor(MchSess mchSess, uint8_t *data, uint8_t sens, uint8_t lun, size_t *responseSize);
-
-int ipmiMsgSetFruActHelper(MchSess mchSess, uint8_t *data, uint8_t fru, int parm);
-
-int ipmiMsgGetFruActPolicyHelper(MchSess mchSess, uint8_t *data, uint8_t fru);
-
-int ipmiMsgGetFanPropHelper(MchSess mchSess, uint8_t *data, uint8_t fru);
-
-int ipmiMsgGetFanLevelHelper(MchSess mchSess, uint8_t *data, uint8_t fru);
-
-int ipmiMsgSetFanLevelHelper(MchSess mchSess, uint8_t *data, uint8_t fru, uint8_t level);
-
-int ipmiMsgGetPowerLevel(MchSess mchSess, uint8_t *data, uint8_t fru, uint8_t parm);
+int ipmiMsgReadSensor(void *device, IpmiSess sess, uint8_t *data, uint8_t sens, uint8_t lun, size_t *responseSize, int offs);
 
 #ifdef __cplusplus
 };

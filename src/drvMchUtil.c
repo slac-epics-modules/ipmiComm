@@ -15,172 +15,6 @@
 	#define MAX( a, b ) ( ((a) > (b)) ? (a) : (b) )
 #endif
 
-/* 
- * Use Manufacturer ID (from Get Device ID command)
- * to determine MCH type
- */
-int
-mchIdentify(MchSess mchSess)
-{
-int      i;
-uint8_t  response[MSG_MAX_LENGTH] = { 0 };
-uint8_t  tmpvt[4] = { 0 }, tmpnat[4] = { 0 };
-uint32_t mfvt, mfnat;
-
-	if ( ipmiMsgGetDeviceId( mchSess, response, IPMI_MSG_ADDR_CM ) ) {
-                errlogPrintf("mchIdentify: Error from Get Device ID command\n");
-                return -1;
-	}
-
-        /* Extract Manufacturer ID */
-        for ( i = 0; i < IPMI_RPLY_MANUF_ID_LENGTH ; i++)
-		tmpvt[i] = response[IPMI_RPLY_MANUF_ID_OFFSET + i];
-        for ( i = 0; i < IPMI_RPLY_MANUF_ID_LENGTH ; i++)
-		tmpnat[i] = response[IPMI_RPLY_MANUF_ID_OFFSET + i + IPMI_RPLY_OFFSET_NAT];
-
-	mfvt  = arrayToUint32( tmpvt  );
-	mfnat = arrayToUint32( tmpnat );
-
-	mfvt  = IPMI_MANUF_ID( mfvt  );
-	mfnat = IPMI_MANUF_ID( mfnat );
-
-        if ( mfvt == MCH_MANUF_ID_VT ) {
-		printf("Identified %s to be Vadatech\n", mchSess->name);
-                mchSess->type = MCH_TYPE_VT;
-		mchSess->timeout = RPLY_TIMEOUT_VT;
-
-        }
-        else if ( mfnat == MCH_MANUF_ID_NAT ) {
-		printf("Identified %s to be NAT\n", mchSess->name);
-                mchSess->type = MCH_TYPE_NAT;
-        }
-        else {
-                errlogPrintf("mchIdentify: Unknown type of MCH, Manufacturer ID 0x%08x or 0x%08x?\n", mfvt, mfnat);
-                mchSess->type = MCH_TYPE_UNKNOWN;
-                return -1;
-        }
-
-        return 0;
-}
-
-void
-mchCreateFile( const char *filename )
-{
-FILE *file;
-
-	file = fopen( filename, "w+" );
-	if ( file )
-		fclose(file);
-	else
-		errlogPrintf("mchCreateFile: Failed to create new file %s\n", filename);
-}
-
-void
-mchSensorFruGetInstance(MchSys mchSys)
-{
-int     f = MAX_FRU;
-int     s = mchSys->sensCount;
-uint8_t fruEntId[f];                         /* Entity IDs */
-uint8_t fruEntInst[f];                       /* Counts of each ID */
-uint8_t sensTypeInst[f][MAX_SENSOR_TYPE];    /* Counts of sensor type per ID instance */
-int i, j, sensCount = 1, found, id;
-Fru     fru;
-Sensor  sens;
-
-	memset( fruEntId,     0, f        );
-	memset( fruEntInst,   0, f        );
-	memset( sensTypeInst, 0, f*MAX_SENSOR_TYPE );
-
-	for ( i = 0; i < f; i++ ) {
-
-		fru   = &mchSys->fru[i];
-                id    = fru->sdr.fruId;
-		found = 0;
-
-		if ( id == UTCA_FRU_TYPE_CARRIER ) {
-			sprintf( fru->parm, "CR" );
-			fru->instance = 1;
-		}
-
-		else if( id >= UTCA_FRU_TYPE_SHELF_MIN && id <= UTCA_FRU_TYPE_SHELF_MAX ) {
-			sprintf( fru->parm, "SH" );
-			fru->instance = ( id - UTCA_FRU_TYPE_SHELF_MIN ) + 1;
-		}
-
-		else if( id >= UTCA_FRU_TYPE_MCH_MIN && id <= UTCA_FRU_TYPE_MCH_MAX ) {
-			sprintf( fru->parm, "MCH" );
-			fru->instance = ( id - UTCA_FRU_TYPE_MCH_MIN ) + 1;
-		}
-
-		else if( id >= UTCA_FRU_TYPE_AMC_MIN && id <= UTCA_FRU_TYPE_AMC_MAX ) {
-			sprintf( fru->parm, "AMC" );
-			fru->instance = ( id - UTCA_FRU_TYPE_AMC_MIN ) + 1;
-		}
-
-		else if( id >= UTCA_FRU_TYPE_CU_MIN && id <= UTCA_FRU_TYPE_CU_MAX ) {
-			sprintf( fru->parm, "CU" );
-			fru->instance = ( id - UTCA_FRU_TYPE_CU_MIN ) + 1;
-		}
-
-		else if( id >= UTCA_FRU_TYPE_PM_MIN && id <= UTCA_FRU_TYPE_PM_MAX ) {
-			sprintf( fru->parm, "PM" );
-			fru->instance = ( id - UTCA_FRU_TYPE_PM_MIN ) + 1;
-		}
-
-		else if( id >= UTCA_FRU_TYPE_RTM_MIN && id <= UTCA_FRU_TYPE_RTM_MAX ) {
-			sprintf( fru->parm, "RTM" );
-			fru->instance = ( id - UTCA_FRU_TYPE_RTM_MIN ) + 1;
-		}
-
-		else if ( id == UTCA_FRU_TYPE_LOG_CARRIER ) {
-			sprintf( fru->parm, "CR" );
-			fru->instance = 1;
-		}
-
-		/* Find sensors associated with this FRU, assign each an instance based on sensor type */
-		for ( j = 0; j < s; j++ ) {
-
-			sens = &mchSys->sens[j];
-
-			if ( mchSys->fru[sens->fruIndex].sdr.fruId == id ) {
-
-				/* If a real entity */
-				if ( fru->sdr.entityInst ) {
-					sens->instance = ++sensTypeInst[i][sens->sdr.sensType]; 
-					sensCount++;
-
-					switch ( sens->sdr.sensType ) {
-	
-						default:
-							break;
-
-						case SENSOR_TYPE_TEMP:
-							fru->tempCnt = sens->instance;
-							break;
-	
-						case SENSOR_TYPE_FAN:
-							fru->fanCnt = sens->instance;
-							break;
-		
-						case SENSOR_TYPE_VOLTAGE:
-							fru->vCnt = sens->instance;
-							break;
-					}
-				}
-			}
-		}
-	}
-
-#ifdef DEBUG
-printf("mchSensorFruGetInstance: Found %i matching sensors, total sensor count is %i\n",sensCount, mchSys->sensCount);
-for ( i = 0; i < mchSys->sensCount; i++ ) {
-	sens = &mchSys->sens[i];
-	int fruIndex = sens->fruIndex;
-	fru  = &mchSys->fru[fruIndex];
-	printf("Sensor %i, type %02x, inst %i, FRU entId %02x, entInst %02x, sens entId %02x  entInst %02x\n",sens->sdr.number, sens->sdr.sensType, sens->instance, fru->sdr.entityId, fru->sdr.entityInst, sens->sdr.entityId, sens->sdr.entityInst);
-}
-#endif
-}
 
 /*
  * Create a script to load the appropriate EPICS records for our shelf
@@ -253,7 +87,7 @@ int      found, inst,  n;
 				/* If we've associated this sensor with a FRU and given it an instance */
 				if ( sens->instance ) {
 
-					fruIndex = sens->fruIndex;	
+					fruIndex = sens->fruIndex;	/* can fruIndex be fruId? */
 					    fru   = &mchSys->fru[fruIndex];    
 					inst  = fru->instance;
 					sprintf( code, "%s", fru->parm );
@@ -302,8 +136,10 @@ int      found, inst,  n;
 					    sprintf( desc, "'%s'", code ); /* Improve this string */
 
 					if ( found )
-						fprintf( file, "dbLoadRecords(\"${TOP}/db/%s\",\"dev=%s,link=%s,code=%s,inst=%i,sensInst=%i,sens=%i,desc=%s\")\n", /* continue next line */
-						dbFile, dev, mchSys->name, code, inst, sens->instance, i, desc );
+						fprintf( file, "dbLoadRecords(\"${TOP}/db/%s\",\"dev=%s,link=%s,code=%s,inst=%i,sensInst=%i,fruid=%i,type=%i,desc=%s\")\n", /* continue next line */
+						dbFile, dev, mchSys->name, code, inst, sens->instance, fruIndex, sens->sdr.sensType, desc );
+						/*fprintf( file, "dbLoadRecords(\"${TOP}/db/%s\",\"dev=%s,link=%s,code=%s,inst=%i,sensInst=%i,sens=%i,desc=%s\")\n", /* continue next line
+						dbFile, dev, mchSys->name, code, inst, sens->instance, i, desc );*/
 				}
 			}
 

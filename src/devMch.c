@@ -21,20 +21,19 @@
 
 	   Supported operations:
 
-             * "TEMP": read temperature sensor
-             * "FAN" : read fan speed sensor
-             * "V"   : read voltage sensor
-             * "I"   : read current sensor
+             * "sens": read sensor
 	   
 	 devAiFru
          --------
+         *   init_fru_ai                  - Record initialization
+         *   fru_ai_ioint_info            - Record initialization
          *   init_fru_ai_record           - Record initialization
          *   read_fru_ai                  - Read analog input
 
 	   Supported operations:
 
-             * "FAN"     : Get fan level
-             * "PWR"     : Get FRU power levels (steady state and early, 
+             * "fan"     : Get fan level
+             * "pwr"     : Get FRU power levels (steady state and early, 
                                                  desired and actual)
 
          Binary Output Device Support:
@@ -48,9 +47,9 @@
 
 	   Supported operations:
 
-             * "RESET": perform IPMI cold reset
-             * "SESS":  close/open session with MCH
-             * "INIT":  override 'MCH communication initialized' bit
+             * "reset": perform IPMI cold reset
+             * "sess":  close/open session with MCH
+             * "init":  override 'MCH communication initialized' bit
 
          Binary Input Device Support:
          -------------------------------------------------------
@@ -65,7 +64,9 @@
 
 	   Supported operations:
 
-             * "STAT": read crate online/offline status
+             * "stat": read crate online/offline status
+             * "spres": sensor presence
+             * "fpres": FRU presence
 
          Multibit-Binary Input Device Support:
          -------------------------------------------------------
@@ -80,10 +81,10 @@
 
 	   Supported operations:
 
-             * "INIT": communication with crate initialized
-             * "FAN":  read fan auto-adjustment
-             * "HS":   read FRU hot-swap sensor 
-	     * "MCH":  MCH vendor
+             * "init": communication with crate initialized
+             * "fan":  read fan auto-adjustment
+             * "hs":   read FRU hot-swap sensor 
+	     * "mch":  MCH vendor
 
 
          Multibit-Binary Output Device Support:
@@ -97,8 +98,9 @@
 
 	   Supported operations:
 
-             * "CHAS": chassis control on/off/reset
-             * "FRU":  FRU on/off
+             * "chas": chassis control on/off/reset
+             * "fru":  FRU on/off
+             * "dbg":   control debug messages for one MCH
 
          String Input Device Support:
          -------------------------------------------------------
@@ -106,17 +108,19 @@
 	 devStringinFru
          --------------
 
+         *   init_fru_stringin            - stringin initialization
+         *   fru_stringin_ioint_info      - Add to i/o scan list
          *   init_fru_stringin_record     - Record initialization
          *   read_fru_stringin            - Read string input
 
 	   Supported operations:
 
-             * "BMF":  FRU board manufacturer
-             * "BP":   FRU board product name
-             * "BPN":  FRU board part number
-             * "PMF":  FRU product manufacturer
-             * "PP":   FRU product product name
-             * "PPN":  FRU product part number
+             * "bmf":  FRU board manufacturer
+             * "bp":   FRU board product name
+             * "bpn":  FRU board part number
+             * "pmf":  FRU product manufacturer
+             * "pp":   FRU product product name
+             * "ppn":  FRU product part number
 
          Long Integer Output Device Support:
          -------------------------------------------------------
@@ -129,7 +133,7 @@
 
 	   Supported operations:
 
-             * "FAN":  fan level control
+             * "fan":  fan level control
 
 =============================================================
 */
@@ -160,19 +164,18 @@
 #include <epicsExport.h>
 #include <asynDriver.h>
 #include <dbScan.h>
+#include <link.h>
 
 #include <ipmiDef.h>
 #include <ipmiMsg.h>
 #include <drvMch.h>
+#include <drvMchMsg.h>
 #include <devMch.h>
 
-#undef DEBUG
-
-extern volatile int IPMICOMM_DEBUG;
+extern uint32_t mchStat[MAX_MCH];
 
 #define MAX_STRING_LENGTH 39
-
-int initTrap = 0;
+#define MAX_EGU_LENGTH 16
 
 /* Device support prototypes */
 static long init_ai_record(struct aiRecord *pai);
@@ -194,16 +197,18 @@ static long mbbi_ioint_info(int cmd, struct mbbiRecord *mbpbi, IOSCANPVT *iopvt)
 static long init_mbbo_record(struct mbboRecord *pmbbo);
 static long write_mbbo(struct mbboRecord *pmbbo);
 
+static long init_fru_ai(struct aiRecord *pai);
 static long init_fru_ai_record(struct aiRecord *pai);
 static long read_fru_ai(struct aiRecord *pai);
-/*static long ai_fru_ioint_info(int cmd, struct aiRecord *pai, IOSCANPVT *iopvt);*/
+static long ai_fru_ioint_info(int cmd, struct aiRecord *pai, IOSCANPVT *iopvt);
 
 static long init_fru_longout_record(struct longoutRecord *plongout);
 static long write_fru_longout(struct longoutRecord *plongout);
 
+static long init_fru_stringin(struct stringinRecord *pstringin);
 static long init_fru_stringin_record(struct stringinRecord *pstringin);
 static long read_fru_stringin(struct stringinRecord *pstringin);
-/*static long stringin_fru_ioint_info(int cmd, struct stringinRecord *pstringin, IOSCANPVT *iopvt);*/
+static long stringin_fru_ioint_info(int cmd, struct stringinRecord *pstringin, IOSCANPVT *iopvt);
 
 /* global struct for devSup */
 typedef struct {
@@ -217,14 +222,14 @@ typedef struct {
 } MCH_DEV_SUP_SET;
 
 /* Add reporting */
-MCH_DEV_SUP_SET devAiMch         = {6, NULL, NULL, init_ai_record,             NULL, read_ai,           NULL};
-MCH_DEV_SUP_SET devBoMch         = {6, NULL, NULL, init_bo_record,             NULL, write_bo,          NULL};
-MCH_DEV_SUP_SET devMbboMch       = {6, NULL, NULL, init_mbbo_record,           NULL, write_mbbo,        NULL};
-MCH_DEV_SUP_SET devBiMch         = {6, NULL, init_bi, init_bi_record,     bi_ioint_info,   read_bi,     NULL};
-MCH_DEV_SUP_SET devMbbiMch       = {6, NULL, init_mbbi, init_mbbi_record, mbbi_ioint_info, read_mbbi,   NULL};
-MCH_DEV_SUP_SET devAiFru         = {6, NULL, NULL, init_fru_ai_record,         NULL, read_fru_ai,       NULL};
-MCH_DEV_SUP_SET devLongoutFru    = {6, NULL, NULL, init_fru_longout_record,    NULL, write_fru_longout, NULL};
-MCH_DEV_SUP_SET devStringinFru   = {6, NULL, NULL, init_fru_stringin_record,   NULL, read_fru_stringin, NULL};
+MCH_DEV_SUP_SET devAiMch         = {6, NULL, NULL,              init_ai_record,           NULL,                    read_ai,           NULL};
+MCH_DEV_SUP_SET devBoMch         = {6, NULL, NULL,              init_bo_record,           NULL,                    write_bo,          NULL};
+MCH_DEV_SUP_SET devMbboMch       = {6, NULL, NULL,              init_mbbo_record,         NULL,                    write_mbbo,        NULL};
+MCH_DEV_SUP_SET devBiMch         = {6, NULL, init_bi,           init_bi_record,           bi_ioint_info,           read_bi,           NULL};
+MCH_DEV_SUP_SET devMbbiMch       = {6, NULL, init_mbbi,         init_mbbi_record,         mbbi_ioint_info,         read_mbbi,         NULL};
+MCH_DEV_SUP_SET devAiFru         = {6, NULL, init_fru_ai,       init_fru_ai_record,       ai_fru_ioint_info,       read_fru_ai,       NULL};
+MCH_DEV_SUP_SET devLongoutFru    = {6, NULL, NULL,              init_fru_longout_record,  NULL,                    write_fru_longout, NULL};
+MCH_DEV_SUP_SET devStringinFru   = {6, NULL, init_fru_stringin, init_fru_stringin_record, stringin_fru_ioint_info, read_fru_stringin, NULL};
 
 epicsExportAddress(dset, devAiMch);
 epicsExportAddress(dset, devBoMch);
@@ -252,10 +257,7 @@ devMchRegister(const char *name)
 MchDev rval = 0, d;
 
         if ( (d = malloc(sizeof(*rval) + strlen(name))) ) {
-                /* pre-load the allocated structure -  'registryAdd()'
-                 * is atomical...
-                 */
-                /*d->baseAddr = baseAddress;*/
+
                 strcpy((char*)d->name, name);
                 if ( (d->mutex = epicsMutexCreate()) ) {
                         /* NOTE: the registry keeps a pointer to the name and
@@ -280,9 +282,6 @@ MchDev rval = 0, d;
 MchDev
 devMchFind(const char *name)
 {
-#ifdef DEBUG
-printf("devMchFind: name is %s\n",name);
-#endif
 	return (MchDev)registryFind(registryId, name);
 }
 
@@ -335,65 +334,152 @@ float value;
 	return value;
 }
 
+static short
+sensLkup(MchSys mchSys, struct camacio link) {
+
+	return mchSys->sensLkup[link.b][link.c][link.n];
+}
+
+static void
+sensEgu(char *egu, unsigned units) {
+
+	switch ( units ) {
+
+		default:
+			strcpy( egu, "" );
+
+		case SENSOR_UNITS_UNSPEC:
+			strcpy( egu, "Unspecified");
+			break;
+
+		case SENSOR_UNITS_DEGC:   
+			strcpy( egu, "DegC");
+			break;
+
+		case SENSOR_UNITS_DEGF:   
+			strcpy( egu, "DegF");
+			break;
+
+		case SENSOR_UNITS_DEGK:   
+			strcpy( egu, "DegK");
+			break;
+
+		case SENSOR_UNITS_VOLTS:  
+			strcpy( egu, "V");
+			break;
+
+		case SENSOR_UNITS_AMPS:   
+			strcpy( egu, "A");
+			break;
+
+		case SENSOR_UNITS_WATTS:  
+			strcpy( egu, "W");
+			break;
+
+		case SENSOR_UNITS_JOULES: 
+			strcpy( egu, "J");
+			break;
+
+		case SENSOR_UNITS_COULOMBS:
+			strcpy( egu, "C");
+			break;
+
+		case SENSOR_UNITS_RPM:
+			strcpy( egu, "RPM");
+			break;
+	}
+
+}		
+
+/* Perform some common dev sup checks */
+static MchRec
+init_record_chk(DBLINK *plink, long *status, char *str) {
+short  f, t, s;
+MchRec rval = 0;
+
+        if ( CAMAC_IO != plink->type ) {
+		*status = S_dev_badBus;
+		return rval;
+	}
+
+        f = plink->value.camacio.b;
+        t = plink->value.camacio.c;
+        s = plink->value.camacio.n;
+
+        if ( f < 0 ) {
+	       	sprintf( str, "FRU id (Branch) is %i; must >= 0", f);
+		*status = S_dev_badSignal;
+		return rval;
+	}
+
+        if ( t < 0 ) {
+	       	sprintf( str, "Sensor type (Crate) is %i; must >= 0", t);
+		*status = S_dev_badSignal;
+	        return rval;
+	}
+
+        if ( s < 0 ) {
+	       	sprintf( str, "Sensor instance (Station) is %i; must >= 0", s);
+		*status = S_dev_badSignal;
+		return rval;
+	}
+
+	if ( ! (rval = calloc( 1, sizeof( *rval ) )) ) {
+		sprintf( str, "No memory for recPvt structure");
+		*status = S_rec_outMem;
+		return rval;
+	}
+
+	return rval;
+}
+
+/* Find data structure in registry by MCH name */
+static long
+init_record_find(MchDev mch, MchRec recPvt, char *node, char *task, long *status, char *str) {
+
+	if ( (mch = devMchFind( node )) ) {
+		recPvt->mch  = mch;
+                recPvt->task = task;
+		return 0;
+	}
+	else {
+		sprintf( str, "Failed to locate data structure" );
+		*status = S_dev_noDeviceFound;
+		return -1;
+	}
+}
+
 static long 
 init_ai_record(struct aiRecord *pai)
 {
 MchRec   recPvt  = 0; /* Info stored with record */
 MchDev   mch     = 0; /* MCH device data structures */
-char    *node;        /* Network node name, stored in parm */
+char    *node    = 0; /* Network node name, stored in parm */
 char    *task    = 0; /* Optional additional parameter appended to parm */
 char    *p;
-short    c, s;
 long     status  = 0;
 char     str[40];
+DBLINK  *plink   = &pai->inp;
 
-        if ( VME_IO != pai->inp.type ) {
-		status = S_dev_badBus;
+	if ( ! ( recPvt = init_record_chk( plink, &status, str )) )
 		goto bail;
-	}
-
-        c = pai->inp.value.vmeio.card;
-        s = pai->inp.value.vmeio.signal;
-
-        if ( c < 0 ) {
-		status = S_dev_badCard;
-		goto bail;
-	}
-
-        if ( s < 0 ) {
-		status = S_dev_badSignal;
-		goto bail;
-	}
-
-	if ( ! (recPvt = calloc( 1, sizeof( *recPvt ) )) ) {
-		sprintf( str, "No memory for recPvt structure");
-		status = S_rec_outMem;
-		goto bail;
-	}
 
 	/* Break parm into node name and optional parameter */
-	node = strtok( pai->inp.value.vmeio.parm, "+" );
+	node = strtok( pai->inp.value.camacio.parm, "+" );
 	if ( (p = strtok( NULL, "+" )) ) {
 		task = p;
-		if ( strcmp( task, "TEMP" ) && strcmp( task, "FAN" ) && strcmp( task, "V") && strcmp( task, "I") ) { 
+		if ( strcmp( task, "sens" ) ) { 
 			sprintf( str, "Unknown task parameter %s", task);
 			status = S_dev_badSignal;
 		}
 	}
 
-	/* Find data structure in registry by MCH name */
-	if ( (mch = devMchFind( node )) ) {
-		recPvt->mch  = mch;
-                recPvt->task = task;
-		pai->dpvt    = recPvt;
-	}
-	else {
-		sprintf( str, "Failed to locate data structure" );
-		status = S_dev_noDeviceFound;
+	if ( init_record_find( mch, recPvt, node, task, &status, str ) )
 		goto bail;
-	}
+	else
+		pai->dpvt = recPvt;
 
-	/* To do: implement alarms 
+	/* To do: implement alarms; use upper, lower, critical, non-critical etc.
 	mchData = mch->udata;
 	sdr     = &mchSys->sens[s].sdr;
 
@@ -442,6 +528,11 @@ bail:
         return status;
 }
 
+/* Take advantage of regular read_ai calls
+ * to periodically check that our MCH data matches
+ * the live configuration. Thus read_ai does not check
+ * that MCH_INIT_DONE is true, but other read routines do
+ */
 static long 
 read_ai(struct aiRecord *pai)
 {
@@ -450,14 +541,14 @@ MchDev   mch;
 MchData  mchData;
 MchSess  mchSess;
 MchSys   mchSys;
-char    *task;
-uint8_t  data[MSG_MAX_LENGTH] = { 0 };
-uint8_t  raw, sensor, bits;
-short    index   = pai->inp.value.vmeio.signal; /* Sensor index */
-long     status  = NO_CONVERT;
+Sensor   sens;
 SdrFull  sdr;
-int      units, s = 0;
-float    value = 0;
+char     egu[16];
+uint8_t  data[MSG_MAX_LENGTH] = { 0 };
+uint8_t  raw = 0, sensor, bits;
+short    index; /* Sensor index */
+long     status = NO_CONVERT;
+int      s = 0, inst;
 size_t   responseSize;
 uint8_t  lun;
 int      offs; 
@@ -468,80 +559,74 @@ int      offs;
 	mch     = recPvt->mch;
 	mchData = mch->udata;
 	mchSess = mchData->mchSess;
-	mchSys  = mchSysData[mchSess->instance];
-	task    = recPvt->task;
+	mchSys  = mchData->mchSys;
+	inst    = mchSess->instance;
 
-	offs = ( mchSess->type == MCH_TYPE_NAT ) ? IPMI_RPLY_OFFSET_NAT : 0;
-
-	if ( mchIsAlive[mchSess->instance] && mchSess->session && mchInitDone[mchSess->instance] ) {
-
-		responseSize = mchSys->sens[index].readMsgLength;
-		sensor = mchSys->sens[index].sdr.number;
-		lun    = mchSys->sens[index].sdr.lun & 0x3;
+	if ( MCH_ONLN( mchStat[inst] ) && mchSess->session ) {    
 
 		epicsMutexLock( mch->mutex );
 
-		if ( !(s = ipmiMsgReadSensor( mchSess, data, sensor, lun, &responseSize )) ) {
+		/* If flag is set, check MCH configuration */
+		if ( MCH_CNFG_CHK( mchStat[inst] ) ) {
+			if ( mchCnfgChk( mchData ) ) {
+				epicsMutexUnlock( mch->mutex );
+				return ERROR;
+			}
+		}
+
+		if ( -1 == (index = sensLkup( mchSys, pai->inp.value.camacio )) ) {
+       			epicsMutexUnlock( mch->mutex );
+			return ERROR;
+		}
+
+		sens = &mchSys->sens[index];
+		offs = ( mchSess->type == MCH_TYPE_NAT ) ? IPMI_RPLY_OFFSET_NAT : 0;
+
+		responseSize = sens->readMsgLength;
+		sensor       = sens->sdr.number;
+		lun          = sens->sdr.lun & 0x3;
+
+		if ( !(s = mchMsgReadSensor( mchData, data, sensor, lun, &responseSize )) ) {
 			bits = data[IPMI_RPLY_SENSOR_ENABLE_BITS_OFFSET + offs];
 
 			if ( IPMI_SENSOR_READING_DISABLED(bits) || IPMI_SENSOR_SCANNING_DISABLED(bits) ) {
-				if ( IPMICOMM_DEBUG )
-					printf("%s sensor reading/state unavailable or scanning disabled. Bits: %02x\n",pai->name, bits);
+				if ( MCH_DBG( mchStat[inst] ) )
+					printf("%s sensor reading/state unavailable or scanning disabled. Bits: %02x\n", pai->name, bits);
 				s = ERROR;
 			}
-			else {
-				raw = data[IPMI_RPLY_SENSOR_READING_OFFSET + offs];
-				mchSys->sens[index].val = raw;
-			}
+			else
+				sens->val = raw = data[IPMI_RPLY_SENSOR_READING_OFFSET + offs];
 		}
 	
 		epicsMutexUnlock( mch->mutex );
 
+		sdr = &sens->sdr;
+
+		if ( !mchSys->sens[index].cnfg ) {
+			sensEgu( egu, sdr->units2 );
+			strcpy( pai->egu,  egu );
+			if ( sdr->str )
+				strcpy( pai->desc, sdr->str );
+			sens->cnfg = 1;
+		}
+
 		if ( s ) {
-			if ( IPMICOMM_DEBUG )
+
+			if ( MCH_DBG( mchStat[inst] ) )
 				printf("%s writeread error sensor %02x index %i\n", pai->name, sensor, index);
 			recGblSetSevr( pai, READ_ALARM, INVALID_ALARM );
 			return ERROR;
 		}
 
-		sdr = &mchSys->sens[index].sdr;
-
 		/* All of our conversions are for Full Sensor SDRs */
 		if ( sdr->recType != SDR_TYPE_FULL_SENSOR )
-			return status;
+			pai->val = raw;
+		else
+			pai->val = (float)sensorConversion( sdr, raw );
 
-		value = sensorConversion( sdr, raw );
-
-		units = sdr->units2;
-		pai->rval = value;
-
-		/* Perform appropriate conversion - check units */
-		if ( !(strcmp( task, "TEMP")) ) {
-			if ( units == SENSOR_UNITS_DEGC)
-				pai->val = value*9/5 + 32;
-			else if ( units == SENSOR_UNITS_DEGF)
-				pai->val = value;
-		}
-		else if ( !(strcmp( task, "FAN")) ) {
-			if ( units == SENSOR_UNITS_RPM )
-				pai->val  = value;
-		}
-		else if ( !(strcmp( task, "V")) ) {
-			if ( units == SENSOR_UNITS_VOLTS )
-				pai->val  = value;
-		}
-		else if ( !(strcmp( task, "I")) ) {
-			if ( units == SENSOR_UNITS_AMPS )
-				pai->val  = value;
-		}
-
-       		if ( IPMICOMM_DEBUG > 2 )
-			printf("%s: raw %02x, sensor %02x, owner %i, lun %i, index %i, value %.1f\n",pai->name, raw, sensor, mchSys->sens[index].sdr.owner, mchSys->sens[index].sdr.lun, index, pai->val);
-
-#ifdef DEBUG
-printf("read_ai: %s sensor index is %i, task is %s, sensor number is %i, value is %.0f, rval is %i\n",
-    pai->name, index, task, mchSys->sens[index].sdr.number, pai->val, pai->rval);
-#endif
+		if ( MCH_DBG( mchStat[inst] ) > 1 )
+			printf("%s read_ai: sensor index is %i, sensor number is %i, value is %.0f, rval is %i\n",
+			pai->name, index, sdr->number, pai->val, pai->rval);
 
 		pai->udf = FALSE;
 		return status;
@@ -562,50 +647,27 @@ MchDev  mch     = 0; /* MCH device data structures */
 char    *node;       /* Network node name, stored in parm */
 char    *task   = 0; /* Optional additional parameter appended to parm */
 char    *p;
-short    c, s;
-long    status = 0;
+long    status  = 0;
 char    str[40];
+DBLINK  *plink  = &pbo->out;
 
-        if ( VME_IO != pbo->out.type ) {
-		status = S_dev_badBus;
+	if ( ! ( recPvt = init_record_chk( plink, &status, str )) )
 		goto bail;
-	}
-
-        c = pbo->out.value.vmeio.card;
-        s = pbo->out.value.vmeio.signal;
-
-        if ( c < 0 )
-		status = S_dev_badCard;
-
-        if ( s < 0 )
-		status = S_dev_badSignal;
-
-        if ( ! (recPvt = calloc( 1, sizeof( *recPvt ) )) ) {
-		sprintf( str, "No memory for recPvt structure");
-		status = S_rec_outMem;
-		goto bail;
-        }
 
         /* Break parm into node name and optional parameter */
-        node = strtok( pbo->out.value.vmeio.parm, "+" );
+        node = strtok( pbo->out.value.camacio.parm, "+" );
         if ( (p = strtok( NULL, "+")) ) {
                 task = p;
-                if ( strcmp( task, "RESET") && strcmp( task, "SESS") && strcmp( task, "INIT") ) {
+                if ( strcmp( task, "reset") && strcmp( task, "sess") && strcmp( task, "init") ) {
 			sprintf( str, "Unknown task parameter %s", task);
 			status = S_dev_badSignal;
 		}
         }
 
-        /* Find data structure in registry by MCH name */
-        if ( (mch = devMchFind(node)) ) {
-                recPvt->mch  = mch;
-                recPvt->task = task;
-                pbo->dpvt  = recPvt;                
-        }
-        else {
-		sprintf( str, "Failed to locate data structure" );
-		status = S_dev_noDeviceFound;
-        }
+	if ( init_record_find( mch, recPvt, node, task, &status, str ) )
+		goto bail;
+	else
+		pbo->dpvt = recPvt;
 
 bail:
 	if ( status ) {
@@ -627,7 +689,7 @@ MchSess  mchSess;
 MchSys   mchSys;
 char    *task;
 long     status = 0;
-int      s = 0;
+int      s = 0, inst;
 
 	if ( !recPvt )
 		return status;
@@ -635,30 +697,31 @@ int      s = 0;
 	mch     = recPvt->mch;
 	mchData = mch->udata;
 	mchSess = mchData->mchSess;
-	mchSys  = mchSysData[mchSess->instance];
+	mchSys  = mchData->mchSys;
+	inst    = mchSess->instance;
 
 	task    = recPvt->task;
 
-	if ( mchIsAlive[mchSess->instance] ) {
+	if (  MCH_ONLN( mchStat[inst] ) ) {
 
-		if ( !(strcmp( task, "SESS" )) ) {
+		if ( !(strcmp( task, "sess" )) ) {
 
 			epicsMutexLock( mch->mutex );
 
-			if ( pbo->val )
+			if ( pbo->val ) /* could change this to be purely soft; session will time out */
 				mchSess->session = 1; /* Re-enable session */
 			else {
 				mchSess->session = 0;
-				ipmiMsgCloseSess( mchSess, data );
+				mchMsgCloseSess( mchSess, mchData->ipmiSess, data );
 			}
 			
 			epicsMutexUnlock( mch->mutex );
 		}
 
-		else if ( !(strcmp( task, "RESET" )) && mchSess->session ) {
+		else if ( !(strcmp( task, "reset" )) && mchSess->session ) {
 
 			epicsMutexLock( mch->mutex );
-		       	s = ipmiMsgColdReset( mchSess, data );
+		       	s = ipmiMsgColdReset( mchSess, mchData->ipmiSess, data );
 			epicsMutexUnlock( mch->mutex );
 
 			if ( s ) {
@@ -667,16 +730,8 @@ int      s = 0;
 			}
 		}
 
-		else if ( !(strcmp( task, "INIT" )) && mchSess->session ) {
-
-			epicsMutexLock( mch->mutex );
-		       	mchInitDone[mchSess->instance] = (pbo->val) ? MCH_INIT_DONE : MCH_INIT_NOT_DONE;
-			epicsMutexUnlock( mch->mutex );
-
-			if ( drvMchInitScan )
-				scanIoRequest( drvMchInitScan );
-		}
-
+		else if ( !(strcmp( task, "init" )) && mchSess->session )
+			mchStatSet( inst, MCH_MASK_INIT, (pbo->val) ? MCH_MASK_INIT_DONE : MCH_MASK_INIT_NOT_DONE );
 
 		pbo->udf = FALSE;
 		return status;
@@ -712,51 +767,27 @@ MchDev  mch     = 0; /* MCH device data structures */
 char    *node;       /* Network node name, stored in parm */
 char    *task   = 0; /* Optional additional parameter appended to parm */
 char    *p;
-short    c, s;
 long     status = 0;
 char     str[40];
+DBLINK  *plink  = &pbi->inp;
 
-        if ( VME_IO != pbi->inp.type ) {
-		status = S_dev_badBus;
+	if ( ! ( recPvt = init_record_chk( plink, &status, str )) )
 		goto bail;
-	}
-
-        c = pbi->inp.value.vmeio.card;
-        s = pbi->inp.value.vmeio.signal;
-
-        if ( c < 0 )
-		status = S_dev_badCard;
-
-        if ( s < 0 )
-		status = S_dev_badSignal;
-
-        if ( ! (recPvt = calloc( 1, sizeof( *recPvt ) )) ) {
-		sprintf( str, "No memory for recPvt structure");
-		status = S_rec_outMem;
-		goto bail;
-        }
 
         /* Break parm into node name and optional parameter */
-        node = strtok( pbi->inp.value.vmeio.parm, "+" );
+        node = strtok( pbi->inp.value.camacio.parm, "+" );
         if ( (p = strtok( NULL, "+")) ) {
                 task = p;
-                if ( strcmp( task, "STAT" ) ) {
+                if ( strcmp( task, "stat" ) && strcmp( task, "spres") && strcmp( task, "fpres") ) {
 			sprintf( str, "Unknown task parameter %s", task);
 			status = S_dev_badSignal;
 		}
         }
 
-        /* Find data structure in registry by MCH name */
-        if ( (mch = devMchFind(node)) ) {
-                recPvt->mch  = mch;
-                recPvt->task = task;
-                pbi->dpvt  = recPvt;
-                
-        }
-        else {
-		sprintf( str, "Failed to locate data structure" );
-		status = S_dev_noDeviceFound;
-        }
+	if ( init_record_find( mch, recPvt, node, task, &status, str ) )
+		goto bail;
+	else
+		pbi->dpvt = recPvt;
 
 bail:
 	if ( status ) {
@@ -775,8 +806,11 @@ MchDev   mch;
 MchData  mchData;
 MchSess  mchSess;
 MchSys   mchSys;
+Fru      fru;
 char    *task;
 long     status = 0;
+int      inst;
+short    id, index;
 
 	if ( !recPvt )
 		return status;
@@ -784,18 +818,29 @@ long     status = 0;
 	mch     = recPvt->mch;
 	mchData = mch->udata;
 	mchSess = mchData->mchSess;
-	mchSys  = mchSysData[mchSess->instance];
+	mchSys  = mchData->mchSys;
+	inst    = mchSess->instance;
 
 	task    = recPvt->task;
 
-	if ( task ) {
+       	if ( !(strcmp( task, "stat" )) ) 
+       		pbi->rval = MCH_ONLN( mchStat[inst] );
 
-		if ( !(strcmp( task, "STAT" )) )
+	else if ( MCH_INIT_DONE( mchStat[inst] ) ) {
 
-			pbi->rval = mchIsAlive[mchSess->instance];
+		if ( !(strcmp( task, "spres")) ) {
+
+			index     = sensLkup( mchSys, pbi->inp.value.camacio );
+			pbi->rval = ( -1 == index ) ? 0 : 1;
+		}
+
+		else if ( !(strcmp( task, "fpres")) ) {
+			id  = pbi->inp.value.camacio.b;   /* FRU id */
+			fru = &mchSys->fru[id];
+
+			pbi->rval = ( fru->sdr.entityInst ) ? 1 : 0;
+		}
 	}
-
-	pbi->udf = FALSE;
 	return status;
 }
 
@@ -824,52 +869,27 @@ MchDev  mch     = 0; /* MCH device data structures */
 char    *node;       /* Network node name, stored in parm */
 char    *task   = 0; /* Optional additional parameter appended to parm */
 char    *p;
-short    c, s;
 long     status = 0;
 char     str[40];
+DBLINK  *plink  = &pmbbi->inp;
 
-        if ( VME_IO != pmbbi->inp.type ) {
-		status = S_dev_badBus;
+	if ( ! ( recPvt = init_record_chk( plink, &status, str )) )
 		goto bail;
-	}
-
-        c = pmbbi->inp.value.vmeio.card;
-        s = pmbbi->inp.value.vmeio.signal;
-
-        if ( c < 0 )
-		status = S_dev_badCard;
-
-        if ( s < 0 )
-		status = S_dev_badSignal;
-
-        if ( ! (recPvt = calloc( 1, sizeof( *recPvt ) )) ) {
-		sprintf( str, "No memory for recPvt structure");
-		status = S_rec_outMem;
-		goto bail;
-        }
 
         /* Break parm into node name and optional parameter */
-        node = strtok( pmbbi->inp.value.vmeio.parm, "+" );
+        node = strtok( pmbbi->inp.value.camacio.parm, "+" );
         if ( (p = strtok( NULL, "+")) ) {
                 task = p;
-                if ( strcmp( task, "HS") && strcmp( task, "FAN") && strcmp( task, "INIT" ) && strcmp( task, "PWR") && strcmp( task, "MCH" ) ) {
+                if ( strcmp( task, "hs") && strcmp( task, "fan") && strcmp( task, "init" ) && strcmp( task, "pwr") && strcmp( task, "mch" ) ) {
 			sprintf( str, "Unknown task parameter %s", task);
 			status = S_dev_badSignal;
 		}
         }
 
-        /* Find data structure in registry by MCH name */
-        if ( (mch = devMchFind(node)) ) {
-                recPvt->mch  = mch;
-                recPvt->task = task;
-                pmbbi->dpvt  = recPvt;
-                
-        }
-        else {
-		sprintf( str, "Failed to locate data structure" );
-		status = S_dev_noDeviceFound;
-        }
-
+	if ( init_record_find( mch, recPvt, node, task, &status, str ) )
+		goto bail;
+	else
+		pmbbi->dpvt = recPvt;
 bail:
 	if ( status ) {
 	       recGblRecordError( status, (void *)pmbbi , (const char *)str );
@@ -890,14 +910,13 @@ MchSess  mchSess;
 MchSys   mchSys;
 char    *task;
 Fru      fru;
-uint8_t  value = 0, sensor, bits;
-uint16_t addr = 0; /* get addr */
-short    id     = pmbbi->inp.value.vmeio.card;   /* FRU id */
-short    index  = pmbbi->inp.value.vmeio.signal; /* Sensor index */
+uint8_t  value  = 0, sensor, bits;
+uint16_t addr   = 0; /* get addr */
+short    id     = pmbbi->inp.value.camacio.b;   /* FRU id */
+short    index; /* Sensor index */
 long     status = 0;
-int      s = 0;
+int      s = 0, inst, offs;
 size_t   responseSize;
-int      offs;
 
 	if ( !recPvt )
 		return status;
@@ -905,44 +924,47 @@ int      offs;
 	mch     = recPvt->mch;
 	mchData = mch->udata;
 	mchSess = mchData->mchSess;
-	mchSys  = mchSysData[mchSess->instance];
+	mchSys  = mchData->mchSys;
+	inst    = mchSess->instance;
 
 	task    = recPvt->task;
 	fru     = &mchSys->fru[id];
 
 	offs = ( mchSess->type == MCH_TYPE_NAT ) ? IPMI_RPLY_OFFSET_NAT : 0;
 
-	if ( task ) {
+       	if ( !(strcmp( task, "init" )) )
+       		pmbbi->rval = mchStat[inst] & MCH_MASK_INIT;
 
-		if ( !(strcmp( task, "FAN" )) )
+	else if ( task && MCH_INIT_DONE( mchStat[inst] ) ) {
+
+		if ( !(strcmp( task, "fan" )) )
 
 			pmbbi->rval = ( fru->fanProp & (1<<7) ) ? 1 : 0;
 
-		else if ( !(strcmp( task, "PWR" )) )
+		else if ( !(strcmp( task, "pwr" )) && fru->sdr.entityInst )
 
 			pmbbi->rval = fru->pwrDyn;
 
-		else if ( !(strcmp( task, "INIT" )) )
-
-			pmbbi->rval = mchInitDone[mchSess->instance];
-
-		else if ( !(strcmp( task, "MCH" )) )
+		else if ( !(strcmp( task, "mch" )) )
 
 			pmbbi->rval = mchSess->type;
 
-		else if ( !(strcmp( task, "HS")) && mchSess->session && mchInitDone[mchSess->instance] ) {
+		else if ( !(strcmp( task, "hs")) && mchSess->session ) {
 
-			if ( mchIsAlive[mchSess->instance] ) {
+			if ( MCH_ONLN( mchStat[inst] ) ) {
+
+				if ( -1 == (index = sensLkup( mchSys, pmbbi->inp.value.camacio )) )
+					return ERROR;
 
 				responseSize = mchSys->sens[index].readMsgLength;
 				sensor = mchSys->sens[index].sdr.number;
 
 				epicsMutexLock( mch->mutex );
 
-				if ( !(s = ipmiMsgReadSensor( mchSess, data, sensor, addr, &responseSize )) ) {	
+				if ( !(s = mchMsgReadSensor( mchData, data, sensor, addr, &responseSize )) ) {	
 					bits = data[IPMI_RPLY_SENSOR_ENABLE_BITS_OFFSET + offs];
 					if ( IPMI_SENSOR_READING_DISABLED(bits)  || IPMI_SENSOR_SCANNING_DISABLED(bits) ) {
-						if ( IPMICOMM_DEBUG )
+						if ( MCH_DBG( mchStat[inst] ) )
 						    printf("%s sensor reading/state unavailable or scanning disabled. Bits: %02x\n", pmbbi->name, bits);
 						s = ERROR;
 					}
@@ -951,8 +973,8 @@ int      offs;
 						value = data[IPMI_RPLY_HS_SENSOR_READING_OFFSET + offs];
 						mchSys->sens[index].val = value;
 
-						if ( IPMICOMM_DEBUG > 2 )
-							printf("%s: value %02x, sensor %02x, owner %i, lun %i, index %i, value %.1f\n",pmbbi->name, value, sensor, mchSys->sens[index].sdr.owner, mchSys->sens[index].sdr.lun, index);
+						if ( MCH_DBG( mchStat[inst] ) > 1 )
+							printf("%s read_mbbi: value %02x, sensor %02x, owner %i, lun %i, index %i, value %i\n",pmbbi->name, value, sensor, mchSys->sens[index].sdr.owner, mchSys->sens[index].sdr.lun, index, value);
 					}
 				}
 
@@ -962,6 +984,7 @@ int      offs;
 					recGblSetSevr( pmbbi, READ_ALARM, INVALID_ALARM );
 					return ERROR;
 				}
+
 				pmbbi->rval = value;
 			}
 		}	
@@ -981,51 +1004,27 @@ MchDev  mch     = 0; /* MCH device data structures */
 char    *node;       /* Network node name, stored in parm */
 char    *task   = 0; /* Optional additional parameter appended to parm */
 char    *p;
-short    c, s;
 long     status = 0;
 char     str[40];
+DBLINK  *plink  = &pmbbo->out;
 
-        if ( VME_IO != pmbbo->out.type ) {
-		status = S_dev_badBus;
+	if ( ! ( recPvt = init_record_chk( plink, &status, str )) )
 		goto bail;
-	}
-
-        c = pmbbo->out.value.vmeio.card;
-        s = pmbbo->out.value.vmeio.signal;
-
-        if ( c < 0 )
-		status = S_dev_badCard;
-
-        if ( s < 0 )
-		status = S_dev_badSignal;
-
-        if ( ! (recPvt = calloc( 1, sizeof( *recPvt ) )) ) {
-		sprintf( str, "No memory for recPvt structure");
-		status = S_rec_outMem;
-		goto bail;
-        }
 
         /* Break parm into node name and optional parameter */
-        node = strtok( pmbbo->out.value.vmeio.parm, "+" );
+        node = strtok( pmbbo->out.value.camacio.parm, "+" );
         if ( (p = strtok( NULL, "+")) ) {
                 task = p;
-                if ( strcmp( task, "CHAS" ) && strcmp( task, "FRU") ) { 
+                if ( strcmp( task, "chas" ) && strcmp( task, "fru") && strcmp( task, "dbg") ) { 
 			sprintf( str, "Unknown task parameter %s", task);
 			status = S_dev_badSignal;
 		}
         }
 
-        /* Find data structure in registry by MCH name */
-        if ( (mch = devMchFind(node)) ) {
-                recPvt->mch  = mch;
-                recPvt->task = task;
-                pmbbo->dpvt  = recPvt;
-        }
-        else {
-		sprintf( str, "Failed to locate data structure" );
-		status = S_dev_noDeviceFound;
-        }
-
+	if ( init_record_find( mch, recPvt, node, task, &status, str ) )
+		goto bail;
+	else
+		pmbbo->dpvt = recPvt;
 bail:
 	if ( status ) {
 	       recGblRecordError( status, (void *)pmbbo , (const char *)str );
@@ -1045,13 +1044,11 @@ MchData  mchData;
 MchSess  mchSess;
 MchSys   mchSys;
 char    *task;
+Fru      fru;
 long     status = 0;
 int      cmd;
-int      id     = pmbbo->out.value.vmeio.card;
-int      s = 0;
-
-/*int      index, i = 0;
-volatile uint8_t val;*/
+int      id     = pmbbo->out.value.camacio.b;
+int      inst;
 
 	if ( !recPvt )
 		return status;
@@ -1059,18 +1056,28 @@ volatile uint8_t val;*/
 	mch     = recPvt->mch;
 	mchData = mch->udata;
 	mchSess = mchData->mchSess;
-	mchSys  = mchSysData[mchSess->instance];
+	mchSys  = mchData->mchSys;
+	inst    = mchSess->instance;
 
 	task    = recPvt->task;
+	fru     = &mchSys->fru[id];
 
-	if ( mchIsAlive[mchSess->instance] && mchSess->session ) {
+	if ( !(strcmp( task, "dbg" )) ) {
 
-		if ( !(strcmp( task, "CHAS" )) && mchInitDone[mchSess->instance] ) {
+       		mchStatSet( inst, MCH_MASK_DBG, (pmbbo->val << 4) );
+       		printf("%s Setting debug message verbosity to %i\n", mchSess->name, pmbbo->val);
+
+		pmbbo->udf = FALSE;
+		return status;
+	}
+	else if (  MCH_ONLN(mchStat[inst] ) && mchSess->session ) {
+
+		if ( !(strcmp( task, "chas" )) ) {
 			epicsMutexLock( mch->mutex );
-			ipmiMsgChassisControl( mchSess, data, pmbbo->val );
+			status = mchMsgChassisControl( mchData, data, pmbbo->val );
 			epicsMutexUnlock( mch->mutex );
 		}
-		else if ( !(strcmp( task, "FRU" )) ) {
+		else if ( !(strcmp( task, "fru" )) && fru->sdr.entityInst ) {
 
 			if ( pmbbo->val > 1 ) { /* reset not supported yet */
 				recGblSetSevr( pmbbo, STATE_ALARM, MAJOR_ALARM );
@@ -1080,43 +1087,20 @@ volatile uint8_t val;*/
 			cmd = ( pmbbo->val == 2 ) ? 0 : pmbbo->val; 
 
 			epicsMutexLock( mch->mutex );
-
-			ipmiMsgSetFruActHelper( mchSess, data, id, cmd );
-
+			status = mchMsgSetFruActHelper( mchData, data, id, cmd );
 			epicsMutexUnlock( mch->mutex );
-	      
-/*			reset not supported yet
-			if ( pmbbo->val == 2 ) {
-
-				index = mchSys->fru[id].hotswap;
-				val   = (volatile uint8_t)mchSys->sens[index].val;
-
-				while( val != 2 ) {
-					epicsThreadSleep(1);
-					i++;
-					if (i > RESET_TIMEOUT ) {
-						recGblSetSevr( pmbbo, TIMEOUT_ALARM, MAJOR_ALARM );
-						return ERROR; /* also set FRU status 
-					}
-				}
-
-				epicsMutexLock( mch->mutex );
-
-				s = ipmiMsgSetFruActHelper( mchSess, data, id, 1 );
-
-				epicsMutexUnlock( mch->mutex );
-			 }
-*/	    
 		}
 
 
-		if ( s ) {
+		if ( status ) {
 			recGblSetSevr( pmbbo, WRITE_ALARM, INVALID_ALARM );
 			return ERROR;
 		}
 
 		pmbbo->udf = FALSE;
+
 		return status;
+
 	}
 	else {
 		recGblSetSevr( pmbbo, WRITE_ALARM, INVALID_ALARM );
@@ -1127,6 +1111,22 @@ volatile uint8_t val;*/
 /* 
  * Device support to read FRU data
  */
+static long
+init_fru_ai(struct aiRecord *pai)
+{
+	scanIoInit( &drvMchFruScan );
+	return 0;
+}
+
+/*
+** Add this record to our IOSCANPVT list
+ */
+static long 
+ai_fru_ioint_info(int cmd, struct aiRecord *pai, IOSCANPVT *iopvt)
+{
+       *iopvt = drvMchFruScan;
+       return 0;
+} 
 
 static long 
 init_fru_ai_record(struct aiRecord *pai)
@@ -1136,51 +1136,27 @@ MchDev  mch     = 0; /* MCH device data structures */
 char   *node;        /* Network node name, stored in parm */
 char   *task    = 0; /* Optional additional parameter appended to parm */
 char   *p;
-short   c, s;
-long    status = 0;
+long    status  = 0;
 char    str[40];
+DBLINK  *plink  = &pai->inp;
 
-        if ( VME_IO != pai->inp.type ) {
-		status = S_dev_badBus;
+	if ( ! ( recPvt = init_record_chk( plink, &status, str )) )
 		goto bail;
-	}
-
-        c = pai->inp.value.vmeio.card;
-        s = pai->inp.value.vmeio.signal;
-
-        if ( c < 0 )
-		status = S_dev_badCard;
-
-        if ( s < 0 )
-		status = S_dev_badSignal;
-
-	if ( ! (recPvt = calloc( 1, sizeof( *recPvt ) )) ) {
-		sprintf( str, "No memory for recPvt structure");
-		status = S_rec_outMem;
-		goto bail;
-	}
 
 	/* Break parm into node name and optional parameter */
-	node = strtok( pai->inp.value.vmeio.parm, "+" );
+	node = strtok( pai->inp.value.camacio.parm, "+" );
 	if ( (p = strtok( NULL, "+" )) ) {
 		task = p;
-		if ( strcmp( task, "TYPE" ) && strcmp( task, "FAN") && strcmp( task, "PWR")  ) {
+		if ( strcmp( task, "type" ) && strcmp( task, "fan") && strcmp( task, "pwr")  ) {
 			sprintf( str, "Unknown task parameter %s", task);
 			status = S_dev_badSignal;
 		}
 	}
 
-	/* Find data structure in registry by MCH name */
-	if ( (mch = devMchFind(node)) ) {
-		recPvt->mch  = mch;
-                recPvt->task = task;
-		pai->dpvt    = recPvt;                
-	}
-	else {
-		sprintf( str, "Failed to locate data structure" );
-		status = S_dev_noDeviceFound;
+	if ( init_record_find( mch, recPvt, node, task, &status, str ) )
 		goto bail;
-        }
+	else
+		pai->dpvt = recPvt;
 
 bail:
 	if ( status ) {
@@ -1201,13 +1177,12 @@ MchData  mchData;
 MchSess  mchSess;
 MchSys   mchSys;
 char    *task;
-int      id     = pai->inp.value.vmeio.card;
-int      parm   = pai->inp.value.vmeio.signal;
+int      id     = pai->inp.value.camacio.b;
+int      parm   = pai->inp.value.camacio.c;
 long     status = NO_CONVERT;
 Fru      fru;
-int      s = 0;
+int      s = 0, inst, offs;
 uint8_t  prop, level, draw, mult;
-int      offs;
 
 	if ( !recPvt )
 		return status;
@@ -1215,48 +1190,44 @@ int      offs;
 	mch     = recPvt->mch;
 	mchData = mch->udata;
 	mchSess = mchData->mchSess;
-	mchSys  = mchSysData[mchSess->instance];
+	mchSys  = mchData->mchSys;
+	inst    = mchSess->instance;
 
 	task    = recPvt->task;
 	fru     = &mchSys->fru[id];
 
 	offs = ( mchSess->type == MCH_TYPE_NAT ) ? IPMI_RPLY_2ND_BRIDGED_OFFSET_NAT : 0;
 
-	if ( mchInitDone[mchSess->instance] && mchIsAlive[mchSess->instance] && mchSess->session ) {
+	if ( MCH_INIT_DONE( mchStat[inst] ) && MCH_ONLN( mchStat[inst] ) && mchSess->session && fru->sdr.entityInst ) {
 
-		if ( !(strcmp( task, "FAN")) ) {
-
-			if ( mchIsAlive[mchSess->instance] && mchSess->session ) {
+		if ( !(strcmp( task, "fan")) ) {
 
 				epicsMutexLock( mch->mutex );
 
-				if ( !(s = ipmiMsgGetFanLevelHelper( mchSess, data, id )) ) 
+				if ( !(s = mchMsgGetFanLevelHelper( mchData, data, id )) ) 
 					pai->rval = data[IPMI_RPLY_GET_FAN_LEVEL_OFFSET + offs];
 
 				epicsMutexUnlock( mch->mutex );
-			}
 		}
 
-		/* Check for systems and FRU IDs that support this query (Vadatech CLI manual 5.7.9) */
-		else if ( !(strcmp( task, "PWR")) && (mchSess->type != MCH_TYPE_NAT) && ( (id >=3 && id <=16) || (id >= 40 && id <= 41) || (id >= 50 && id <= 53) )  ) {
+		/* Check for systems and FRU IDs that support this query */
+		else if ( !(strcmp( task, "pwr")) && MCH_IS_VT( mchSess->type ) && FRU_PWR_MSG_CMPTBL( id ) ) {
 
 				epicsMutexLock( mch->mutex );
 
 				if ( parm < 4 ) {
 
-					if ( !(s = ipmiMsgGetPowerLevel( mchSess, data, id, parm )) ) {
-
+					if ( !(s = mchMsgGetPowerLevelVt( mchData, data, id, parm )) ) {
 
 							prop  = data[IPMI_RPLY_GET_POWER_LEVEL_PROP_OFFSET + offs];
 
 							if ( (level = FRU_PWR_LEVEL( prop )) ) {
-								draw  = data[IPMI_RPLY_GET_POWER_LEVEL_DRAW_OFFSET + (level -1)];
+								draw  = data[IPMI_RPLY_GET_POWER_LEVEL_DRAW_OFFSET + (level - 1)];
 								mult  = data[IPMI_RPLY_GET_POWER_LEVEL_MULT_OFFSET];
 								pai->rval = draw * mult * 0.1; /* Convert from 0.1 Watts to Watts */
 							}
 
-							/* If these don't change, consider moving this section to drvMch.c
-                                                           and don't scan PWRDYN and PWRDELAY */
+							/* If these don't change, consider i/o scanning these after initialization */
 							switch ( parm ) {
 
 								default: 
@@ -1271,7 +1242,6 @@ int      offs;
 									break;
 							}
 				       	}
-
 				}
 
 				else if ( parm == 4 )
@@ -1288,10 +1258,11 @@ int      offs;
 
 		       	pai->val  = pai->rval;
 
-#ifdef DEBUG
-printf("read_fru_ai: %s FRU id is %i, value is %.0f\n",pai->name, id, pai->val);
-#endif
+		if ( MCH_DBG( mchStat[inst] ) > 1 )
+			printf("read_fru_ai: %s FRU id is %i, value is %.0f\n", pai->name, id, pai->val);
+
 		pai->udf = FALSE;
+
 		return status;
 	}
 	else {
@@ -1300,16 +1271,23 @@ printf("read_fru_ai: %s FRU id is %i, value is %.0f\n",pai->name, id, pai->val);
 	}
 }
 
+static long
+init_fru_stringin(struct stringinRecord *pstringin)
+{
+	scanIoInit( &drvMchFruScan );
+	return 0;
+}
+
 /*
-** Add this record to our IOSCANPVT list.
+** Add this record to our IOSCANPVT list
+ */
 
 static long 
-ai_fru_ioint_info(int cmd, struct aiRecord *pai, IOSCANPVT *iopvt)
+stringin_fru_ioint_info(int cmd, struct stringinRecord *pstringin, IOSCANPVT *iopvt)
 {
        *iopvt = drvMchFruScan;
        return 0;
 } 
-*/
 
 /* Create the dset for stringin support */
 static long 
@@ -1320,51 +1298,27 @@ MchDev  mch     = 0; /* MCH device data structures */
 char    *node;       /* Network node name, stored in parm */
 char    *task   = 0; /* Optional additional parameter appended to parm */
 char    *p;
-short    c, s; 
 long    status  = 0;
 char    str[40];
+DBLINK  *plink  = &pstringin->inp;
 
-        if ( VME_IO != pstringin->inp.type ) {
-		status = S_dev_badBus;
+	if ( ! ( recPvt = init_record_chk( plink, &status, str )) )
 		goto bail;
-        }
-
-        c = pstringin->inp.value.vmeio.card;
-        s = pstringin->inp.value.vmeio.signal;
-
-        if ( c < 0 )
-		status = S_dev_badCard;
-
-        if ( s < 0 )
-		status = S_dev_badSignal;
-
-	if ( ! (recPvt = calloc( 1, sizeof( *recPvt ) )) ) {
-		sprintf( str, "No memory for recPvt structure");
-		status = S_rec_outMem;
-		goto bail;
-	}
 
 	/* Break parm into node name and optional parameter */
-	node = strtok( pstringin->inp.value.vmeio.parm, "+" );
+	node = strtok( pstringin->inp.value.camacio.parm, "+" );
 	if ( (p = strtok( NULL, "+" )) ) {
 		task = p;
-		if ( strcmp( task, "BMF" ) && strcmp( task, "BP" ) && strcmp( task, "PMF" ) && strcmp( task, "PP") && strcmp( task, "BPN" ) && strcmp( task, "PPN") && strcmp( task, "BSN" ) && strcmp( task, "PSN" )) {
+		if ( strcmp( task, "bmf" ) && strcmp( task, "bp" ) && strcmp( task, "pmf" ) && strcmp( task, "pp") && strcmp( task, "bpn" ) && strcmp( task, "ppn") && strcmp( task, "bsn" ) && strcmp( task, "psn" )) {
 			sprintf( str, "Unknown task parameter %s", task);
 			status = S_dev_badSignal;
 		}
 	}
 
-	/* Find data structure in registry by MCH name */
-	if ( (mch = devMchFind(node)) ) {
-		recPvt->mch  = mch;
-                recPvt->task = task;
-		pstringin->dpvt    = recPvt;
-                
-	}
-	else {
-		sprintf( str, "Failed to locate data structure" );
-		status = S_dev_noDeviceFound;
-        }
+	if ( init_record_find( mch, recPvt, node, task, &status, str ) )
+		goto bail;
+	else
+		pstringin->dpvt = recPvt;
 
 bail:
 
@@ -1385,8 +1339,8 @@ MchData  mchData;
 MchSess  mchSess;
 MchSys   mchSys;
 char    *task;
-short    id = pstringin->inp.value.vmeio.card;     /* FRU ID */
-int      i;
+short    id = pstringin->inp.value.camacio.b;     /* FRU ID */
+int      i, inst;
 long     status = NO_CONVERT;
 Fru      fru;
 uint8_t  l = 0, *d = 0; /* FRU data length and raw */
@@ -1397,43 +1351,44 @@ uint8_t  l = 0, *d = 0; /* FRU data length and raw */
 	mch     = recPvt->mch;
 	mchData = mch->udata;
 	mchSess = mchData->mchSess;
-	mchSys  = mchSysData[mchSess->instance];
+	mchSys  = mchData->mchSys;
+	inst    = mchSess->instance;
 
 	task    = recPvt->task;
 	fru     = &mchSys->fru[id];
 
-	if ( mchInitDone[mchSess->instance] ) {
+	if ( MCH_INIT_DONE( mchStat[inst] ) && fru->sdr.entityInst ) {
 
-		if ( !(strcmp( task, "BMF" )) ) {
+		if ( !(strcmp( task, "bmf" )) ) {
 			d = fru->board.manuf.data;
 			l = fru->board.manuf.length;
 		}
-		else if ( !(strcmp( task, "BP" )) ) {
+		else if ( !(strcmp( task, "bp" )) ) {
 			d = fru->board.prod.data;
 			l = fru->board.prod.length;
 		}
-		else if ( !(strcmp( task, "PMF" )) ) {
+		else if ( !(strcmp( task, "pmf" )) ) {
 			d = fru->prod.manuf.data;
 			l = fru->prod.manuf.length;
 		}
-		else if ( !(strcmp( task, "PP" )) ) {
+		else if ( !(strcmp( task, "pp" )) ) {
 			d = fru->prod.prod.data;
 			l = fru->prod.prod.length;
 		}
-		else if ( !(strcmp( task, "BPN" )) ) {
+		else if ( !(strcmp( task, "bpn" )) ) {
 			d = fru->board.part.data;
 			l = fru->board.part.length;
 		}
-		else if ( !(strcmp( task, "PPN" )) ) {
+		else if ( !(strcmp( task, "ppn" )) ) {
 			d = fru->prod.part.data;
 			l = fru->prod.part.length;
 		}
-		else if ( !(strcmp( task, "BSN" )) ) {
+		else if ( !(strcmp( task, "bsn" )) ) {
 			d = fru->board.sn.data;
 			l = fru->board.sn.length;
 		} 
 
-		else if ( !(strcmp( task, "PSN" )) ) {
+		else if ( !(strcmp( task, "psn" )) ) {
 			d = fru->prod.sn.data;
 			l = fru->prod.sn.length;
 		}
@@ -1442,12 +1397,11 @@ uint8_t  l = 0, *d = 0; /* FRU data length and raw */
 
 			l = ( l <= MAX_STRING_LENGTH ) ? l : MAX_STRING_LENGTH;
 			for ( i = 0; i < l; i++ )
-				pstringin->val[i] = d[i];
+					pstringin->val[i] = d[i];
 		}
 
-#ifdef DEBUG
-errlogPrintf("read_fru_stringin: %s, task is %s, card is %i, id into FRU array is %i\n", pstringin->name, task, pstringin->inp.value.vmeio.card, pstringin->inp.value.vmeio.signal);
-#endif
+		if ( MCH_DBG( mchStat[inst] ) > 1 )
+			printf("%s read_fru_stringin: task is %s, FRU is %i\n", pstringin->name, task, pstringin->inp.value.camacio.b);
 		pstringin->udf = FALSE;
 		return status;
 	}
@@ -1457,81 +1411,35 @@ errlogPrintf("read_fru_stringin: %s, task is %s, card is %i, id into FRU array i
 	}
 }
 
-/*
-** Add this record to our IOSCANPVT list.
-
-static long 
-stringin_fru_ioint_info(int cmd, struct stringinRecord *pstringin, IOSCANPVT *iopvt)
-{
-       *iopvt = drvMchFruScan;
-       return 0;
-} 
-*/
-
 static long
 init_fru_longout_record(struct longoutRecord *plongout)
 {
 MchRec  recPvt  = 0; /* Info stored with record */
 MchDev  mch     = 0; /* MCH device data structures */
-MchData mchData = 0;
-MchSess mchSess = 0;
-MchSys  mchSys  = 0;
 char   *node;        /* Network node name, stored in parm */
 char   *task    = 0; /* Optional additional parameter appended to parm */
 char   *p;
-short   c, s;
 long    status = 0;
 char    str[40];
+DBLINK  *plink  = &plongout->out;
 
-        if ( VME_IO != plongout->out.type ) {
-		status = S_dev_badBus;
+	if ( ! ( recPvt = init_record_chk( plink, &status, str )) )
 		goto bail;
-	}
-
-        c = plongout->out.value.vmeio.card;   /* FRU ID */
-        s = plongout->out.value.vmeio.signal;
-
-        if ( c < 0 )
-		status = S_dev_badCard;
-
-        if ( s < 0 )
-		status = S_dev_badSignal;
-
-	if ( ! (recPvt = calloc( 1, sizeof( *recPvt ) )) ) {
-		sprintf( str, "No memory for recPvt structure");
-		status = S_rec_outMem;
-		goto bail;
-	}
 
 	/* Break parm into node name and optional parameter */
-	node = strtok( plongout->out.value.vmeio.parm, "+" );
+	node = strtok( plongout->out.value.camacio.parm, "+" );
 	if ( (p = strtok( NULL, "+" )) ) {
 		task = p;
-		if ( strcmp( task, "FAN" ) ) {
+		if ( strcmp( task, "fan" ) ) {
 			sprintf( str, "Unknown task parameter %s", task);
 			status = S_dev_badSignal;
 		}
 	}
 
-	/* Find data structure in registry by MCH name */
-	if ( (mch = devMchFind(node)) ) {
-		recPvt->mch  = mch;
-                recPvt->task = task;
-		plongout->dpvt    = recPvt;                
-	}
-	else {
-		sprintf( str, "Failed to locate data structure" );
-		status = S_dev_noDeviceFound;
+	if ( init_record_find( mch, recPvt, node, task, &status, str ) )
 		goto bail;
-        }
-
-	if ( !(strcmp( task, "FAN" )) ) {
-		mchData = mch->udata;
-		mchSess = mchData->mchSess;
-		mchSys  = mchSysData[mchSess->instance];
-       		plongout->drvl = plongout->lopr = mchSys->fru[c].fanMin;
-	       	plongout->drvh = plongout->hopr = mchSys->fru[c].fanMax;
-	}
+	else
+		plongout->dpvt = recPvt;
 
 bail:
 	if ( status ) {
@@ -1542,6 +1450,7 @@ bail:
 	return status;
 }
 
+/* scan i/o int? */
 static long 
 write_fru_longout(struct longoutRecord *plongout)
 {
@@ -1551,11 +1460,11 @@ MchData  mchData;
 MchSess  mchSess;
 MchSys   mchSys;
 char    *task;
-int      id      = plongout->out.value.vmeio.card; /* FRU ID */
+int      id      = plongout->out.value.camacio.b; /* FRU ID */
 long     status  = 0;
 Fru      fru;
 uint8_t  data[MSG_MAX_LENGTH] = { 0 };
-int      s = 0;
+int      s = 0, inst;
 
 	if ( !recPvt )
 		return status;
@@ -1563,21 +1472,25 @@ int      s = 0;
 	mch     = recPvt->mch;
 	mchData = mch->udata;
 	mchSess = mchData->mchSess;
-	mchSys  = mchSysData[mchSess->instance];
+	mchSys  = mchData->mchSys;
+	inst    = mchSess->instance;
 
 	task    = recPvt->task;
 	fru     = &mchSys->fru[id];
 
-#ifdef DEBUG
-printf("write_fru_longout: %s FRU id is %i, value is %.0f\n",plongout->name, id, plongout->val);
-#endif
+	if ( MCH_DBG( mchStat[inst] ) > 1 )
+		printf("%s write_fru_longout: FRU id is %i, value is %.0f\n",plongout->name, id, plongout->val);
 
-	if ( mchIsAlive[mchSess->instance] && mchSess->session && mchInitDone[mchSess->instance] ) {
-		if ( !(strcmp( task, "FAN" )) ) {
+	if ( MCH_ONLN( mchStat[inst] ) && mchSess->session && MCH_INIT_DONE( mchStat[inst] ) && fru->sdr.entityInst ) {
+		if ( !(strcmp( task, "fan" )) ) {
+
+       			/* For now test init done above and then always set these; change this to after detect config change ? */
+       			plongout->drvl = plongout->lopr = mchSys->fru[id].fanMin;
+       			plongout->drvh = plongout->hopr = mchSys->fru[id].fanMax;
 
 			epicsMutexLock( mch->mutex );
 
-			s = ipmiMsgSetFanLevelHelper( mchSess, data, id, plongout->val );
+			s = mchMsgSetFanLevelHelper( mchData, data, id, plongout->val );
 
 			epicsMutexUnlock( mch->mutex );
 

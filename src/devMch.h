@@ -6,17 +6,18 @@
 #include <epicsMutex.h>
 #include <epicsTypes.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define NO_CONVERT 2 /* Return value for ai record */
 #define ERROR     -1
 
 #define RESET_TIMEOUT 180 /* seconds */
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 IOSCANPVT drvMchStatScan;
 IOSCANPVT drvMchInitScan;
+IOSCANPVT drvMchFruScan;
 
 /* Much of this stolen from devBusMapped */
 
