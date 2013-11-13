@@ -4,7 +4,7 @@
 #
 #	Auth: Sonya Hoobler
 #
-#	Last updated: 16 May 2013
+#	Last updated: 5 Nov 2013
 #
 ############################################################
 
@@ -23,13 +23,6 @@ IOCManager_LIBS += ipmiComm
 3. Add to Db/Makefile
 
 DB_INSTALLS += $(IPMICOMM)/db/shelf.db
-DB_INSTALLS += $(IPMICOMM)/db/module.db
-DB_INSTALLS += $(IPMICOMM)/db/sensor_temp.db
-DB_INSTALLS += $(IPMICOMM)/db/sensor_fan.db
-DB_INSTALLS += $(IPMICOMM)/db/sensor_hotswap_vt.db
-DB_INSTALLS += $(IPMICOMM)/db/sensor_hotswap_nat.db
-DB_INSTALLS += $(IPMICOMM)/db/sensor_voltage.db
-DB_INSTALLS += $(IPMICOMM)/db/sensor_current.db
 
 4. Add these lines to st.cmd for each MCH/shelf before iocInit. *Order is important*
 
@@ -37,7 +30,7 @@ Example for mch-b34-cd38:
 
 drvAsynIPPortConfigure ("mch-b34-cd38","mch-b34-cd38:623 udp",0,0,0)
 mchInit("mch-b34-cd38")
-< st.mch-b34-cd38.cmd
+dbLoadRecords("../../db/shelf.db","dev=CRAT:B34:CD38,link=mch-b34-cd38")
 
 
 NOTES ON THIS RELEASE
@@ -49,21 +42,15 @@ NOTES ON THIS RELEASE
 -This release supports NAT and Vadatech MCHs
 
 -During ioc boot, the ioc will discover which modules/sensors exist
- for each carrier defined in st.cmd. It will then build a script to 
- load EPICS records for what has been discovered. The script is saved
- to the ioc's data directory. The script is not in CVS. Any carriers
- that are offline during ioc boot will not have scripts created for them
- and thus, no PVs will be loaded for them.
+ for each MCH defined in st.cmd. If the MCH is offline, the ioc will do basic
+ initialization and perform the module/sensor discovery later, when it comes online.
 
--There is a EPICS PV $(crat):INIT for each crate. It is set to "Initialized"
+-During runtime, if the ioc detects that a MCH system's configuration has changed, it will
+ re-discover the modules/sensors and modify the PVs as appropriate.
+
+-There is a EPICS PV $(crat):INIT for each crate/MCH. It is set to "Initialized"
  after all of the modules/sensors have been discovered. It is set to "Not
- initialized" if the software detects that the system has gone offline and 
- come back up in a different configuration. This is because sensor addresses 
- can change when new hardware is removed or reinstalled and we cannot be sure 
- we are correctly addressing the sensors when the system comes back up. Later,
- we will handle this better. Until then, if INIT = "Not initialized", the ioc 
- must be rebooted in order to re-discover the modules/sensors and resume 
- system monitoring.
+ initialized" if not. During the discovery process, it is set to "Initializing...".
 
 -No alarm limits or severities have been implemented.
 
