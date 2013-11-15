@@ -31,6 +31,19 @@ int  mchSdrGetDataAll(MchData mchData);
 int  mchFruGetDataAll(MchData mchData);
 int  mchCnfg(MchData mchData);
 
+void
+mchSeqInit(IpmiSess ipmiSess)
+{
+int i;
+	/* Initialize IPMI sequence */
+	ipmiSess->seq = 0;
+
+        /* Initialize our stored sequence number for messages from MCH */
+	ipmiSess->seqRply[0] = IPMI_MSG_HEADER_SEQ_INITIAL;
+        for ( i = 1; i < IPMI_RPLY_SEQ_LENGTH - 1 ; i++)
+                ipmiSess->seqRply[i] = 0;	
+}
+
 /* Start communication session with MCH
  * Multi-step handshaking sequence
  *
@@ -49,14 +62,8 @@ int     i;
 	if ( MCH_DBG( mchStat[mchSess->instance] ) )
 		printf("%s Connecting...\n", mchSess->name);
 
-	/* Initialize IPMI sequence */
-	ipmiSess->seq = 0;
+	mchSeqInit( ipmiSess );
 
-        /* Initialize our stored sequence number for messages from MCH */
-	ipmiSess->seqRply[0] = IPMI_MSG_HEADER_SEQ_INITIAL;
-        for ( i = 1; i < IPMI_RPLY_SEQ_LENGTH - 1 ; i++)
-                ipmiSess->seqRply[i] = 0;
-	
 	if ( ipmiMsgGetChanAuth( mchSess, ipmiSess, response ) )
 		return -1;	
 
@@ -968,6 +975,8 @@ int i;
 	mchStatSet( inst, MCH_MASK_INIT, MCH_MASK_INIT_IN_PROGRESS );
 
 	set3DArrayVals( MAX_FRU, MAX_SENSOR_TYPE, MAX_SENS, mchSys->sensLkup, -1 );
+
+	mchSeqInit( mchData->ipmiSess );
 
         /* Determine MCH type */
         if ( mchIdentify( mchData ) ) {
