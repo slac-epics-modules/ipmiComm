@@ -1,3 +1,44 @@
+13Nov2013 (SH)
+Major changes to handle dynamic changes in system configurations and MCHs
+  that are offline at boot. Also separate MCH-specific and IPMI-specific
+  routines, etc.
+  - Db:
+     -No longer generate record list at init; instead load full subset
+      of possible records. Now ioc only needs to load shelf.db for each 
+      system.
+     -Increase number of sensors; changes to module_basic.sub, module_cu.sub,
+      module_pm.sub
+     -Change record INP/OUT fields from VME_IO to CAMAC_IO (more fields);
+      specify fru, sens typ, sens instance instead of sensor index
+     -Use sensor_ai.db; remove sensor type specific dbs
+     -Lots of reorganizing...
+  - src:
+     -drvMch.h/c: Move MCH-specific defines from ipmiDef.h to .h; move mchSys 
+      struct into mchData struct; add new MCH status MASK, remove old status 
+      variables; remove unused mchFruDiff; new routines to periodically detect 
+      system configuration changes and update our data structs; move 
+      mchSensorFruGetInstance, mchIdentify frobsolete drvMchUtil.c/.h;
+      move msg sequence number init to new routine and call it before mchIdentiy
+      (otherwise VT MCH doesn't respond)
+     -new drvMchMsg.c/.h: contains mch/microtca-specific message routines and 
+      defines, moved from ipmiMsg.c/.h and ipmiDef.h
+     -ipmiDef.h: move mch/microtca-specific defines to drvMchMsg.h
+     -remove drvMchUtil.c/.h 
+     -ipmiMsg.c/.h: move mch/microtca-specific stuff to drvMchMsg.c/.h; remove 
+      debug routine and registration (now EPICS PV); add responseLen arg to 
+      ipmiMsgWriteRead
+     -devMch.c/.h: change from vmeio to camacio (more args); incorporate new 
+      mch status mask; sensor number (not address) is now indexed by fru, 
+      sensor type, and sensor type instance (so that it can be dynamic and no 
+      longer needs to be hardcoded in db); use sensor's specified units (no 
+      longer convert to slac-preferred units because it can be confusing if 
+      value is 0.0, which seems to mean non working, and we display it as 32.5,
+      for example); break out common dev sup init tasks to separate routines; 
+      launch routine to check if our mch 'configuration' is up to date; set 
+      previously static values (fru info) to be scanned on interrupt when we 
+      detect new configuration; 
+  - Update README
+
 Release: ipmiComm-R1-6-0
 
 04Jun2013 (SH)
