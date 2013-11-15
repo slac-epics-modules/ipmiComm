@@ -1,4 +1,6 @@
-13Nov2013 (SH)
+Release: ipmiComm-R2-0-0
+
+15Nov2013 (SH)
 Major changes to handle dynamic changes in system configurations and MCHs
   that are offline at boot. Also separate MCH-specific and IPMI-specific
   routines, etc.
