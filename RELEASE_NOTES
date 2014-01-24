@@ -1,3 +1,6 @@
+ipmiComm-R2-0-1:  Copy base RULES.Db patch to Makefile/Db so build works on all
+                    systems 
+
 ipmiComm-R2-0-0:  Major changes, mostly to handle dynamic configuration changes
                     See Changelog for details
 
