@@ -1479,7 +1479,7 @@ int      s = 0, inst;
 	fru     = &mchSys->fru[id];
 
 	if ( MCH_DBG( mchStat[inst] ) > 1 )
-		printf("%s write_fru_longout: FRU id is %i, value is %.0f\n",plongout->name, id, plongout->val);
+		printf("%s write_fru_longout: FRU id is %i, value is %.0f\n",plongout->name, id, (double)plongout->val);
 
 	if ( MCH_ONLN( mchStat[inst] ) && mchSess->session && MCH_INIT_DONE( mchStat[inst] ) && fru->sdr.entityInst ) {
 		if ( !(strcmp( task, "fan" )) ) {

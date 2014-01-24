@@ -53,10 +53,10 @@ size_t   responseLen;
 	if ( MCH_DBG( mchStat[inst] ) > 1 ) {
 
 		if ( status )
-			printf("%s Message status %i, received %i, expected %i\n", mchSess->name, status, responseLen, *responseSize);
+			printf("%s Message status %i, received %i, expected %i\n", mchSess->name, status, (size_t)responseLen, *(size_t *)*responseSize);
 
 		if ( MCH_DBG( mchStat[inst] ) > 2 ) {
-			printf("%s Message status %i, received %i, expected %i, raw data:\n", mchSess->name, status, responseLen, *responseSize );
+			printf("%s Message status %i, received %i, expected %i, raw data:\n", mchSess->name, status, (size_t)responseLen, *(size_t *)responseSize );
 			for ( i = 0; i < MSG_MAX_LENGTH; i++ )
 				printf("%02x ", response[i]);
 			printf("\n");
