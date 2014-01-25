@@ -35,7 +35,7 @@ include $(TOP)/configure/RULES
 #----------------------------------------
 #  ADD RULES AFTER THIS LINE
 #
-DBFLAGS = $($*_DBFLAGS) $(USR_DBFLAGS) -I. -I.. -I$(COMMON_DIR) $(INSTALL_DBFLAGS) $(RELEASE_DBFLAGS)
+USR_DBFLAGS = -I$(COMMON_DIR)
 
 # End of file
 
