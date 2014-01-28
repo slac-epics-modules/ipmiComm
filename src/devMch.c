@@ -689,7 +689,7 @@ MchSess  mchSess;
 MchSys   mchSys;
 char    *task;
 long     status = 0;
-int      s = 0, inst;
+int      inst;
 
 	if ( !recPvt )
 		return status;
