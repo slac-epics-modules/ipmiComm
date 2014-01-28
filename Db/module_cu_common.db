@@ -19,7 +19,7 @@ record(longout, "$(dev):$(code)$(inst)_FANSPEEDSET") {
 }
 
 record(ai, "$(dev):$(code)$(inst)_FANLEVEL") {
-  field(SCAN, "2 second")
+  field(SCAN, "10 second")
   field(DESC, "Fan level")
   field(DTYP, "FRUinfo")
   field(INP,  "#B$(fruid) C0 N0 @$(link)+fan")
