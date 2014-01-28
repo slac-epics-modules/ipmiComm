@@ -721,13 +721,8 @@ int      s = 0, inst;
 		else if ( !(strcmp( task, "reset" )) && mchSess->session ) {
 
 			epicsMutexLock( mch->mutex );
-		       	s = ipmiMsgColdReset( mchSess, mchData->ipmiSess, data );
+		       	ipmiMsgColdReset( mchSess, mchData->ipmiSess, data );
 			epicsMutexUnlock( mch->mutex );
-
-			if ( s ) {
-				recGblSetSevr( pbo, WRITE_ALARM, INVALID_ALARM );
-				return ERROR;
-			}
 		}
 
 		else if ( !(strcmp( task, "init" )) && mchSess->session )

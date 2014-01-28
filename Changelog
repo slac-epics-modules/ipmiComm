@@ -1,3 +1,12 @@
+Release: ipmiComm-R2-0-1
+
+27Jan2013 (SH)
+Minor changes, including changes to build on RHEL64
+ - src/devMch.c: Ignore status from ipmiMsgColdReset; it will always 
+   return an error. (Aspects of this can be improved; added to TODO LIST)
+ - src/drvMchMsg.c: mchMsgWriteReadHelper: Fix casting types, remove
+   redundant debug messages
+
 Release: ipmiComm-R2-0-0
 
 15Nov2013 (SH)
