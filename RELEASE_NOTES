@@ -1,5 +1,6 @@
 ipmiComm-R2-0-1:  Copy base RULES.Db patch to Makefile/Db so build works on all
-                    systems. Minor changes, including for building on RHEL64.
+                    systems. Changes to support SPEAR and to build in RHEL64. 
+                    Add PV archiving intructions.
                     See Changelog for details
 
 ipmiComm-R2-0-0:  Major changes, mostly to handle dynamic configuration changes
