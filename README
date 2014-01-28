@@ -4,7 +4,7 @@
 #
 #	Auth: Sonya Hoobler
 #
-#	Last updated: 5 Nov 2013
+#	Last updated: 27 Jan 2014
 #
 ############################################################
 
@@ -31,6 +31,15 @@ Example for mch-b34-cd38:
 drvAsynIPPortConfigure ("mch-b34-cd38","mch-b34-cd38:623 udp",0,0,0)
 mchInit("mch-b34-cd38")
 dbLoadRecords("../../db/shelf.db","dev=CRAT:B34:CD38,link=mch-b34-cd38")
+
+5. For each MCH/shelf, add the PVs in Db/shelf_archive_request_template to 
+the archiver, substituting the crate name for $(dev)
+
+LCLS example, $(dev) = CRAT:LI27:BP03
+
+The template contains all possible PVs and will (nearly always) be a superset of the 
+PVs that are actually in use by the system. If you prefer, you can choose to only archive 
+those that you know are in use.
 
 
 NOTES ON THIS RELEASE
