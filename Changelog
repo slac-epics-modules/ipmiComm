@@ -1,11 +1,15 @@
 Release: ipmiComm-R2-0-1
 
 27Jan2013 (SH)
-Minor changes, including changes to build on RHEL64
+Minor changes, including changes to build on RHEL64 and for SPEAR
  - src/devMch.c: Ignore status from ipmiMsgColdReset; it will always 
    return an error. (Aspects of this can be improved; added to TODO LIST)
  - src/drvMchMsg.c: mchMsgWriteReadHelper: Fix casting types, remove
    redundant debug messages
+ - New file configure/RELEASE_SPEAR
+ - New archive request template Db/shelf_archive_request_template
+   Update README accordingly
+ 
 
 Release: ipmiComm-R2-0-0
 
