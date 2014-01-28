@@ -54,3 +54,9 @@ NOTES ON THIS RELEASE
 
 -No alarm limits or severities have been implemented.
 
+TO-DO LIST (for Sonya)
+----------------------
+
+- Allow caller to message write routines to specify whether a response is
+  expected. If not expected, skip response-related checks and immediate
+  attempt at reconnection.
