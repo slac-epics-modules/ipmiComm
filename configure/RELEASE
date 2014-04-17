@@ -9,16 +9,16 @@ include $(TOP)/RELEASE_SITE
 # =============================================================
 EPICS_MODULES=$(MODULES_SITE_TOP)
 
-# ==============================================================
-# Define the version of EPICS BASE that you will use
 # =============================================================
-BASE_MODULE_VERSION=base-R3-14-12
+# Define epics version 
+# =============================================================
+BASE_MODULE_VERSION=$(EPICS_BASE_VER)
 
 # =============================================================
 # Define the version of modules needed by
 # IOC apps or other Support apps
 # =============================================================
-ASYN_MODULE_VERSION=asyn-R4-18-lcls1
+ASYN_MODULE_VERSION=asyn-R4-21_1-0
 
 # ============================================================
 # Support module locations
@@ -30,5 +30,7 @@ ASYN=$(EPICS_MODULES)/asyn/$(ASYN_MODULE_VERSION)
 # EPICS_BASE usually appears last so other apps can override stuff:
 # =================================================================
 EPICS_BASE=$(BASE_SITE_TOP)/$(BASE_MODULE_VERSION)
+
+
 
 
