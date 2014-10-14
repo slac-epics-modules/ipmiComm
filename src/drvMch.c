@@ -647,7 +647,7 @@ int      offs = ( MCH_IS_NAT( mchData->mchSess->type ) ) ? IPMI_RPLY_OFFSET_NAT 
 		sens->tmask = 0;
 		return;
 	}
-*/
+
 
 	sens->tmask = response[IPMI_RPLY_SENSOR_THRESH_MASK_OFFSET + offs];
 	sens->tlnc  = response[IPMI_RPLY_SENSOR_THRESH_LNC_OFFSET  + offs];
@@ -656,6 +656,7 @@ int      offs = ( MCH_IS_NAT( mchData->mchSess->type ) ) ? IPMI_RPLY_OFFSET_NAT 
 	sens->tunc  = response[IPMI_RPLY_SENSOR_THRESH_UNC_OFFSET  + offs];
 	sens->tuc   = response[IPMI_RPLY_SENSOR_THRESH_UC_OFFSET   + offs];
 	sens->tunr  = response[IPMI_RPLY_SENSOR_THRESH_UNR_OFFSET  + offs];
+*/
 }
 
 /*
@@ -856,7 +857,7 @@ int     inst = mchSess->instance, i = 0;
 
 		ipmiMsgWriteRead( mchSess->name, message, sizeof( RMCP_HEADER ) + sizeof( ASF_MSG ), response, &responseSize, RPLY_TIMEOUT_NAT, &responseLen );
 
-		if ( responseSize == 0 ) {
+		if ( responseLen == 0 ) {
 
 			if ( MCH_ONLN( mchStat[inst] ) ) {
 				if ( MCH_DBG( mchStat[inst] ) )
