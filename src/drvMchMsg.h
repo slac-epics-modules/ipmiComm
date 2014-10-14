@@ -27,6 +27,8 @@ int mchMsgGetDevSdrInfo(MchData mchData, uint8_t *data, uint8_t parm);
 				
 int mchMsgReadSensor(MchData mchData, uint8_t *data, uint8_t sens, uint8_t lun, size_t *responseSize);
 
+int mchMsgGetSensorThresholds(MchData mchData, uint8_t *data, uint8_t sens, uint8_t lun, size_t *responseSize);
+
 int mchMsgSetFruActHelper(MchData mchData, uint8_t *data, uint8_t fru, int parm);
 
 int mchMsgGetFruActPolicyHelper(MchData mchData, uint8_t *data, uint8_t fru);

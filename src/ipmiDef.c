@@ -77,6 +77,13 @@ uint8_t SENS_READ_MSG[] = { IPMI_MSG_ADDR_BMC,           /* Requester's address 
 			    0,                           /* For sensor number */
                             0 };                         /* For checksum */
 
+/* Get Sensor Thresholds  */
+uint8_t GET_SENSOR_THRESH_MSG[] = { IPMI_MSG_ADDR_BMC,           /* Requester's address (BMC) */            
+                            0,                           /* Message sequence number */         
+                            IPMI_MSG_CMD_GET_SENSOR_THRESH,    /* Command code */         
+			    0,                           /* For sensor number */
+                            0 };                         /* For checksum */
+
 /* Read FRU Data  */
 uint8_t FRU_READ_MSG[]  = { IPMI_MSG_ADDR_BMC,           /* Requester's address (BMC) */            
                             0,                           /* Message sequence number */         
