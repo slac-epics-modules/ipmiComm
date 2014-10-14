@@ -20,6 +20,8 @@
 #include <drvMchMsg.h>
 #include <ipmiMsg.h>
 
+#undef DEBUG 
+
 #define PING_PERIOD  5
 
 int mchCounter = 0;
@@ -237,6 +239,7 @@ int        offs = ( MCH_IS_NAT( mchSess->type ) ) ? IPMI_RPLY_OFFSET_NAT : 0; /*
 	if ( 0 == (sizeInt = arrayToUint16( fru->size )) )
 		return 0;
 
+
 	if ( MCH_DBG( mchStat[inst] ) )
 		printf("%s mchFruDataGet: FRU %i inventory info size %i\n", mchSess->name, id, sizeInt);
 
@@ -321,8 +324,8 @@ int rval = 0;
 		printf("%s mchFruGetDataAll: FRU Summary:\n", mchSess->name);
 		for ( i = 0; i < MAX_FRU  ; i++) {
 			fru = &mchSys->fru[i];
-			if ( fru->sdr.fruId )
-				printf("FRU %i %s was found, id %02x instance %02x, addr %02x dev %02x lun %02x\n", 
+			if ( fru->sdr.fruId || (arrayToUint16( fru->size ) > 0) )
+				printf("SDR FRU ID %i %s was found, id %02x instance %02x, addr %02x dev %02x lun %02x\n", 
 				fru->sdr.fruId, fru->board.prod.data, fru->sdr.entityId, fru->sdr.entityInst, fru->sdr.addr, fru->sdr.fruId, fru->sdr.lun);
 		}
 	}
@@ -346,12 +349,28 @@ int rval = 0;
  * Caller must perform locking.
  */
 void
-mchSensorGetFru(MchSys mchSys, uint8_t index)
+mchSensorGetFru(int type, MchSys mchSys, uint8_t index)
 {
-int i;
-int id      = -1;
+int  i, natid;
+char buff[9];
+int  id     = -1;
 Sensor sens = &mchSys->sens[index];
+SdrFull sdr = &sens->sdr;
+char test[20];
 
+	/* NAT associates hotswap aka M-state sensors with carrier manager but
+         * Vadatech associates them with the actual FRU described by the sensor.
+	 * For NAT, parse sensor description to get associated FRU number
+         */
+	if ( (type == MCH_TYPE_NAT) && (sdr->sensType == SENSOR_TYPE_HOTSWAP) ) {
+		if ( 2 != sscanf( (const char *)(sdr->str), "HS %d %s", &natid, buff ) ) {
+			printf("sscanf parse error %s\n", sdr->str);
+			return;
+		}
+		sens->fruIndex = natid;
+		return;
+	}
+		
 	/* First loop through FRUs */
 	for ( i = 0; i < MAX_FRU; i++ ) {
 		if ( (sens->sdr.entityId == mchSys->fru[i].sdr.entityId) && (sens->sdr.entityInst == mchSys->fru[i].sdr.entityInst ) ) {
@@ -493,6 +512,36 @@ int n, l, i;
 }
 
 /* 
+ * Store SDR for one management controller device into data structure
+ *
+ * Caller must perform locking.
+ */
+void
+mchSdrMgmtCtrlDev(SdrMgmt sdr, uint8_t *raw)
+{
+int n, l, i;
+	n = SDR_HEADER_LENGTH + raw[SDR_LENGTH_OFFSET];
+
+	sdr->id[0]      = raw[SDR_ID_LSB_OFFSET];
+	sdr->id[1]      = raw[SDR_ID_MSB_OFFSET];
+	sdr->ver        = raw[SDR_VER_OFFSET];
+	sdr->recType    = raw[SDR_REC_TYPE_OFFSET];
+	sdr->length     = raw[SDR_LENGTH_OFFSET];
+	sdr->addr       = raw[SDR_MGMT_ADDR_OFFSET];
+	sdr->chan       = raw[SDR_MGMT_CHAN_OFFSET];
+	sdr->pwr        = raw[SDR_MGMT_PWR_OFFSET];
+	sdr->cap        = raw[SDR_MGMT_CAP_OFFSET];
+	sdr->entityId   = raw[SDR_MGMT_ENTITY_ID_OFFSET];
+	sdr->entityInst = raw[SDR_MGMT_ENTITY_INST_OFFSET];
+	sdr->strLength  = raw[SDR_MGMT_STR_LENGTH_OFFSET];
+			
+	l = IPMI_DATA_LENGTH( sdr->strLength );
+	for ( i = 0; i < l; i++ )
+	       	sdr->str[i] = raw[SDR_MGMT_STR_OFFSET + i];
+       	sdr->str[i+1] = '\0';
+}
+
+/* 
  * Store SDR for one sensor into sensor data structure
  *
  * Caller must perform locking.
@@ -500,7 +549,8 @@ int n, l, i;
 void
 mchSdrFullSens(SdrFull sdr, uint8_t *raw, int type)
 {
-int n, l, i;
+int n, i, l = 0;
+
 	n = SDR_HEADER_LENGTH + raw[SDR_LENGTH_OFFSET];
 
 	sdr->id[0]      = raw[SDR_ID_LSB_OFFSET];
@@ -517,6 +567,15 @@ int n, l, i;
 	sdr->cap        = raw[SDR_CAP_OFFSET];
 	sdr->sensType   = raw[SDR_SENS_TYPE_OFFSET];
 	sdr->readType   = raw[SDR_READ_TYPE_OFFSET];
+
+	if ( type == SDR_TYPE_COMPACT_SENSOR ) {
+		sdr->strLength  = raw[SDR_COMPACT_STR_LENGTH_OFFSET];    
+
+		l = IPMI_DATA_LENGTH( sdr->strLength );
+		for ( i = 0; i < l; i++ )
+			sdr->str[i] = raw[SDR_COMPACT_STR_OFFSET + i];
+		sdr->str[i+1] = '\0';
+	}
 
 	/* Full Sensor fields */
 	if ( type == SDR_TYPE_FULL_SENSOR ) {
@@ -542,12 +601,67 @@ int n, l, i;
 			sdr->str[i] = raw[SDR_STR_OFFSET + i];
 		sdr->str[i+1] = '\0';
        	}     
+
+#ifdef DEBUG
+printf("mchSdrFullSens: owner 0x%02x lun %i sdr number %i type 0x%02x, str l %i\n", sdr->owner, sdr->lun, sdr->number, sdr->sensType, l);
+if ( l > 0 )
+printf("string %s\n", sdr->str);
+#endif
+
+}
+
+/*
+ * Read sensor to save sensor reading response length; it varies
+ * by sensor and this prevents read timeouts later.
+ * Get sensor thresholds and store them for use by device support.
+ * (Assuming thresholds do not change)
+ *
+ * Caller must perform locking.
+ */
+void
+mchGetSensorInfo(MchData mchData, Sensor sens)
+{
+uint8_t  response[MSG_MAX_LENGTH] = { 0 };
+size_t   responseSize;
+int      offs = ( MCH_IS_NAT( mchData->mchSess->type ) ) ? IPMI_RPLY_OFFSET_NAT : 0; /* Offset into reply message */
+
+
+	responseSize = sens->readMsgLength = ( MCH_IS_NAT( mchData->mchSess->type ) ) ? IPMI_RPLY_SENSOR_READ_MAX_LENGTH_NAT : IPMI_RPLY_SENSOR_READ_MAX_LENGTH_VT;
+
+	if( !(MCH_ONLN( mchStat[mchData->mchSess->instance] )) ) {
+		if ( MCH_DBG( mchStat[mchData->mchSess->instance] ) )
+			printf("%s mchGetSensorInfo: MCH offline; aborting\n", mchData->mchSess->name);
+		return;
+	}
+
+	/* Do not check status because timeout is allowed here */
+	mchMsgReadSensor( mchData, response, sens->sdr.number, (sens->sdr.lun & 0x3) , &responseSize );	
+	sens->readMsgLength = responseSize;
+
+	responseSize = ( MCH_IS_NAT( mchData->mchSess->type ) ) ? IPMI_RPLY_GET_SENSOR_THRESH_LENGTH_NAT : IPMI_RPLY_GET_SENSOR_THRESH_LENGTH_VT;
+
+/* not ready for prime time; seems MCH does not respond if discrete sensor
+	if (  mchMsgGetSensorThresholds( mchData, response, sens->sdr.number, (sens->sdr.lun & 0x3), &responseSize ) ) {
+		if ( MCH_DBG( mchStat[mchData->mchSess->instance] ) )
+			printf("%s mchGetSensorInfo: mchMsgGetSensorThresholds error, assume no thresholds are readable\n", mchData->mchSess->name);
+		sens->tmask = 0;
+		return;
+	}
+*/
+
+	sens->tmask = response[IPMI_RPLY_SENSOR_THRESH_MASK_OFFSET + offs];
+	sens->tlnc  = response[IPMI_RPLY_SENSOR_THRESH_LNC_OFFSET  + offs];
+	sens->tlc   = response[IPMI_RPLY_SENSOR_THRESH_LC_OFFSET   + offs];
+	sens->tlnr  = response[IPMI_RPLY_SENSOR_THRESH_LNR_OFFSET  + offs];
+	sens->tunc  = response[IPMI_RPLY_SENSOR_THRESH_UNC_OFFSET  + offs];
+	sens->tuc   = response[IPMI_RPLY_SENSOR_THRESH_UC_OFFSET   + offs];
+	sens->tunr  = response[IPMI_RPLY_SENSOR_THRESH_UNR_OFFSET  + offs];
 }
 
 /*
  * Read sensor data records. Call ipmiMsgGetSdr twice per record;
  * once to get record length, then to read record. This prevents timeouts,
- * saving much delay
+ * saving much delay. 
  *
  * Caller must perform locking.
  */				  
@@ -566,13 +680,14 @@ uint8_t  type   = 0, addr = 0;
 uint8_t *raw    = 0;
 int      err;
 int      size; /* SDR record size (after header) */
-int      i, iFull = 0, iFru = 0, fruId;
+int      i, iFull = 0, iFru = 0, iMgmt = 0, fruId;
 size_t   responseSize;
 int      rval = -1;
 int      offs = ( MCH_IS_NAT( mchSess->type ) ) ? IPMI_RPLY_OFFSET_NAT : 0;
 int      base = ( MCH_IS_NAT( mchSess->type ) ) ? IPMI_RPLY_GET_SDR_BASE_LENGTH_NAT : IPMI_RPLY_GET_SDR_BASE_LENGTH_VT;
 int      inst = mchSess->instance;
 Fru      fru;
+SdrMgmt  mgmt;
 
 	if ( mchSdrRepGetInfo( mchData ) )
 		return rval;
@@ -583,12 +698,12 @@ Fru      fru;
 		printf("mchSdrGetDataAll: No memory for raw SDR data for %s\n", mchSess->name);
 		goto bail;
 	}
-
        	for ( i = 0; i < sdrCount; i++) {
 		       
 		err = 0;
 		/* readSize = 5 because 5th byte is remaining record length; 0xFF reads entire record */
        		if ( mchMsgGetSdr( mchData, response, id, res, offset, 5, 0, 0 ) ) {
+
 			i--;
 			if ( err++ > 5 ) {
 			        printf("mchSdrGetDataAll: too many errors reading SDR for %s", mchSess->name);
@@ -623,11 +738,15 @@ Fru      fru;
 
 					case SDR_TYPE_FRU_DEV:
 						break;
+
+					case SDR_TYPE_MGMT_CTRL_DEV:
+						mchSys->mgmtCount++;
+						break;
 				}
 				id[0]  = response[IPMI_RPLY_GET_SDR_NEXT_ID_LSB_OFFSET + offs];
 				id[1]  = response[IPMI_RPLY_GET_SDR_NEXT_ID_MSB_OFFSET + offs];
 
-				if ( arrayToUint16( id ) == 0xFFFF )
+				if ( arrayToUint16( id ) == 0xFFFF ) // last record in SDR
 					break;
 			}
 		}
@@ -640,6 +759,11 @@ Fru      fru;
 		goto bail;
 	}
 
+	if ( !(mchSys->mgmt = calloc( mchSys->mgmtCount, sizeof(*mgmt) ) ) ) {
+		printf("mchSdrGetDataAll: No memory for sensor data for %s\n", mchSess->name);
+		goto bail;
+	}
+
 	/* Store SDR data; for now we only support Compact/Full Sensor Records and FRU Device Locator Records */
 	for ( i = 0; i < sdrCount; i++) {
 		type = raw[i*SDR_MAX_LENGTH + SDR_REC_TYPE_OFFSET];
@@ -648,18 +772,7 @@ Fru      fru;
 			mchSdrFullSens( &(mchSys->sens[iFull].sdr) , raw + i*SDR_MAX_LENGTH, type );
 			mchSys->sens[iFull].instance = 0; /* Initialize instance to 0 */
 
-			/* Save sensor reading response length for future reads (response length varies per sensor) */
-			responseSize = mchSys->sens[iFull].readMsgLength = ( MCH_IS_NAT( mchSess->type ) ) ? IPMI_RPLY_SENSOR_READ_MAX_LENGTH_NAT : IPMI_RPLY_SENSOR_READ_MAX_LENGTH_VT;
-
-			if( !(MCH_ONLN( mchStat[inst] )) ) {
-				if ( MCH_DBG( mchStat[inst] ) )
-					printf("%s mchSdrGetDataAll: MCH offline; aborting\n", mchSess->name);
-				goto bail;
-			}
-
-			mchMsgReadSensor( mchData, response, mchSys->sens[iFull].sdr.number, addr, &responseSize );	
-
-			mchSys->sens[iFull].readMsgLength = responseSize;
+			mchGetSensorInfo( mchData, &mchSys->sens[iFull] );
 			mchSys->sens[iFull].cnfg = 0;
 
 			iFull++;
@@ -670,22 +783,29 @@ Fru      fru;
 			mchSys->fru[iFru].instance = 0;     /* Initialize instance to 0 */
 			iFru++;
 		}
-		/*else
-		    mchSdrFullSens( &(mchSys->sens[iFull].sdr) , raw + i*SDR_MAX_LENGTH, type );*/
+	        else if ( type == SDR_TYPE_MGMT_CTRL_DEV ) {
+			mchSdrMgmtCtrlDev( &(mchSys->mgmt[iMgmt]), raw + i*SDR_MAX_LENGTH );
+			mchSys->mgmt[iMgmt].instance = 0;     /* Initialize instance to 0 */
+			iMgmt++;
+		}
 	}
-
 
 	if ( MCH_DBG( mchStat[inst] ) > 1 ) {
 		printf("%s mchSdrGetDataAll Sumary:\n", mchSess->name);
 		for ( i = 0; i < iFull; i++ ) {
 			sens = &mchSys->sens[i];
-			printf("SDR %i, %s entity ID %02x, entity inst %02x, sensor number %02x, sens type %02x, owner %02x, LUN %02x, RexpBexp %i, M %i, MTol %i, B %i, BAcc %i\n", i, sens->sdr.str, sens->sdr.entityId, sens->sdr.entityInst, sens->sdr.number, sens->sdr.sensType, sens->sdr.owner, sens->sdr.lun, sens->sdr.RexpBexp, sens->sdr.M, sens->sdr.MTol, sens->sdr.B, sens->sdr.BAcc);
+			printf("SDR %i, %s entity ID 0x%02x, entity inst 0x%02x, sensor number %i, sens type 0x%02x, owner 0x%02x, LUN %i, RexpBexp %i, M %i, MTol %i, B %i, BAcc %i\n", i, sens->sdr.str, sens->sdr.entityId, sens->sdr.entityInst, sens->sdr.number, sens->sdr.sensType, sens->sdr.owner, sens->sdr.lun, sens->sdr.RexpBexp, sens->sdr.M, sens->sdr.MTol, sens->sdr.B, sens->sdr.BAcc);
 		}
 		for ( i = 0; i < MAX_FRU; i++ ) {
 			fru = &mchSys->fru[i];
 			if ( fru->sdr.entityInst )
-			printf("SDR %i, entity ID %02x, entity inst %02x, FRU id %02x, %s\n", 
-			i, fru->sdr.entityId, fru->sdr.entityInst, fru->sdr.fruId, fru->sdr.str);
+				printf("FRU %i, entity ID 0x%02x, entity inst 0x%02x, FRU id %i, %s\n", 
+				i, fru->sdr.entityId, fru->sdr.entityInst, fru->sdr.fruId, fru->sdr.str);
+		}
+		for ( i = 0; i < iMgmt; i++ ) {
+			mgmt = &mchSys->mgmt[i];
+       			printf("Mgmt Ctrl %i, entity ID 0x%02x, entity inst 0x%02x, %s\n", 
+				i, mgmt->entityId, mgmt->entityInst, mgmt->str);
 		}
 
 	}
@@ -835,7 +955,7 @@ mchIdentify(MchData mchData)
 MchSess  mchSess = mchData->mchSess;
 int      i;
 uint8_t  response[MSG_MAX_LENGTH] = { 0 };
-uint8_t  tmpvt[4] = { 0 }, tmpnat[4] = { 0 };
+uint8_t  tmpvt[4] = { 0 }, tmpnat[4] = { 0 }, vers;
 uint32_t mfvt, mfnat;
 
 	if ( mchMsgGetDeviceId( mchData, response, IPMI_MSG_ADDR_CM ) ) {
@@ -856,13 +976,15 @@ uint32_t mfvt, mfnat;
 	mfnat = IPMI_MANUF_ID( mfnat );
 
         if ( mfvt == MCH_MANUF_ID_VT ) {
-		printf("Identified %s to be Vadatech\n", mchSess->name);
                 mchSess->type = MCH_TYPE_VT;
 		mchSess->timeout = RPLY_TIMEOUT_VT;
+		vers = response[IPMI_RPLY_IPMI_VERS_OFFSET];
+		printf("Identified %s to be Vadatech. IPMI version %i.%i\n", mchSess->name, IPMI_VER_MSD( vers ), IPMI_VER_LSD( vers ));
         }
         else if ( mfnat == MCH_MANUF_ID_NAT ) {
-		printf("Identified %s to be N.A.T.\n", mchSess->name);
                 mchSess->type = MCH_TYPE_NAT;
+		vers = response[IPMI_RPLY_IPMI_VERS_OFFSET + IPMI_RPLY_OFFSET_NAT];
+		printf("Identified %s to be N.A.T. IPMI version %i.%i\n", mchSess->name, IPMI_VER_MSD( vers ), IPMI_VER_LSD( vers ));
         }
         else {
                 printf("mchIdentify: Unknown type of MCH, Manufacturer ID 0x%08x or 0x%08x?\n", mfvt, mfnat);
@@ -895,46 +1017,6 @@ Sensor  sens;
                 id    = fru->sdr.fruId;
 		found = 0;
 
-		if ( id == UTCA_FRU_TYPE_CARRIER ) {
-			sprintf( fru->parm, "CR" );
-			fru->instance = 1;
-		}
-
-		else if( id >= UTCA_FRU_TYPE_SHELF_MIN && id <= UTCA_FRU_TYPE_SHELF_MAX ) {
-			sprintf( fru->parm, "SH" );
-			fru->instance = ( id - UTCA_FRU_TYPE_SHELF_MIN ) + 1;
-		}
-
-		else if( id >= UTCA_FRU_TYPE_MCH_MIN && id <= UTCA_FRU_TYPE_MCH_MAX ) {
-			sprintf( fru->parm, "MCH" );
-			fru->instance = ( id - UTCA_FRU_TYPE_MCH_MIN ) + 1;
-		}
-
-		else if( id >= UTCA_FRU_TYPE_AMC_MIN && id <= UTCA_FRU_TYPE_AMC_MAX ) {
-			sprintf( fru->parm, "AMC" );
-			fru->instance = ( id - UTCA_FRU_TYPE_AMC_MIN ) + 1;
-		}
-
-		else if( id >= UTCA_FRU_TYPE_CU_MIN && id <= UTCA_FRU_TYPE_CU_MAX ) {
-			sprintf( fru->parm, "CU" );
-			fru->instance = ( id - UTCA_FRU_TYPE_CU_MIN ) + 1;
-		}
-
-		else if( id >= UTCA_FRU_TYPE_PM_MIN && id <= UTCA_FRU_TYPE_PM_MAX ) {
-			sprintf( fru->parm, "PM" );
-			fru->instance = ( id - UTCA_FRU_TYPE_PM_MIN ) + 1;
-		}
-
-		else if( id >= UTCA_FRU_TYPE_RTM_MIN && id <= UTCA_FRU_TYPE_RTM_MAX ) {
-			sprintf( fru->parm, "RTM" );
-			fru->instance = ( id - UTCA_FRU_TYPE_RTM_MIN ) + 1;
-		}
-
-		else if ( id == UTCA_FRU_TYPE_LOG_CARRIER ) {
-			sprintf( fru->parm, "CR" );
-			fru->instance = 1;
-		}
-
 		/* Find sensors associated with this FRU, assign each an instance based on sensor type */
 		for ( j = 0; j < s; j++ ) {
 
@@ -957,7 +1039,7 @@ for ( i = 0; i < mchSys->sensCount; i++ ) {
 	sens = &mchSys->sens[i];
 	int fruIndex = sens->fruIndex;
 	fru  = &mchSys->fru[fruIndex];
-	printf("Sensor %i, type %02x, inst %i, FRU entId %02x, entInst %02x, sens entId %02x  entInst %02x\n",sens->sdr.number, sens->sdr.sensType, sens->instance, fru->sdr.entityId, fru->sdr.entityInst, sens->sdr.entityId, sens->sdr.entityInst);
+	printf("Sensor %i, type %02x, inst %i, FRU entId %02x, entInst %02x, sens entId %02x  entInst %02x recType %i\n",sens->sdr.number, sens->sdr.sensType, sens->instance, fru->sdr.entityId, fru->sdr.entityInst, sens->sdr.entityId, sens->sdr.entityInst, sens->sdr.recType);
 }
 #endif
 }
@@ -1005,7 +1087,7 @@ int i;
 
 	/* Get Sensor/FRU association */
 	for ( i = 0; i < mchSys->sensCount; i++ )
-		mchSensorGetFru( mchSys, i );
+		mchSensorGetFru( mchSess->type, mchSys, i );
 
 	mchSensorFruGetInstance( mchSys );
 
