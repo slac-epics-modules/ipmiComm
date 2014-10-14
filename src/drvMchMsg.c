@@ -70,8 +70,7 @@ size_t   responseLen;
 	       	return code;
 	}
 
-       	if ( (*responseSize == 0) || (mchSess->err > 9) ) {
-
+       	if ( (responseLen == 0) || (mchSess->err > 9) ) {
        		if ( MCH_DBG( mchStat[inst] ) )
        			printf("%s start new session; err count is %i\n", mchSess->name, mchSess->err);
 
@@ -128,6 +127,7 @@ size_t   responseLen;
 
 	mchSess->err = 0;
 	return 0;
+
 }
 
 /* Close Session - test for NAT and determine reply offset*/
@@ -248,6 +248,14 @@ mchMsgReadSensor(MchData mchData, uint8_t *data, uint8_t sens, uint8_t lun, size
 int offs = 0; /* doesn't seem to be used; look into this */
 
 	return ipmiMsgReadSensor( mchData->mchSess, mchData->ipmiSess, data, sens, lun, responseSize, offs );
+}
+
+int
+mchMsgGetSensorThresholds(MchData mchData, uint8_t *data, uint8_t sens, uint8_t lun, size_t *responseSize)
+{
+int offs = 0; /* doesn't seem to be used; look into this */
+
+	return ipmiMsgGetSensorThresholds( mchData->mchSess, mchData->ipmiSess, data, sens, lun, responseSize, offs );
 }
 
 /* Set FRU Activation using Vadatech MCH - not used at this time
