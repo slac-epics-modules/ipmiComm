@@ -1,6 +1,22 @@
+14JOct2014 (SH)
+
+src:
+ -  Began support to read sensor thresholds but left inactive for now
+    (MCH does not respond to threshold query for discrete sensors and
+    this is causing out-of-order sequence numbers and timeouts)
+ -  Add support to detect and store data for Management Controller Devices
+    in SDR. 
+ -  Read, store, and print ipmi version supported by device.
+ -  Add support for NAT hot swap sensors. There is a problem with their
+    sensor numbers, so current work-around is to parse sensor string 
+    in order to find associated FRU
+Db/shelf.substitutions:
+ -  Add support for more FRUs
+
+
 Release: ipmiComm-R2-0-1
 
-27Jan2013 (SH)
+27Jan2014 (SH)
 Minor changes, including changes to build on RHEL64 and for SPEAR
  - src/devMch.c: Ignore status from ipmiMsgColdReset; it will always 
    return an error. (Aspects of this can be improved; added to TODO LIST)
