@@ -121,6 +121,8 @@ int ipmiMsgGetSdr(void *device, IpmiSess sess, uint8_t *data, uint8_t *id, uint8
 				
 int ipmiMsgReadSensor(void *device, IpmiSess sess, uint8_t *data, uint8_t sens, uint8_t lun, size_t *responseSize, int offs);
 
+int ipmiMsgGetSensorThresholds(void *device, IpmiSess sess, uint8_t *data, uint8_t sens, uint8_t lun, size_t *responseSize, int offs);
+
 #ifdef __cplusplus
 };
 #endif
