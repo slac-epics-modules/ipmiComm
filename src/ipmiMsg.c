@@ -633,8 +633,6 @@ asynUser  *pasynUser;
 
 	pasynOctetSyncIO->disconnect( pasynUser );
 
-	*responseSize = *responseLen;
-
 	return status;
 }
 
@@ -1017,6 +1015,43 @@ uint8_t  netfn = IPMI_MSG_NETFN_SENSOR_EVENT;
 	memcpy( imsg2, SEND_MSG_MSG , imsg2Size );
 	memcpy( b1msg1, IPMI_MSG1    , b1msg1Size );
 	memcpy( b1msg2, SENS_READ_MSG, b1msg2Size );
+
+	imsg2[IPMI_MSG2_CHAN_OFFSET]   = IPMI_MSG_CHAN_IPMB0 + IPMI_MSG_TRACKING;
+       	imsg2[IPMI_MSG2_SEQLUN_OFFSET] = lun;
+
+	b1msg1[IPMI_MSG1_RSADDR_OFFSET]   = IPMI_MSG_ADDR_CM;
+	b1msg1[IPMI_MSG1_NETFNLUN_OFFSET] = netfn << 2;
+
+	b1msg2[IPMI_MSG2_SENSOR_OFFSET] = sens;
+
+	messageSize = ipmiMsgBuild( sess, message, cmd, 0, imsg2, imsg2Size, b1msg1, b1msg2, b1msg2Size, 0, 0, 0 );
+
+	return sess->wrf( device, sess, message, messageSize, data, responseSize, cmd, netfn, offs, 0 );
+}
+
+/* Get Sensor Thresholds 
+ *
+ *   RETURNS: status from sess->wrf
+ *            0 on success
+ *            non-zero for error
+ */
+int
+ipmiMsgGetSensorThresholds(void *device, IpmiSess sess, uint8_t *data, uint8_t sens, uint8_t lun, size_t *responseSize, int offs)
+{
+uint8_t  message[MSG_MAX_LENGTH] = { 0 };
+size_t   imsg2Size   = sizeof( SEND_MSG_MSG );
+size_t   b1msg1Size   = sizeof( IPMI_MSG1 );
+size_t   b1msg2Size   = sizeof( GET_SENSOR_THRESH_MSG );
+uint8_t  imsg2[imsg2Size];
+uint8_t  b1msg1[b1msg1Size];
+uint8_t  b1msg2[b1msg2Size];
+size_t   messageSize;
+uint8_t  cmd   = IPMI_MSG_CMD_GET_SENSOR_THRESH;
+uint8_t  netfn = IPMI_MSG_NETFN_SENSOR_EVENT;
+
+	memcpy( imsg2,  SEND_MSG_MSG , imsg2Size );
+	memcpy( b1msg1, IPMI_MSG1    , b1msg1Size );
+	memcpy( b1msg2, GET_SENSOR_THRESH_MSG, b1msg2Size );
 
 	imsg2[IPMI_MSG2_CHAN_OFFSET]   = IPMI_MSG_CHAN_IPMB0 + IPMI_MSG_TRACKING;
        	imsg2[IPMI_MSG2_SEQLUN_OFFSET] = lun;
