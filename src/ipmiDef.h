@@ -3,7 +3,7 @@
 
 #include <math.h> /* pow */
 
-#define MSG_MAX_LENGTH  200
+#define MSG_MAX_LENGTH  200 /* arbitrarily chosen, not in the specs */
 
 typedef struct IpmiSessRec_ *IpmiSess;
 
@@ -14,7 +14,7 @@ typedef struct IpmiSessRec_ *IpmiSess;
  *   msg      - Pointer to outgoing message array
  *   msg_n    - Size of outgoing message
  *   rply     - Pointer to response array
- *   rply_n   - Response size, 0 if unknown
+ *   rply_n   - Expected response size, 0 if unknown
  *   cmd      - IPMI command code
  *   netfn    - IPMI network function
  *   offs     - Offset from IPMI_RPLY_COMPLETION_CODE_OFFSET to read comp code (see ipmiDef.h)
@@ -25,6 +25,7 @@ typedef int
 
 /* Struct for IPMI session information */
 typedef struct IpmiSessRec_ {
+	uint8_t       ivers;         /* IPMI version number */
 	uint8_t       id[4];         /* Session ID */
 	uint8_t       str[16];       /* Session challenge string; used in establishing a session */
         uint8_t       seqSend[4];    /* Message sequence number for messages to device, null until session activated; chosen by system software (us); rolls over at 0xFFFFFFFF */
@@ -43,6 +44,7 @@ extern uint8_t ACT_SESS_MSG[26];
 extern uint8_t SET_PRIV_MSG[5];
 extern uint8_t SEND_MSG_MSG[5];
 extern uint8_t SENS_READ_MSG[5];
+extern uint8_t GET_SENSOR_THRESH_MSG[5];
 extern uint8_t FRU_READ_MSG[8];
 extern uint8_t GET_SDR_MSG[10];
 extern uint8_t CLOSE_SESS_MSG[8];
@@ -88,6 +90,7 @@ extern uint8_t FRU_I2C_ADDR[102];
 #define IPMI_MSG_PRIV_LEVEL_ADMIN            0x04 /* Privilege level: administrator  */
 #define IPMI_MSG_PRIV_LEVEL_OEM              0x05 /* Privilege level: OEM proprietary  */
 #define IPMI_MSG_AUTH_TYPE_NONE              0
+#define IPMI_MSG_AUTH_TYPE_MD5               2
 #define IPMI_MSG_CURR_CHAN                   0x0E /* Channel number currently in use */
 #define IPMI_MSG_HDR_SEQ_OFFSET              1    /* Session sequence number */
 #define IPMI_MSG_HDR_SEQ_LENGTH              4    
@@ -114,7 +117,7 @@ extern uint8_t FRU_I2C_ADDR[102];
 #define IPMI_MSG2_GET_SDR_RES_LSB_OFFSET     3    /* SDR Reservation ID, LS Byte */
 #define IPMI_MSG2_GET_SDR_RES_MSB_OFFSET     4    /* SDR Reservation ID, LS Byte */
 #define IPMI_MSG2_GET_SDR_ID_LSB_OFFSET      5    /* SDR Record ID, LS Byte */
-#define IPMI_MSG2_GET_SDR_ID_MSB_OFFSET      6    /* SDR Record ID, LS Byte */
+#define IPMI_MSG2_GET_SDR_ID_MSB_OFFSET      6    /* SDR Record ID, MS Byte */
 #define IPMI_MSG2_GET_SDR_OFFSET_OFFSET      7    /* Offset into record to start read */
 #define IPMI_MSG2_GET_SDR_CNT_OFFSET         8    /* Count to read in bytes (0xFF means entire record) */
 #define IPMI_MSG2_GET_DEV_SDR_INFO_OP_OFFSET 3    /* 1 get SDR count, 0 get sensor count */
@@ -143,6 +146,8 @@ extern uint8_t FRU_I2C_ADDR[102];
 #define IPMI_MSG_CMD_CLOSE_SESSION           0x3C
 #define IPMI_MSG_CMD_SEND_MSG                0x34
 #define IPMI_MSG_CMD_SENSOR_READ             0x2D
+#define IPMI_MSG_CMD_SET_SENSOR_THRESH       0x26
+#define IPMI_MSG_CMD_GET_SENSOR_THRESH       0x27
 #define IPMI_MSG_CMD_GET_CHAS_STATUS         0x01
 #define IPMI_MSG_CMD_CHAS_CTRL               0x02
 #define IPMI_MSG_CMD_GET_FRU_INFO            0x10
@@ -183,14 +188,25 @@ extern uint8_t FRU_I2C_ADDR[102];
 #define IPMI_RPLY_BRIDGED_SEQ_OFFSET         27     /* From-MCH sequence number */
 #define IPMI_RPLY_BRIDGED_SEQLUN_OFFSET      41     /* MS 6 bits: IPMI sequence, LS 2 bits: LUN */
 
-#define IPMI_SENSOR_READING_DISABLED(x)  x & 1<<5
+#define IPMI_SENSOR_READING_DISABLED(x)   x & 1<<5
 #define IPMI_SENSOR_SCANNING_DISABLED(x) ~x & 1<<6
+
+#define IPMI_SENSOR_THRESH_LNC_READABLE(x) x & 1<<0
+#define IPMI_SENSOR_THRESH_LC_READABLE(x)  x & 1<<1
+#define IPMI_SENSOR_THRESH_LNR_READABLE(x) x & 1<<2
+#define IPMI_SENSOR_THRESH_UNC_READABLE(x) x & 1<<3
+#define IPMI_SENSOR_THRESH_UC_READABLE(x)  x & 1<<4
+#define IPMI_SENSOR_THRESH_UNR_READABLE(x) x & 1<<5
 
 #define IPMI_DATA_TYPE(x)          x & 3<<6
 #define IPMI_DATA_LENGTH(x)        x & 0x3F
 #define IPMI_DATA_LANG_ENGLISH(x)  x==0 || x==25                 
 
 #define IPMI_MANUF_ID(x) x & 0x0FFFFF
+
+/* IPMI version, least- and most-significant digits, eg 0x51 = version 1.5 */
+#define IPMI_VER_LSD(x) (x & 0xF0)>>4
+#define IPMI_VER_MSD(x) x & 0x0F
 
 /* Completion codes, IPMI spec Table 5-2 */
 #define IPMI_COMP_CODE_NORMAL                   0x00
@@ -226,7 +242,7 @@ extern uint8_t FRU_I2C_ADDR[102];
 /* Sensor Data Record (SDR) types*/
 #define SDR_TYPE_FULL_SENSOR      0x01
 #define SDR_TYPE_COMPACT_SENSOR   0x02
-#define SDR_TYPE_EVENT_ONLY       0x03
+#define SDR_TYPE_EVENT_ONLY       0x03dr
 #define SDR_TYPE_ENTITY_ASSOC     0x08
 #define SDR_TYPE_DEV_ENTITY_ASSOC 0x09
 #define SDR_TYPE_GENERIC_DEV      0x10
@@ -270,9 +286,9 @@ extern uint8_t FRU_I2C_ADDR[102];
 #define SDR_UNITS3_OFFSET       22
 #define SDR_LINEAR_OFFSET       23
 #define SDR_M_OFFSET            24 /* LS 8 bits, 2's complement signed 10-bit 'M' value */
-#define SDR_M_TOL_OFFSET        25 /* [7:2] MS 2 bits, [5:0] Tolerance 6 bits, unsigned (in +/- 1/2 raw counts) */ 
+#define SDR_M_TOL_OFFSET        25 /* [7:6] MS 2 bits, [5:0] Tolerance 6 bits, unsigned (in +/- 1/2 raw counts) */ 
 #define SDR_B_OFFSET            26 /* LS 8 bits, 2's complement signed 10-bit 'B' value */			   
-#define SDR_B_ACC_OFFSET        27 /* [7:2] MS 2 bits unsigned, 10-bit acc in 1/100 % scaled up by: [5:0] Accuracy LS 6 bits */ 
+#define SDR_B_ACC_OFFSET        27 /* [7:6] MS 2 bits unsigned, 10-bit acc in 1/100 % scaled up by: [5:0] Accuracy LS 6 bits */ 
 #define SDR_ACC_OFFSET          28 /* [7:4] Accuracy MS 4 bits, [3:2] Accuracy exp: 2 bits unsigned, [1:0] sensor direction */
 #define SDR_EXP_OFFSET          29
 #define SDR_ANLG_CHAR_OFFSET    30
@@ -283,9 +299,13 @@ extern uint8_t FRU_I2C_ADDR[102];
 #define SDR_STR_OFFSET          48
 /*...more...*/
 
+/* SDR Compact Sensor */
+#define SDR_COMPACT_STR_LENGTH_OFFSET 31
+#define SDR_COMPACT_STR_OFFSET        32
+
 #define SENSOR_LINEAR(x)           (x & 0x7F)
-#define SENSOR_CONV_M_B(x,y)       (x + ( (y & 0xC0) << 2))
-#define TWOS_COMP_SIGNED_NBIT(x,n) (x > (pow(2,n)/2 - 1)) ? x - pow(2,n)    : x /* Extract n-bit signed number stored as two's complement */
+#define SENSOR_CONV_M_B(x,y)       (x + ( (y & 0xC0) << 8))
+#define TWOS_COMP_SIGNED_NBIT(x,n) (x > (pow(2,n)/2 - 1)) ? x - pow(2,n) : x     /* Extract n-bit signed number stored as two's complement */
 #define ONES_COMP_SIGNED_NBIT(x,n) (x > (pow(2,n)/2 - 1)) ? x - pow(2,n) + 1 : x /* Extract n-bit signed number stored as one's complement */
 #define SENSOR_CONV_REXP(x)        ((x & 0xF0) >> 4)
 #define SENSOR_CONV_BEXP(x)        (x & 0xF)
@@ -336,6 +356,16 @@ extern uint8_t FRU_I2C_ADDR[102];
 #define SDR_FRU_STR_LENGTH_OFFSET  15
 #define SDR_FRU_STR_OFFSET         16
 
+/* SDR Management Device contents */
+#define SDR_MGMT_ADDR_OFFSET       5  /* SDR Body */
+#define SDR_MGMT_CHAN_OFFSET       6
+#define SDR_MGMT_PWR_OFFSET        7     
+#define SDR_MGMT_CAP_OFFSET        8     
+#define SDR_MGMT_ENTITY_ID_OFFSET  12     
+#define SDR_MGMT_ENTITY_INST_OFFSET  13
+#define SDR_MGMT_STR_LENGTH_OFFSET 14     
+#define SDR_MGMT_STR_OFFSET        15     
+     
 #define SENSOR_OWNER_ID(x)        x & 0xFE
 #define SENSOR_OWNER_ID_TYPE(x)   x & 0x1
 #define SENSOR_OWNER_CHAN(x)      x & 0xF0
