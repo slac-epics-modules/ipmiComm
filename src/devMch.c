@@ -144,6 +144,7 @@
 
 #include <math.h> /* can be removed with ipmiSensorConversion */
 
+#include <epicsTypes.h>
 #include <registry.h>
 #include <alarm.h>
 #include <dbAccess.h>
@@ -189,7 +190,7 @@ static long init_bi_record(struct biRecord *pbi);
 static long read_bi(struct biRecord *pbi);
 static long bi_ioint_info(int cmd, struct biRecord *pbi, IOSCANPVT *iopvt);
 
-static long init_mbbi(struct biRecord *pmbbi);
+static long init_mbbi(struct mbbiRecord *pmbbi);
 static long init_mbbi_record(struct mbbiRecord *pmbbi);
 static long read_mbbi(struct mbbiRecord *pmbbi);
 static long mbbi_ioint_info(int cmd, struct mbbiRecord *mbpbi, IOSCANPVT *iopvt);
@@ -288,11 +289,11 @@ devMchFind(const char *name)
 
 /*--- end stolen ---*/
 
-static float 
-sensorConversion(SdrFull sdr, uint8_t raw)
+static epicsFloat64
+sensorConversion(SdrFull sdr, uint8_t raw, char *name)
 {
 int l, units, m, b, rexp, bexp;
-float value;
+epicsFloat64 value;
 
 	l = SENSOR_LINEAR( sdr->linear );
 
@@ -390,6 +391,43 @@ sensEgu(char *egu, unsigned units) {
 	}
 
 }		
+
+static void
+sensThresh(SdrFull sdr, Sensor sens, epicsFloat64 *lolo, epicsEnum16 *llsv, epicsFloat64 *low, epicsEnum16 *lsv, epicsFloat64 *high, epicsEnum16 *hsv, epicsFloat64 *hihi, epicsEnum16 *hhsv, char *name) 
+{
+	if ( IPMI_SENSOR_THRESH_LC_READABLE(sens->tmask) ) {
+		*lolo = sensorConversion( sdr, sens->tlc, name );
+		*llsv = MAJOR_ALARM;
+	}
+	else {
+		*lolo = 0;
+		*llsv = NO_ALARM;
+	}
+	if ( IPMI_SENSOR_THRESH_LNC_READABLE(sens->tmask) ) {
+		*low  = sensorConversion( sdr, sens->tlnc, name  );
+		*lsv  = MINOR_ALARM;
+	}
+	else {
+		*low  = 0;
+		*lsv  = NO_ALARM;
+	}
+	if ( IPMI_SENSOR_THRESH_UNC_READABLE(sens->tmask) ) {
+		*high = sensorConversion( sdr, sens->tunc, name  );
+		*hsv  = MINOR_ALARM;
+	}
+	else {
+		*high = 0;
+		*hsv  = NO_ALARM;
+	}
+	if ( IPMI_SENSOR_THRESH_UC_READABLE(sens->tmask) ) {
+		*hihi = sensorConversion( sdr, sens->tuc, name  );
+		*hhsv = MAJOR_ALARM;
+	}
+	else {
+		*hihi = 0;
+		*hhsv = NO_ALARM;
+	}
+}
 
 /* Perform some common dev sup checks */
 static MchRec
@@ -602,11 +640,15 @@ int      offs;
 
 		sdr = &sens->sdr;
 
-		if ( !mchSys->sens[index].cnfg ) {
+		if ( !sens->cnfg ) {
 			sensEgu( egu, sdr->units2 );
 			strcpy( pai->egu,  egu );
 			if ( sdr->str )
 				strcpy( pai->desc, sdr->str );
+
+			if ( sdr->recType == SDR_TYPE_FULL_SENSOR )
+				sensThresh( sdr, sens, &pai->lolo, &pai->llsv, &pai->low, &pai->lsv, &pai->high, &pai->hsv, &pai->hihi, &pai->hhsv, pai->name );
+
 			sens->cnfg = 1;
 		}
 
@@ -622,7 +664,7 @@ int      offs;
 		if ( sdr->recType != SDR_TYPE_FULL_SENSOR )
 			pai->val = raw;
 		else
-			pai->val = (float)sensorConversion( sdr, raw );
+			pai->val = sensorConversion( sdr, raw, pai->name );
 
 		if ( MCH_DBG( mchStat[inst] ) > 1 )
 			printf("%s read_ai: sensor index is %i, sensor number is %i, value is %.0f, rval is %i\n",
@@ -840,7 +882,7 @@ short    id, index;
 }
 
 static long
-init_mbbi(struct biRecord *pmbbi)
+init_mbbi(struct mbbiRecord *pmbbi)
 {
 	scanIoInit( &drvMchInitScan );
 	return 0;
@@ -939,7 +981,7 @@ size_t   responseSize;
 		else if ( !(strcmp( task, "pwr" )) && fru->sdr.entityInst )
 
 			pmbbi->rval = fru->pwrDyn;
-
+    
 		else if ( !(strcmp( task, "mch" )) )
 
 			pmbbi->rval = mchSess->type;
@@ -963,14 +1005,14 @@ size_t   responseSize;
 						    printf("%s sensor reading/state unavailable or scanning disabled. Bits: %02x\n", pmbbi->name, bits);
 						s = ERROR;
 					}
-					else {
+					else { 
 						/* Store raw sensor reading */
 						value = data[IPMI_RPLY_HS_SENSOR_READING_OFFSET + offs];
 						mchSys->sens[index].val = value;
 
 						if ( MCH_DBG( mchStat[inst] ) > 1 )
 							printf("%s read_mbbi: value %02x, sensor %02x, owner %i, lun %i, index %i, value %i\n",pmbbi->name, value, sensor, mchSys->sens[index].sdr.owner, mchSys->sens[index].sdr.lun, index, value);
-					}
+					} 
 				}
 
 				epicsMutexUnlock( mch->mutex );
