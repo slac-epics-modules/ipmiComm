@@ -785,7 +785,7 @@ SdrMgmt  mgmt;
 		}
 	        else if ( type == SDR_TYPE_MGMT_CTRL_DEV ) {
 			mchSdrMgmtCtrlDev( &(mchSys->mgmt[iMgmt]), raw + i*SDR_MAX_LENGTH );
-			mchSys->mgmt[iMgmt].instance = 0;     /* Initialize instance to 0 */
+//			mchSys->mgmt[iMgmt].instance = 0;     /* Initialize instance to 0 */
 			iMgmt++;
 		}
 	}
