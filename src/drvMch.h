@@ -40,6 +40,8 @@ extern uint32_t mchStat[MAX_MCH];
 extern "C" {
 #endif
 
+// Much of this should be moved to ipmiDef.h
+
 typedef struct FruFieldRec_ {
 	uint8_t     type;         /* Type of data */
 	uint8_t     length;       /* Length of data (bytes) */
@@ -90,7 +92,7 @@ typedef struct SdrFullRec_ {
 	uint8_t      id[2];         /* Sensor ID (can change, so key bytes must also be used to identify a sensor) */
 	uint8_t      ver;           /* SDR version (0x51) */
 	uint8_t      recType;       /* Record type, 0x01 for Full Sensor Record */
-        uint8_t      length;        /* Number of remaining record bytes (we only use the first few) */
+        uint8_t      length;        /* Number of remaining record bytes */
 	uint8_t      owner;         /* Sensor owner ID, [7:1] slave address or software ID; [0] 0 = IPMB, 1 = system software */
 	uint8_t      lun;           /* Sensor owner LUN, [7:4] channel number; [3:2] reserved; [1:0] sensor owner LUN */
 	uint8_t      number;        /* Sensor number, unique behind given address and LUN, 0xFF reserved */
@@ -121,13 +123,13 @@ typedef struct SdrFullRec_ {
 } SdrFullRec, *SdrFull;
 	
 /* 
- * Handle for FRU Device Locator Record, IPMI Table 43-7
+ * Handle for FRU Device Locator Record, IPMI v2.0 Table 43-7
  */
 typedef struct SdrFruRec_ {
 	uint8_t      id[2];         /* Sensor ID (can change, so key bytes must also be used to identify a sensor) */
 	uint8_t      ver;           /* SDR version (0x51) */
 	uint8_t      recType;       /* Record type, 0x01 for Full Sensor Record */
-        uint8_t      length;        /* Number of remaining record bytes (we only use the first few) */
+        uint8_t      length;        /* Number of remaining record bytes */
 	uint8_t      addr;          /* [7:1] slave address of controller, all 0 if dev on IPMB, [0] reserved */
 	uint8_t      fruId;         /* FRU Device ID/Slave address. For logical FRU device, [7:0] FRU dev ID, for non-intelligent, [7:1] slave address, [0] reserved */
 	uint8_t      lun;           /* [7] logical/physical FRU device, [6:5] reserved, [4:3] LUN for FRU commands, [2:0] private bus ID */
@@ -139,6 +141,25 @@ typedef struct SdrFruRec_ {
 	uint8_t      strLength;     /* Device ID string type/length Section 43.15*/
 	char         str[17];       /* Device ID string, 16 bytes maximum */
 } SdrFruRec, *SdrFru;
+	
+/* 
+ * Handle for Management Controller Device Locator Record, IPMI v2.0 Table 43-8
+ */
+typedef struct SdrMgmtRec_ {
+	uint8_t      id[2];         /* Record ID */
+	uint8_t      ver;           /* SDR version */
+	uint8_t      recType;       /* Record type, 0x12 for Management Controller Locator */
+        uint8_t      length;        /* Number of remaining record bytes */
+	uint8_t      addr;          /* [7:1] I2C slave address of device on channel, [0] reserved */
+	uint8_t      chan;          /* [7:4] reserved; [3:0] Channel number for the channel that the management controller is on, use 0 for primary BMC */
+	uint8_t      pwr;           /* Power state notification and Global initialization, see IPMI spec for meaning of each bit */
+	uint8_t      cap;           /* Device capabilities, see IPMI spec for meaning of each bit */
+	/* next 3 bytes reserved */
+	uint8_t      entityId;      /* Entity ID for the FRU associated with this device, 0 if not specified */
+	uint8_t      entityInst;    /* Entity instance */
+	uint8_t      strLength;     /* Device ID string type/length Section 43.15*/
+	char         str[17];       /* Device ID string, 16 bytes maximum */
+} SdrMgmtRec, *SdrMgmt;
 	
 
 /* Handle for Sensor Data Record Repository and Dynamic Sensor Device */
@@ -162,7 +183,7 @@ typedef struct SdrRepRec_ {
 /* Handle for each FRU */
 typedef struct FruRec_ {
 	uint8_t      type;          /* FRU type */
-	uint8_t      instance;      /* Instance of this FRU type, set in drvMchUtil.c */
+	uint8_t      instance;      /* Instance of this FRU type, set in drvMch.c */
 	uint8_t      size[2];       /* FRU Inventory Area size, LS byte stored first */	
 	uint8_t      access;        /* Access FRU data by words or bytes */
 	uint8_t      readOffset[2];  
@@ -172,9 +193,6 @@ typedef struct FruRec_ {
 	FruProdRec   prod;
 	SdrFruRec    sdr;
 	char         parm[10];      /* Describes FRU type, used to load EPICS records */
-	int          tempCnt;       /* Number of temperature sensors associated with this FRU */         
-	int          fanCnt;        /* Number of fan sensors associated with this FRU */         
-	int          vCnt;          /* Number of v sensors associated with this FRU */ 
 	uint8_t      pwrDyn;        /* 1 if FRU supports dynamic reconfiguration of power, otherwise 0 */
 	uint8_t      pwrDly;        /* Delay to stable power */
 /* Following used only by cooling unit FRUs */
@@ -193,6 +211,13 @@ typedef struct SensorRec_ {
 	char          parm[10];     /* Describes signal type, used by device support */
 	size_t        readMsgLength;/* Get Sensor Reading message response length */
 	int           cnfg;         /* 0 if needs record fields need to be updated */
+	uint8_t       tmask;        /* Mask of which thresholds are readable */
+	uint8_t       tlnc;         /* Threshold lower non-critical */
+	uint8_t       tlc;          /* Threshold lower critical */
+	uint8_t       tlnr;         /* Threshold lower non-recoverable */
+	uint8_t       tunc;         /* Threshold upper non-critical */
+	uint8_t       tuc;          /* Threshold upper critical */
+	uint8_t       tunr;         /* Threshold upper non-recoverable */
 } SensorRec, *Sensor;
 
 /* Struct for MCH session information */
@@ -214,6 +239,8 @@ typedef struct MchSysRec_ {
 	int           sensLkup[MAX_FRU][MAX_SENSOR_TYPE][MAX_SENS]; /* Index into sens struct array, used by devsup, -1 if not used */
 	uint8_t       sensCount;     /* Sensor count */
 	SensorRec    *sens;          /* Array of sensors (size of sensCount) */	
+	uint8_t       mgmtCount;     /* Management controller device count */
+	SdrMgmtRec   *mgmt;          /* Array of management controller devices (size of mgmtCount) */	
 } MchSysRec, *MchSys;
 
 /* Struct for MCH system information */
@@ -232,6 +259,7 @@ int  mchNewSession(MchSess mchSess, IpmiSess ipmiSess);
 /* Response message lengths using Vadatech MCH (0s for those that can vary) */ 
 #define IPMI_RPLY_CLOSE_SESSION_LENGTH_VT           22
 #define IPMI_RPLY_SENSOR_READ_MAX_LENGTH_VT         48 /* length varies */
+#define IPMI_RPLY_GET_SENSOR_THRESH_LENGTH_VT       51 /* need to determine this; using NAT length for now*/
 #define IPMI_RPLY_GET_CHAS_STATUS_LENGTH_VT         47 /* does NOT include optional byte */
 #define IPMI_RPLY_CHAS_CTRL_LENGTH_VT               44
 #define IPMI_RPLY_GET_FRU_INFO_LENGTH_VT            47
@@ -255,6 +283,7 @@ int  mchNewSession(MchSess mchSess, IpmiSess ipmiSess);
 /* Response message lengths using NAT MCH (0s for those we haven't figured out yet) */
 #define IPMI_RPLY_CLOSE_SESSION_LENGTH_NAT           22 /* UPDATE THIS */
 #define IPMI_RPLY_SENSOR_READ_MAX_LENGTH_NAT         34 /* length varies */
+#define IPMI_RPLY_GET_SENSOR_THRESH_LENGTH_NAT       51
 #define IPMI_RPLY_GET_CHAS_STATUS_LENGTH_NAT         47 /* does NOT include optional byte */
 #define IPMI_RPLY_CHAS_CTRL_LENGTH_NAT               44
 #define IPMI_RPLY_GET_FRU_INFO_LENGTH_NAT            32
@@ -297,11 +326,19 @@ int  mchNewSession(MchSess mchSess, IpmiSess ipmiSess);
 #define IPMI_RPLY_SEQ_LENGTH                 4
 #define IPMI_RPLY_SEQLUN_OFFSET              18     /* MS 6 bits: IPMI sequence, LS 2 bits: LUN */
 #define IPMI_RPLY_COMPLETION_CODE_OFFSET     42
+#define IPMI_RPLY_IPMI_VERS_OFFSET           47     /* Returned from Get Device ID Command */
 #define IPMI_RPLY_MANUF_ID_OFFSET            49     /* Returned from Get Device ID Command */
 #define IPMI_RPLY_MANUF_ID_LENGTH            3    
 #define IPMI_RPLY_SENSOR_READING_OFFSET      43     /* Sensor reading (1 byte) */
 #define IPMI_RPLY_SENSOR_ENABLE_BITS_OFFSET  44     /* Sensor enable bits: event msgs; scanning; reading/state */
 #define IPMI_RPLY_HS_SENSOR_READING_OFFSET   45     /* Hot swap sensor reading (1 byte) */
+#define IPMI_RPLY_SENSOR_THRESH_MASK_OFFSET  43     /* Mask of readable thresholds */
+#define IPMI_RPLY_SENSOR_THRESH_LNC_OFFSET   44     /* Lower non-critical threshold */
+#define IPMI_RPLY_SENSOR_THRESH_LC_OFFSET    45     /* Lower critical threshold */
+#define IPMI_RPLY_SENSOR_THRESH_LNR_OFFSET   46     /* Lower non-recoverable threshold */
+#define IPMI_RPLY_SENSOR_THRESH_UNC_OFFSET   47     /* Upper non-critical threshold */
+#define IPMI_RPLY_SENSOR_THRESH_UC_OFFSET    48     /* Upper critical threshold */
+#define IPMI_RPLY_SENSOR_THRESH_UNR_OFFSET   49     /* Upper non-recoverable threshold */
 #define IPMI_RPLY_FRU_AREA_SIZE_LSB_OFFSET   43     /* FRU inventory area size in bytes, LSB */
 #define IPMI_RPLY_FRU_AREA_SIZE_MSB_OFFSET   44     /* FRU inventory area size in bytes, MSB */
 #define IPMI_RPLY_FRU_AREA_ACCESS_OFFSET     45     /* Bit 0 indicates if device is accessed by bytes (0) or words (1) */
@@ -329,7 +366,7 @@ int  mchNewSession(MchSess mchSess, IpmiSess ipmiSess);
 
 #define IPMI_RPLY_COMPLETION_CODE_UNBRIDGED_OFFSET 20
 
-#define SENSOR_TYPE_HOTSWAP_VT     0xF0
+#define SENSOR_TYPE_HOTSWAP        0xF0
 #define SENSOR_TYPE_HOTSWAP_NAT    0xF2
 
 /* MCH vendors */
@@ -358,6 +395,15 @@ int  mchNewSession(MchSess mchSess, IpmiSess ipmiSess);
 #define FRU_PWR_EARLY            2
 #define FRU_PWR_EARLY_DES        3
 #define FRU_PWR_MSG_CMPTBL(x) ((x>=3 && x<=16) || (x>=40 && x<=41) || (x>=50 && x<=53)) /* See Vadatech CLI Manual (5.7.9) */
+
+#define PICMG_ENTITY_ID_FRONT_BOARD          0xA0
+#define PICMG_ENTITY_ID_RTM                  0xC0
+#define PICMG_ENTITY_ID_AMC                  0xC1
+#define PICMG_ENTITY_ID_SHM                  0xF0 /* Shelf management controller */
+#define PICMG_ENTITY_ID_FILTRATION_UNIT      0xF1
+#define PICMG_ENTITY_ID_SHELF_FRU_INFO       0xF2
+#define PICMG_ENTITY_ID_ALARM_PANEL          0xF3
+#define PICMG_ENTITY_ID_POWER_FILTERING      0x15
 
 /* MicroTCA */
 #define UTCA_FRU_TYPE_CARRIER                0
