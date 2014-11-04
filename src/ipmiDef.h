@@ -312,7 +312,7 @@ extern uint8_t FRU_I2C_ADDR[102];
 #define SENSOR_NOMINAL_GIVEN(x)    (x & (1<<0))
 #define SENSOR_NORM_MAX_GIVEN(x)   (x & (1<<1))
 #define SENSOR_NORM_MIN_GIVEN(x)   (x & (1<<2))
-#define SENSOR_NOMINAL_FORMAT(x)   ((x & 0xC0) >> 6)
+#define SENSOR_NUMERIC_FORMAT(x)   ((x & 0xC0) >> 6)
 
 #define SENSOR_UNITS_UNSPEC        0
 #define SENSOR_UNITS_DEGC          1
@@ -339,10 +339,10 @@ extern uint8_t FRU_I2C_ADDR[102];
 #define SENSOR_CONV_SQRT           10
 #define SENSOR_CONV_CUBE_NEG1      11
 
-#define SENSOR_NOMINAL_UNSIGNED    0
-#define SENSOR_NOMINAL_ONES_COMP   1
-#define SENSOR_NOMINAL_TWOS_COMP   2
-#define SENSOR_NOMINAL_NONNUMERIC  3
+#define SENSOR_NUMERIC_FORMAT_UNSIGNED    0
+#define SENSOR_NUMERIC_FORMAT_ONES_COMP   1
+#define SENSOR_NUMERIC_FORMAT_TWOS_COMP   2
+#define SENSOR_NUMERIC_FORMAT_NONNUMERIC  3
 
 /* SDR FRU Device contents */
 #define SDR_FRU_ADDR_OFFSET        5  /* SDR Body */
