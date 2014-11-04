@@ -292,7 +292,7 @@ devMchFind(const char *name)
 static epicsFloat64
 sensorConversion(SdrFull sdr, uint8_t raw, char *name)
 {
-int l, units, m, b, rexp, bexp;
+int l, units, format, m, b, rexp, bexp;
 epicsFloat64 value;
 
 	l = SENSOR_LINEAR( sdr->linear );
@@ -303,7 +303,32 @@ epicsFloat64 value;
 	bexp  = TWOS_COMP_SIGNED_NBIT(SENSOR_CONV_BEXP( sdr->RexpBexp ), 4 );
 	units = sdr->units2;    
 
-       	value = ((m*raw) + (b*pow(10,bexp)))*pow(10,rexp);
+	format = SENSOR_NUMERIC_FORMAT( sdr->units1 );
+
+	switch ( format ) {
+
+		default:
+			printf("sensorConversion %s: Unknown analog data format\n", name);
+			return raw;
+
+		case SENSOR_NUMERIC_FORMAT_UNSIGNED:
+			value = raw;
+			break;
+
+		case SENSOR_NUMERIC_FORMAT_ONES_COMP:
+			value = ONES_COMP_SIGNED_NBIT( raw, 8 );
+			break;
+
+		case SENSOR_NUMERIC_FORMAT_TWOS_COMP:
+			value = TWOS_COMP_SIGNED_NBIT( raw, 8 );
+			break;
+
+		case SENSOR_NUMERIC_FORMAT_NONNUMERIC:
+			printf("sensorConversion %s: Non-numeric data format\n", name);
+			return raw;
+	}
+
+       	value = ((m*value) + (b*pow(10,bexp)))*pow(10,rexp);
 
 	if ( l == SENSOR_CONV_LINEAR )
 		value = value;
@@ -395,6 +420,7 @@ sensEgu(char *egu, unsigned units) {
 static void
 sensThresh(SdrFull sdr, Sensor sens, epicsFloat64 *lolo, epicsEnum16 *llsv, epicsFloat64 *low, epicsEnum16 *lsv, epicsFloat64 *high, epicsEnum16 *hsv, epicsFloat64 *hihi, epicsEnum16 *hhsv, char *name) 
 {
+
 	if ( IPMI_SENSOR_THRESH_LC_READABLE(sens->tmask) ) {
 		*lolo = sensorConversion( sdr, sens->tlc, name );
 		*llsv = MAJOR_ALARM;
@@ -516,46 +542,6 @@ DBLINK  *plink   = &pai->inp;
 		goto bail;
 	else
 		pai->dpvt = recPvt;
-
-	/* To do: implement alarms; use upper, lower, critical, non-critical etc.
-	mchData = mch->udata;
-	sdr     = &mchSys->sens[s].sdr;
-
-	if ( sdr->recType == SDR_TYPE_FULL_SENSOR ) {
-
-		if ( SENSOR_NOMINAL_GIVEN( sdr->anlgChar ) || (sdr->nominal) ) {
-
-			switch ( SENSOR_NOMINAL_FORMAT( sdr->units1 ) ) {
-
-				default:
-					goto bail;
-
-				case SENSOR_NOMINAL_UNSIGNED:
-
-					raw = sdr->nominal;
-					break;
-
-				case SENSOR_NOMINAL_ONES_COMP:
-
-					raw = ONES_COMP_SIGNED_NBIT( sdr->nominal, 8 );
-					break;
-
-				case SENSOR_NOMINAL_TWOS_COMP:
-
-					raw = TWOS_COMP_SIGNED_NBIT( sdr->nominal, 8 );
-					break;
-
-				case SENSOR_NOMINAL_NONNUMERIC:
-					goto bail;
-
-			}
-
-			nominal = sensorConversion( sdr, raw );
-			if ( sdr->units2 == SENSOR_UNITS_DEGC)
-				nominal = nominal*9/5 + 32;
-		}
-
-	} */
 
 bail:
 	if ( status ) {
