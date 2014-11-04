@@ -1,9 +1,10 @@
-ipmiComm-R2-0-3:  14-Oct-2014 S. Hoobler
+ipmiComm-R2-0-3:  04-Nov-2014 S. Hoobler
 		  Add support to read NAT hot swap sensors
 		  Start support to get sensor thresholds and push to PV limits
                   (left inactive until further testing complete)
 		  Read IPMI version of device
-		  Add databases for more FRU types			
+		  Add databases for more FRU types
+		  Decode data format for sensor values and limits and then convert			
 
 ipmiComm-R2-0-2:  17-Apr-2014   K. Luchini
                   Upgrade asyn from R4-18-lcls1 to R4-21_1-0
