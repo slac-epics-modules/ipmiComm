@@ -356,7 +356,6 @@ char buff[9];
 int  id     = -1;
 Sensor sens = &mchSys->sens[index];
 SdrFull sdr = &sens->sdr;
-char test[20];
 
 	/* NAT associates hotswap aka M-state sensors with carrier manager but
          * Vadatech associates them with the actual FRU described by the sensor.
@@ -623,7 +622,7 @@ mchGetSensorInfo(MchData mchData, Sensor sens)
 {
 uint8_t  response[MSG_MAX_LENGTH] = { 0 };
 size_t   responseSize;
-int      offs = ( MCH_IS_NAT( mchData->mchSess->type ) ) ? IPMI_RPLY_OFFSET_NAT : 0; /* Offset into reply message */
+//int      offs = ( MCH_IS_NAT( mchData->mchSess->type ) ) ? IPMI_RPLY_OFFSET_NAT : 0; /* Offset into reply message, used for get sensor thresholds */
 
 
 	responseSize = sens->readMsgLength = ( MCH_IS_NAT( mchData->mchSess->type ) ) ? IPMI_RPLY_SENSOR_READ_MAX_LENGTH_NAT : IPMI_RPLY_SENSOR_READ_MAX_LENGTH_VT;
@@ -677,12 +676,11 @@ uint8_t  id[2]  = { 0 };
 uint8_t  res[2] = { 0 };
 Sensor   sens   = 0;
 uint8_t  offset = 0;
-uint8_t  type   = 0, addr = 0;
+uint8_t  type   = 0;
 uint8_t *raw    = 0;
 int      err;
 int      size; /* SDR record size (after header) */
 int      i, iFull = 0, iFru = 0, iMgmt = 0, fruId;
-size_t   responseSize;
 int      rval = -1;
 int      offs = ( MCH_IS_NAT( mchSess->type ) ) ? IPMI_RPLY_OFFSET_NAT : 0;
 int      base = ( MCH_IS_NAT( mchSess->type ) ) ? IPMI_RPLY_GET_SDR_BASE_LENGTH_NAT : IPMI_RPLY_GET_SDR_BASE_LENGTH_VT;
