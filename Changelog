@@ -1,4 +1,10 @@
-14JOct2014 (SH)
+04Nov2014 (SH)
+
+src:
+ -  Decode data format for sensor values and limits and then convert as needed
+    Changes to devMch.c, ipmiDef.h
+
+14Oct2014 (SH)
 
 src:
  -  Began support to read sensor thresholds but left inactive for now
