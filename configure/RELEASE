@@ -19,7 +19,7 @@ BASE_MODULE_VERSION=$(EPICS_BASE_VER)
 # IOC apps or other Support apps
 # =============================================================
 ASYN_MODULE_VERSION=asyn-R4-21_1-0
-IOCADMIN_MODULE_VERSION=iocAdmin-R3-1-9_1-0
+IOCADMIN_MODULE_VERSION=iocAdmin-R3-1-12_1-0
 # ============================================================
 # Support module locations
 # ============================================================
