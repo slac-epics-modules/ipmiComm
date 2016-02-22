@@ -618,7 +618,6 @@ int        eomReason;
 asynStatus status;
 asynUser  *pasynUser;
 
-	pasynUser = pasynManager->createAsynUser(0, 0);
 	if ( (status = pasynOctetSyncIO->connect(name, 0, &pasynUser, NULL)) ) {
 		pasynManager->freeAsynUser( pasynUser );
 		return status;
