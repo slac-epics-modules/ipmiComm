@@ -1,3 +1,14 @@
+Release: ipmiComm-R2-0-4
+
+22Feb2015 (SH)
+
+src:
+ -  Remove createAsynUser. Not needed and apparently creates
+    memory leak when used with syncio writeread.
+
+configure/RELEASE, ipmiCommApp/Db, and ipmiCommApp/src/Makefile:
+ - add suppport for iocAdmin
+
 04Nov2014 (SH)
 
 src:
