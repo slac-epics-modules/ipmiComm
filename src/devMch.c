@@ -1014,7 +1014,8 @@ int readoffset;
 
 				epicsMutexLock( mch->mutex );
 
-				if ( !(s = mchGetSensorReadingStat( mchData, sensor,data, sensor, addr, &responseSize )) ) {	
+/* Change this to use mchGetSensorReadingStat */
+				if ( !(s = mchMsgReadSensor( mchData, data, sensor, addr, &responseSize )) ) {	
 
 					bits = data[IPMI_RPLY_IMSG2_SENSOR_ENABLE_BITS_OFFSET];// + offs];
 					if ( IPMI_SENSOR_READING_DISABLED(bits)  || IPMI_SENSOR_SCANNING_DISABLED(bits) ) {

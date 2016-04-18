@@ -14,6 +14,8 @@ For username/password, find other solution than hard-coded in code/headers
 Need to reconsider how to handle alarms if sensor scanning disabled
 --Continue to enforce alarms? Instead of INVALID, 'grey' out alarms on display?
 
+Change language/names everywhere to no longer use 'MCH' to describe a general system
+
 ***************************/
 
 

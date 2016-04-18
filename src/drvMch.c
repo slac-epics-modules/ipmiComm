@@ -881,7 +881,7 @@ uint8_t rval;
 	bits = response[IPMI_RPLY_IMSG2_SENSOR_ENABLE_BITS_OFFSET];
 	if ( IPMI_SENSOR_READING_DISABLED(bits) || IPMI_SENSOR_SCANNING_DISABLED(bits) ) {
 		if ( MCH_DBG( mchStat[mchData->mchSess->instance] ) )
-			printf("sensor %i reading/state unavailable or scanning disabled. Bits: %02x\n", number, bits);
+			printf("%s mchGetSensorReadingStat: sensor %i reading/state unavailable or scanning disabled. Bits: %02x\n", mchData->mchSess->name, number, bits);
 		return -1;
 	}
 
