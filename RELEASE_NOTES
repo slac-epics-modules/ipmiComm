@@ -1,3 +1,9 @@
+ipmiComm-R3-0-0:  18-Apr-2016 S. Hoobler
+		  Add support for Supermicro
+                  Refactoring and reorgnization
+		  *Not tested with Vadatech MCH*
+		  *New PV names but aliases added for backward compatibility"
+
 ipmiComm-R2-0-4:  22-Feb-2016 S. Hoobler
                   Change asyn commands to fix memory leak (ipmiMsg.c)
                   Add iocAdmin
