@@ -1,0 +1,30 @@
+# Aliases are temporary for backward-compatibility
+
+record(mbbi, "$(dev):$(id)$(unit):FANAUTO") {
+  field(DESC, "Fan supports auto adjustment")
+  field(SCAN, "I/O Intr")
+  field(DTYP, "MCHsensor")
+  field(INP,  "#B$(fruid) C0 N0 @$(link)+fan")
+  field(ZRST, "No")
+  field(ZRVL, "0")
+  field(ONST, "Yes")
+  field(ONVL, "1")
+  field(PINI, "YES")
+  alias("$(dev):$(id)$(unit)_FANAUTO")
+}
+
+record(longout, "$(dev):$(id)$(unit):FANSPEEDSET") {
+  field(DESC, "Set fan level")
+  field(DTYP, "FRUinfo")
+  field(OUT,  "#B$(fruid) C0 N0 @$(link)+fan")
+  field(OMSL, "supervisory")
+  alias("$(dev):$(id)$(unit)_FANSPEEDSET")
+}
+
+record(ai, "$(dev):$(id)$(unit):FANLEVEL") {
+  field(SCAN, "10 second")
+  field(DESC, "Fan level")
+  field(DTYP, "FRUinfo")
+  field(INP,  "#B$(fruid) C0 N0 @$(link)+fan")
+  alias("$(dev):$(id)$(unit)_FANLEVEL")
+}

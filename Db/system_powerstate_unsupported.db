@@ -1,0 +1,8 @@
+# For system in which cannot read 
+# power state, populate this PV 
+record(stringin, "$(dev):POWERSTATE") {
+  field(DESC, "Power on state")
+  field(INP, "")
+  field(VAL,  "No info")
+  field(PINI, "YES")
+}

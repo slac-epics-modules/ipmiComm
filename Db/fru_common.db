@@ -1,0 +1,179 @@
+# Aliases are temporary for backward-compatibility
+
+# FRU 'presence' record to indicate whether FRU
+# is active; used by edm visibility rules
+record(bi, "$(dev):$(id)$(unit):P") {
+  field(DESC, "Module presence")
+  field(SCAN, "I/O Intr")
+  field(DTYP, "MCHsensor")
+  field(INP, "#B$(fruid) C0 N0 @$(link)+fpres")
+  field(ZNAM, "Not present")
+  field(ONAM, "Present")
+  field(PINI, "YES")
+  alias("$(dev):$(id)$(unit)P")
+}
+
+# Vadatech 'hotswap' sensor, provides FRU M-state
+record(mbbi, "$(dev):$(id)$(unit):MSTATE") {
+  field(SCAN, "10 second")
+  field(DTYP, "MCHsensor")
+  field(INP,  "#B$(fruid) C240 N1 @$(link)+hs")
+  field(ONVL, "0x01")
+  field(ONST, "Not Installed")
+  field(TWVL, "0x02")
+  field(TWST, "Inactive")
+  field(THVL, "0x04")
+  field(THST, "Activation Request")
+  field(FRVL, "0x08")
+  field(FRST, "Activation In Progress")
+  field(FVVL, "0x10")
+  field(FVST, "Active")
+  field(SXVL, "0x20")
+  field(SXST, "Deactivation Request")
+  field(SVVL, "0x40")
+  field(SVST, "Deactivation In Progress")
+  field(EIVL, "0x80")
+  field(EIST, "Communication Lost")
+  alias("$(dev):$(id)$(unit)_MSTATE")
+}
+
+record(ai, "$(dev):$(id)$(unit):FRUID") {
+  field(DESC, "Module type")
+  field(VAL,  "$(fruid)")
+  field(PINI, "YES")
+  alias("$(dev):$(id)$(unit)_FRUID")
+}
+
+record(stringin, "$(dev):$(id)$(unit):BMANUF") {
+  field(DESC, "Board manufacturer")
+  field(SCAN, "I/O Intr")
+  field(DTYP, "FRUinfo")
+  field(INP, "#B$(fruid) C0 N0  @$(link)+bmf")
+  field(PINI, "YES")
+  field(FLNK, "$(dev):$(id)$(unit):BPRODNAME")
+  alias("$(dev):$(id)$(unit)_BMANUF")
+}
+
+record(stringin, "$(dev):$(id)$(unit):BPRODNAME") {
+  field(DESC, "Board product name")
+  field(DTYP, "FRUinfo")
+  field(INP, "#B$(fruid) C0 N0  @$(link)+bp")
+  field(FLNK, "$(dev):$(id)$(unit):BSN")
+  alias("$(dev):$(id)$(unit)_BPRODNAME")
+}
+
+record(stringin, "$(dev):$(id)$(unit):BSN") {
+  field(DESC, "Board serial number")
+  field(DTYP, "FRUinfo")
+  field(INP, "#B$(fruid) C0 N0  @$(link)+bsn")
+  field(FLNK, "$(dev):$(id)$(unit):BPARTNUMBER")
+  alias("$(dev):$(id)$(unit)_BSN")
+}
+
+record(stringin, "$(dev):$(id)$(unit):BPARTNUMBER") {
+  field(DESC, "Board part number")
+  field(DTYP, "FRUinfo")
+  field(INP, "#B$(fruid) C0 N0  @$(link)+bpn")
+  field(FLNK, "$(dev):$(id)$(unit):PMANUF")
+  alias("$(dev):$(id)$(unit)_BPARTNUMBER")
+}
+
+record(stringin, "$(dev):$(id)$(unit):PMANUF") {
+  field(DESC, "Product manufacturer")
+  field(DTYP, "FRUinfo")
+  field(INP, "#B$(fruid) C0 N0  @$(link)+pmf")
+  field(FLNK, "$(dev):$(id)$(unit):PPRODNAME")
+  alias("$(dev):$(id)$(unit)_PMANUF")
+}
+
+record(stringin, "$(dev):$(id)$(unit):PPRODNAME") {
+  field(DESC, "Product product name")
+  field(DTYP, "FRUinfo")
+  field(INP, "#B$(fruid) C0 N0  @$(link)+pp")
+  field(FLNK, "$(dev):$(id)$(unit):PSN")
+  alias("$(dev):$(id)$(unit)_PPRODNAME")
+}
+
+record(stringin, "$(dev):$(id)$(unit):PSN") {
+  field(DESC, "Product serial number")
+  field(DTYP, "FRUinfo")
+  field(INP, "#B$(fruid) C0 N0  @$(link)+psn")
+  field(FLNK, "$(dev):$(id)$(unit):PPARTNUMBER")
+  alias("$(dev):$(id)$(unit)_PSN")
+}
+
+record(stringin, "$(dev):$(id)$(unit):PPARTNUMBER") {
+  field(DESC, "Product part number")
+  field(DTYP, "FRUinfo")
+  field(INP, "#B$(fruid) C0 N0  @$(link)+ppn")
+  alias("$(dev):$(id)$(unit)_PPARTNUMBER")
+}
+
+record(mbbo, "$(dev):$(id)$(unit):POWERCTL") {
+  field(DESC, "Payload power control")
+  field(DTYP, "MCHsensor")
+  field(OMSL, "supervisory")
+  field(OUT, "#B$(fruid) C0 N0  @$(link)+fru")
+  field(ZRST, "Power off")
+  field(ONST, "Power on")
+#  reset not supported yet
+#  field(TWST, "Hard reset")
+  alias("$(dev):$(id)$(unit)_POWERCTL")
+}
+
+record(ai, "$(dev):$(id)$(unit):PWR") {
+  field(DESC, "Steady state power draw")
+  field(SCAN, "10 second")
+  field(DTYP, "FRUinfo")
+  field(INP, "#B$(fruid) C0 N0  @$(link)+pwr")
+  field(EGU, "W")
+  field(FLNK, "$(dev):$(id)$(unit):PWRDES")
+  alias("$(dev):$(id)$(unit)_PWR")
+}
+
+record(ai, "$(dev):$(id)$(unit):PWRDES") {
+  field(DESC, "Desired steady state power draw")
+  field(DTYP, "FRUinfo")
+  field(INP, "#B$(fruid) C1 N0  @$(link)+pwr")
+  field(EGU, "W")
+  field(FLNK, "$(dev):$(id)$(unit):EPWR")
+  alias("$(dev):$(id)$(unit)_PWRDES")
+}
+
+record(ai, "$(dev):$(id)$(unit):EPWR") {
+  field(DESC, "Early power draw")
+  field(DTYP, "FRUinfo")
+  field(INP, "#B$(fruid) C2 N0  @$(link)+pwr")
+  field(EGU, "W")
+  field(FLNK, "$(dev):$(id)$(unit):EPWRDES")
+  alias("$(dev):$(id)$(unit)_EPWR")
+}
+
+record(ai, "$(dev):$(id)$(unit):EPWRDES") {
+  field(DESC, "Desired early power draw")
+  field(DTYP, "FRUinfo")
+  field(INP, "#B$(fruid) C3 N0  @$(link)+pwr")
+  field(EGU, "W")
+  field(FLNK, "$(dev):$(id)$(unit):PWRDLY")
+  alias("$(dev):$(id)$(unit)_EPWRDES")
+}
+
+record(ai, "$(dev):$(id)$(unit):PWRDLY") {
+  field(DESC, "FRU delay to stable power")
+  field(DTYP, "FRUinfo")
+  field(INP, "#B$(fruid) C0 N0  @$(link)+pwr")
+  field(EGU, "s")
+  field(FLNK, "$(dev):$(id)$(unit):PWRDYN")
+  alias("$(dev):$(id)$(unit)_PWRDLY")
+}
+
+record(mbbi, "$(dev):$(id)$(unit):PWRDYN") {
+  field(DESC, "FRU supports dynamic pwr reconfig")
+  field(DTYP, "MCHsensor")
+  field(INP,  "#B$(fruid) C0 N0  @$(link)+pwr")
+  field(ZRST, "No")
+  field(ZRVL, "0")
+  field(ONST, "Yes")
+  field(ONVL, "1")
+  alias("$(dev):$(id)$(unit)_PWRDYN")
+}

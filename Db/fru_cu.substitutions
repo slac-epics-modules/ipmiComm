@@ -1,0 +1,75 @@
+#==============================================================================
+#
+# Abs:  Default Cooling Unit FRU and sensor PVs
+#
+# Name:  fru_cu.substitutions
+#
+# Macros in:
+#	dev      Shelf name, for example CRAT:LI28:RF01
+#	prefix   String in PV name that identifies the FRU sensor is associated with (if there is one)
+#		 PV name syntax: $(dev):$(prefix)$(attr)$(sensinst)
+#		 For microTCA systems, prefix is "<frutype><instance>_", for example AMC1_ for the first AMC
+#		 or CU2_ for the second cooling unit
+#		 For supermicro, the sensors are not associated with a FRU, so prefix is an empty string
+#	aliasprefix Temporary string to keep PV names backward-compatible via alias
+#	id       String identifier, for example 'CU' for cooling unit
+#       unit     Instance of this type of module, for example 2 for the second MCH in a carrier
+#       attr	 Used in PV attribute, for example FAN1SPEED or TEMP2
+#       sensinst Instance of this type of sensor on this module
+#       type     Sensor type code, defined in IPMI spec (and src/ipmiDef.h)
+#       fruid    FRU ID according to MicroTCA spec
+#	dev      Shelf name, for example CRAT:LI28:RF01
+#	cod      String identifier, for example 'CU' for cooling unit
+#       inst     Instance of this type of module, for example 2 for the second MCH in a carrier
+#       attr	 Used in PV attribute, for example FAN1SPEED or TEMP2
+#       sensinst Instance of this type of sensor on this module
+#       type     Sensor type code, defined in IPMI spec (and src/ipmiDef.h)
+#       fruid    FRU ID according to MicroTCA spec
+#
+#==============================================================================
+#
+
+file fru_cu_common.db
+{
+   pattern { dev	, id		, unit		, fruid		}
+           { $(dev)	, $(id)		, $(unit)  	, $(fruid)	}
+}
+
+file fru_basic.db
+{
+   pattern { dev	, id		, unit		, fru 		}
+	   { $(dev)	, $(id)		, $(unit)	, $(fruid)    	}
+}
+
+file sensor_ai.db
+{
+   pattern { dev	, prefix	, aliasprefix	,  attr		, sensinst	, type	, fru 		}
+           { $(dev)	, $(id)$(unit):	, $(id)$(unit)_	,  FANSPEED	, 1		, 4	, $(fruid)	}
+           { $(dev)	, $(id)$(unit):	, $(id)$(unit)_	,  FANSPEED	, 2		, 4	, $(fruid)	}
+           { $(dev)	, $(id)$(unit):	, $(id)$(unit)_	,  FANSPEED	, 3		, 4	, $(fruid)	}
+           { $(dev)	, $(id)$(unit):	, $(id)$(unit)_	,  FANSPEED	, 4		, 4	, $(fruid)	}
+           { $(dev)	, $(id)$(unit):	, $(id)$(unit)_	,  FANSPEED	, 5		, 4	, $(fruid)	}
+           { $(dev)	, $(id)$(unit):	, $(id)$(unit)_	,  FANSPEED	, 6		, 4	, $(fruid)	}
+           { $(dev)	, $(id)$(unit):	, $(id)$(unit)_	,  FANSPEED	, 7		, 4	, $(fruid)	}
+           { $(dev)	, $(id)$(unit):	, $(id)$(unit)_	,  FANSPEED	, 8		, 4	, $(fruid)	}
+           { $(dev)	, $(id)$(unit):	, $(id)$(unit)_	,  FANSPEED	, 9		, 4	, $(fruid)	}
+           { $(dev)	, $(id)$(unit):	, $(id)$(unit)_	,  FANSPEED	, 10		, 4	, $(fruid)	}
+}			  			
+			  	
+			  	
+			  	
+			  	
+			  	
+			  	
+			  	
+			  	
+			  	
+			  	
+			  	
+			  	
+			  	
+			  	
+			  	
+			  	
+			  	
+			  	

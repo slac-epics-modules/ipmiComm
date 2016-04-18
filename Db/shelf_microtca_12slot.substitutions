@@ -1,0 +1,95 @@
+#==============================================================================
+#
+# Abs:  Populate shelf PVs
+#
+# Name:  shelf_microtca_12slot.substitutions
+#
+# Macros in:
+#	crat    Shelf name, for example CRAT:LI28:RF01
+#       node    Name of shelf used in asynIPPortConfigure in st.cmd, for example crat-li28-rf01
+#	id      String identifier, for example 'CU' for cooling unit
+#       unit    Instance of this type of module, for example 2 for the second MCH in a shelf
+#	loca	Building, rack, elevation
+#
+#
+# Macros out:
+#
+#       dev     Shelf Name, for example CRAT:LI28:RF01
+#       link    Name of shelf used in asynIPPortConfigure in st.cmd, for example crat-li28-rf01
+#	location Building, rack, elevation
+#
+#
+#==============================================================================
+#
+
+file system_common.db
+{
+   pattern { dev	, link		, location	}
+	   { $(dev)	, $(link)	, $(location)	}	
+}
+
+file system_powerstate_unsupported.db
+{
+   pattern { dev	}
+	   { $(dev)	}	
+}
+
+file fru_basic.db
+{
+   pattern { dev	, id	, unit	, fruid	}
+           { $(dev)	, MCH	, 1  	, 3	}
+           { $(dev)	, MCH	, 2  	, 4	}
+           { $(dev)	, MCHRTM, 1  	, 64	}
+           { $(dev)	, MCHRTM, 2  	, 65	}
+           { $(dev)	, AMC	, 1  	, 5	}
+           { $(dev)	, AMC	, 2  	, 6	}
+           { $(dev)	, AMC	, 3  	, 7	}
+           { $(dev)	, AMC	, 4  	, 8	}
+           { $(dev)	, AMC	, 5  	, 9	}
+           { $(dev)	, AMC	, 6  	, 10	}
+           { $(dev)	, AMC	, 7  	, 11	}
+           { $(dev)	, AMC	, 8  	, 12	}
+           { $(dev)	, AMC	, 9  	, 13	}
+           { $(dev)	, AMC	, 10  	, 14	}
+           { $(dev)	, AMC	, 11  	, 15	}
+           { $(dev)	, AMC	, 12  	, 16	}
+           { $(dev)	, RTM	, 1  	, 90	}
+           { $(dev)	, RTM	, 2  	, 91	}
+           { $(dev)	, RTM	, 3  	, 92	}
+           { $(dev)	, RTM	, 4  	, 93	}
+           { $(dev)	, RTM	, 5  	, 94	}
+           { $(dev)	, RTM	, 6  	, 95	}
+           { $(dev)	, RTM	, 7  	, 96	}
+           { $(dev)	, RTM	, 8  	, 97	}
+           { $(dev)	, RTM	, 9  	, 98	}
+           { $(dev)	, RTM	, 10  	, 99	}
+           { $(dev)	, RTM	, 11 	, 100	}
+           { $(dev)	, RTM	, 12  	, 101	}
+           { $(dev)	, CLK	, 1  	, 60	}
+           { $(dev)	, CLK	, 2  	, 62	}
+           { $(dev)	, HUB	, 1  	, 61	}
+           { $(dev)	, HUB	, 2  	, 63	}
+           { $(dev)	, MCHCM	, 1  	, 0	}
+           { $(dev)	, SH	, 1  	, 1	}
+           { $(dev)	, SH	, 2  	, 2	}
+           { $(dev)	, CM	, 1  	, 253	}
+           { $(dev)	, SHM	, 1  	, 254	}
+           { $(dev)	, BP	, 1  	, 164	}
+}
+
+file fru_cu.db
+{
+   pattern { dev	, id	, unit	, fruid	}
+           { $(dev)	, CU	, 1  	, 40	}
+           { $(dev)	, CU	, 2  	, 41	}
+}
+
+file fru_pm.db
+{
+   pattern { dev	, id	, unit	, fruid }
+           { $(dev)	, PM	, 1    	, 50	}
+           { $(dev)	, PM	, 2  	, 51	}
+           { $(dev)	, PM	, 3  	, 52	}
+           { $(dev)	, PM	, 4  	, 53	}
+}
+

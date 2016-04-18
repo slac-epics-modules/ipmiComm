@@ -1,0 +1,18 @@
+record(calc, "$(dev):STATSUMY") {
+  field(SCAN, "1 second")
+# CALC field copied from IOCManager (not sure how it's used)
+  field(CALC, "A+B+C+D+E+F+G+H+I+J+K+L=12?1:0")
+  field(INPA, "$(inpa).SEVR MS")
+  field(INPB, "$(inpb).SEVR MS")
+  field(INPC, "$(inpc).SEVR MS")
+  field(INPD, "$(inpd).SEVR MS")
+  field(INPE, "$(inpe).SEVR MS")
+  field(INPF, "$(inpf).SEVR MS")
+  field(INPG, "$(inpg).SEVR MS")
+  field(INPH, "$(inph).SEVR MS")
+  field(INPI, "$(inpi).SEVR MS")
+  field(INPJ, "$(inpj).SEVR MS")
+  field(INPK, "$(inpk).SEVR MS")
+  field(INPL, "$(inpl).SEVR MS")
+  info(autosaveFields,"INPA INPB INPC INPD INPE INPF INPG INPH INPI INPJ INPK INPL")
+}

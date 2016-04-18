@@ -1,0 +1,108 @@
+# 24 bits assigned as follows:
+# 0-7   power state byte (bit 7 ignored)
+# 8-15  last power event byte (bits 5-7 ignored)
+# 16-23 misc chassis state byte (bits 4-7 ignored)
+record(longin, "$(dev):CHASSTAT") {
+ field(DESC, "Chassis status")
+ field(DTYP, "MCHsensor")
+ field(SCAN, "5 second")
+ field(INP, "#B0 C0 N0 @$(link)+chas")
+ field(FLNK, "$(dev):POWERINFO_CALC")
+}
+
+record(calc, "$(dev):POWERINFO_CALC") {
+ field(DESC, "Chassis power info")
+ field(CALC, "A & 0x7F")
+ field(INPA, "$(dev):CHASSTAT MS")
+ field(FLNK, "$(dev):POWERSTAT_CALC")
+}
+
+record(calc, "$(dev):POWERSTAT_CALC") {
+ field(DESC, "Chassis power status")
+ field(CALC, "A & 0x1F")
+ field(INPA, "$(dev):POWERINFO_CALC MS")
+ field(FLNK, "$(dev):POWERSTAT")
+}
+
+record(longin,"$(dev):POWERSTAT") {
+  field(DESC, "Chassis power status")
+  field(INP,  "$(dev):POWERSTAT_CALC MS")
+  field(FLNK, "$(dev):POWERSTATE_CALC")
+}
+
+# Name POWERSTATE to be consistent with other 
+# SLAC systems
+record(calc,  "$(dev):POWERSTATE_CALC") {
+  field(DESC, "Power on state")
+  field(CALC, "A & 0x1")
+  field(INPA, "$(dev):POWERSTAT MS")
+  field(FLNK, "$(dev):POWERSTATE")
+}
+
+record(bi,    "$(dev):POWERSTATE") {
+  field(DESC, "Power on state")
+  field(INP,  "$(dev):POWERSTATE_CALC MS")
+  field(ZNAM, "Not on")
+  field(ZSV,  "MAJOR")
+  field(ONAM, "On")
+  field(OSV,  "NO_ALARM")
+  field(FLNK, "$(dev):POWERPOLICY_CALC")
+}
+
+record(calc, "$(dev):POWERPOLICY_CALC") {
+ field(DESC, "Chassis power policy")
+ field(CALC, "(A & 0x60)>>5")
+ field(INPA, "$(dev):POWERINFO_CALC MS")
+ field(FLNK, "$(dev):POWERPOLICY")
+}
+
+record(mbbi,  "$(dev):POWERPOLICY") {
+  field(DESC, "Chassis power policy")
+  field(INP,  "$(dev):POWERPOLICY_CALC")
+  field(ZRST, "Remains off")
+  field(ZRVL, "0")
+  field(ONST, "Previous state")
+  field(ONVL, "1")
+  field(TWST, "Powers up")
+  field(TWVL, "2")
+  field(THST, "Unknown")
+  field(THVL, "3")
+  field(FLNK, "$(dev):MISCSTAT_CALC")
+}
+
+record(calc, "$(dev):MISCSTAT_CALC") {
+ field(DESC, "Chassis misc status")
+ field(CALC, "(A & 0x0F0000)>>16")
+ field(INPA, "$(dev):CHASSTAT MS")
+ field(FLNK, "$(dev):MISCSTAT")
+}
+
+record(longin, "$(dev):MISCSTAT") {
+ field(DESC, "Chassis misc status")
+ field(INP,  "$(dev):MISCSTAT_CALC MS")
+ field(FLNK, "$(dev):LASTPOWER_CALC")
+}
+
+record(calc, "$(dev):LASTPOWER_CALC") {
+ field(DESC, "Last power event")
+ field(CALC, "(A & 0x1F00)>>8")
+ field(INPA, "$(dev):CHASSTAT MS")
+ field(FLNK, "$(dev):LASTPOWER")
+}
+
+record(mbbi, "$(dev):LASTPOWER") {
+ field(DESC, "Last power event")
+ field(INP,  "$(dev):LASTPOWER_CALC MS")
+ field(ZRST, "N/A")
+ field(ZRVL, "0")
+ field(ONST, "AC power failed")
+ field(ONVL, "1")
+ field(TWST, "Power overload")
+ field(TWVL, "2")
+ field(THST, "Power interlock")
+ field(THVL, "4")
+ field(FRST, "Power fault")
+ field(FRVL, "8")
+ field(FVST, "Remote power on")
+ field(FVVL, "32") 
+}

@@ -1,0 +1,218 @@
+record(mbbi, "$(dev):TYPE_RAW") {
+# DESC filled in by device support
+ field(DESC, "")
+ field(DTYP, "MCHsensor")
+ field(SCAN, "I/O Intr")
+ field(INP, "#B0 C0 N0 @$(link)+mch")
+ field(ZRST, "Unknown")
+ field(ZRVL, "0")
+ field(ZRSV, "MAJOR")
+ field(ONST, "Vadatech")
+ field(ONVL, "1")
+ field(ONSV, "NO_ALARM")
+ field(TWST, "NAT")
+ field(TWVL, "2")
+ field(TWSV, "NO_ALARM")
+ field(THST, "Supermicro")
+ field(THVL, "3")
+ field(THSV, "NO_ALARM")
+ field(PINI, "YES")
+ field(FLNK, "$(dev):TYPE_CALC")
+}
+
+# Convert to TYPE numbers used at SLAC
+# and push DESC field to high-level TYPE PV
+record(calc, "$(dev):TYPE_CALC") {
+  field(CALC, "A+25")
+  field(INPA, "$(dev):TYPE_RAW")
+  field(FLNK, "$(dev):TYPE_DESC")
+}
+
+record(stringout, "$(dev):TYPE_DESC") {
+  field(OMSL, "closed_loop")
+  field(DOL,  "$(dev):TYPE_RAW.DESC")
+  field(OUT,  "$(dev):TYPE.DESC")
+  field(FLNK, "$(dev):TYPE")
+}
+
+record(ai, "$(dev):TYPE") {
+# DESC filled in by TYPE_DESC PV
+  field(DESC, "")
+  field(INP, "$(dev):TYPE_CALC")
+}
+
+record(stringin, "$(dev):LOC") {
+  field(PINI, "YES")
+  field(VAL, "$(location)")
+  info(autosaveFields,"VAL")
+}
+
+# Control debug message verbosity
+record(mbbo, "$(dev):DBG") {
+ field(DTYP, "MCHsensor")
+ field(OMSL, "supervisory")
+ field(ZRVL, "0")
+ field(ZRST, "Off")
+ field(ONVL, "1")
+ field(ONST, "Low")
+ field(TWVL, "2")
+ field(TWST, "Med")
+ field(THVL, "3")
+ field(THST, "High")
+ field(OUT,  "#B0 C0 N0 @$(link)+dbg")
+ field(VAL,  "0")
+ field(PINI, "YES")
+}
+
+record(bi, "$(dev):ONLNSTAT") {
+ field(DESC, "MCH online status")
+ field(DTYP, "MCHsensor")
+ field(SCAN, "I/O Intr")
+ field(INP, "#B0 C0 N0 @$(link)+stat")
+ field(ZNAM, "Offline")
+ field(ZSV, "MAJOR")
+ field(ONAM, "Online")
+ field(OSV, "NO_ALARM")
+ field(PINI, "YES")
+ alias("$(dev):STAT")
+}
+
+record(mbbi, "$(dev):INIT") {
+ field(DESC, "MCH comm initialized")
+ field(DTYP, "MCHsensor")
+ field(SCAN, "I/O Intr")
+ field(INP, "#B0 C0 N0 @$(link)+init")
+ field(ZRST, "Not initialized")
+ field(ZRVL, "0")
+ field(ZRSV, "MAJOR")
+ field(ONST, "Initializing...")
+ field(ONVL, "1")
+ field(ONSV, "MINOR")
+ field(TWST, "Initialized")
+ field(TWVL, "2")
+ field(TWSV, "NO_ALARM")
+ field(THST, "Initialize failed")
+ field(THVL, "3")
+ field(THSV, "MAJOR")
+ field(PINI, "YES")
+}
+
+record(bo, "$(dev):INITBYP") {
+ field(DESC, "Override init for testing")
+ field(DTYP, "MCHsensor")
+ field(OMSL, "supervisory")
+ field(OUT, "#B0 C0 N0 @$(link)+init")
+ field(ZNAM, "Not initialized")
+ field(ZSV, "MAJOR")
+ field(ONAM, "Initialized")
+ field(OSV, "NO_ALARM")
+ field(PINI, "NO")
+}
+
+record(bo, "$(dev):CONNECT") {
+ field(DESC, "Enable comm with MCH")
+ field(DTYP, "MCHsensor")
+ field(OMSL, "supervisory")
+ field(OUT,  "#B0 C0 N0 @$(link)+sess")
+ field(ZNAM, "Disconnect")
+ field(ZSV,  "MAJOR")
+ field(ONAM, "Connect")
+ field(OSV,  "NO_ALARM")
+ field(RVAL, "1")
+ field(PINI, "YES") 
+ info(autosaveFields,"VAL")
+}
+
+# Add power on, power off, hard-reset, and msg
+# PVs to be consistent with other SLAC systems       
+record(bo, "$(dev):POWEROFF") {     
+  field(DESC, "Power off system")            
+  field(FLNK, "$(dev):POWEROFFSEQ")
+  field(PINI, "NO")             
+}                                               
+
+record(seq, "$(dev):POWEROFFSEQ") {
+  field(SELM, "All")               
+  field(DOL1, "1")                 
+  field(LNK1, "$(dev):POWERMSG PP")
+  field(DOL2, "0")                 
+  field(LNK2, "$(dev):POWERCTL PP")
+  field(DLY3, "5")                
+  field(DOL3, "0")                
+  field(LNK3, "$(dev):POWERMSG PP")
+}                                   
+
+record(bo, "$(dev):POWERON") {
+  field(DESC, "Power on system")            
+  field(FLNK, "$(dev):POWERONSEQ")
+  field(PINI, "NO")             
+}                                 
+
+record(seq, "$(dev):POWERONSEQ") {
+  field(SELM, "All")              
+  field(DOL1, "2")                 
+  field(LNK1, "$(dev):POWERMSG PP")
+  field(DOL2, "1")                
+  field(LNK2, "$(dev):POWERCTL PP")
+  field(DLY3, "5")                
+  field(DOL3, "0")                
+  field(LNK3, "$(dev):POWERMSG PP")
+}                                   
+
+record(bo, "$(dev):HARDRESET") {
+  field(DESC, "Power cycle system")            
+  field(FLNK, "$(dev):HARDRESETSEQ")
+  field(PINI, "NO")
+}                                   
+
+record(seq, "$(dev):HARDRESETSEQ") {
+  field(SELM, "All")                
+  field(DOL1, "3")                 
+  field(LNK1, "$(dev):POWERMSG PP")
+  field(DOL2, "2")                  
+  field(LNK2, "$(dev):POWERCTL PP") 
+  field(DLY3, "5")                 
+  field(DOL3, "0")                 
+  field(LNK3, "$(dev):POWERMSG PP")
+}                                   
+
+record(mbbo, "$(dev):POWERMSG") {
+  field(ZRVL, "0")               
+  field(ONVL, "1")               
+  field(TWVL, "2")               
+  field(THVL, "3")               
+  field(ONST, "TURNING_OFF")     
+  field(TWST, "TURNING_ON")      
+  field(THST, "RESETTING")       
+  field(ZRSV, "NO_ALARM")        
+  field(ONSV, "MINOR")           
+  field(TWSV, "MINOR")           
+  field(THSV, "MINOR")           
+  field(VAL, "0")                
+  field(PINI, "YES")             
+}                                
+
+# Sends 'Chassis Power' IPMI command
+# Vadatech MCH results are unreliable
+# NAT MCH does not implement this command
+# Dell Server does seem to work
+record(mbbo, "$(dev):POWERCTL") {
+ field(DTYP, "MCHsensor")
+ field(OMSL, "supervisory")
+ field(OUT, "#B0 C0 N0 @$(link)+chas")
+ field(ZRVL, "0")
+ field(ZRST, "Power off")
+ field(ONVL, "1")
+ field(ONST, "Power on")
+ field(THVL, "3")
+ field(THST, "Hard reset")
+ field(VAL, "1")
+}
+
+# Peform IPMI 'Cold Reset'
+record(bo, "$(dev):RESET") {
+ field(DTYP, "MCHsensor")
+ field(OMSL, "supervisory")
+ field(OUT, "#B0 C0 N0 @$(link)+reset")
+}
+
