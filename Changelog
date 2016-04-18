@@ -1,6 +1,19 @@
+Release: ipmiComm-R3-0-0
+
+18Apr2016 (SH)
+
+Many many changes. Refactor code to support non-MicroTCA systems,
+to determine (instead of hard-code) message lengths, offsets, etc.
+based on system type and properties. Add support for Supermicro
+server. Change privilege level to Operator (from Administrator). 
+PV name changes but aliases added for backward compatibility.
+
+*NOTE* that none of this has yet been tested with a Vadatech MCH 
+MicroTCA system. 
+
 Release: ipmiComm-R2-0-4
 
-22Feb2015 (SH)
+22Feb2016 (SH)
 
 src:
  -  Remove createAsynUser. Not needed and apparently creates
