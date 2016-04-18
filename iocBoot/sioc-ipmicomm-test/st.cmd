@@ -21,22 +21,25 @@
 < envPaths
 
 # Change to TOP of ioc application
-cd ${TOP}
+#cd ${TOP}
+cd ../../
 
 # Load EPICS Database
 dbLoadDatabase("dbd/ipmiCommIoc.dbd")
 ipmiCommIoc_registerRecordDeviceDriver(pdbbase)
 
+dbLoadRecords("db/iocAdminSoft.db","IOC=MCHTEST")
+
 # Order of commands is important
 drvAsynIPPortConfigure ("mch-test","mch-b34-cd42:623 udp",0,0,0)
 mchInit("mch-test")
-dbLoadRecords("db/shelf.db","dev=MCH:TEST,link=mch-test")
+dbLoadRecords("db/shelf_microtca_12slot.db","dev=MCH:TEST,link=mch-test,location=")
 
 #asynSetTraceMask("mch-test",-1,0x9)
 #asynSetTraceIOMask("mch-test",-1,0x5)
 
 cd ${TOP}/iocBoot/${IOC}
-iocInit()
+#iocInit()
 
 # End of file
 
