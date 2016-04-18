@@ -10,10 +10,11 @@
 extern "C" {
 #endif
 
-#define NO_CONVERT 2 /* Return value for ai record */
-#define ERROR     -1
-
 #define RESET_TIMEOUT 180 /* seconds */
+
+/* Some arbitrary sizes */
+#define MAX_NAME_LENGTH 50 
+#define MAX_TASK_LENGTH 10
 
 IOSCANPVT drvMchStatScan;
 IOSCANPVT drvMchInitScan;
@@ -24,16 +25,15 @@ IOSCANPVT drvMchFruScan;
 /* Per-MCH information kept in the registry */
 typedef struct MchDevRec_ {
 	epicsMutexId  mutex;     /* any other driver/devSup sharing resources must with devMch MUST LOCK THIS MUTEX when
-                                    performing modifications or non-atomical reads. */
-                                      
+                                    performing modifications or non-atomical reads. */                                   
 	void         *udata;	 /* for use by the driver / user */
-	const char    name[1];	 /* space for the terminating NULL; the entire string is appended here, however. */
+	const char    name[MAX_NAME_LENGTH]; /* space for the terminating NULL; the entire string is appended here, however. */
 } MchDevRec, *MchDev;
 
 /* Data private to IPMI MCH device support; to be stored in record's DPVT field */
 typedef struct MchRec_ {
 	MchDev      mch;
-        char       *task; /* operation type */
+        char        task[MAX_TASK_LENGTH]; /* operation type */
 } *MchRec;
 
 

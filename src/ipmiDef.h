@@ -1,9 +1,32 @@
 #ifndef IPMI_DEF_H
 #define IPMI_DEF_H
 
+/***************************
+
+TODO:
+
+Test MicroTCA remote on/off commands with new privilege level of operator
+
+Test everything with Vadatech MCH
+
+For username/password, find other solution than hard-coded in code/headers
+
+Need to reconsider how to handle alarms if sensor scanning disabled
+--Continue to enforce alarms? Instead of INVALID, 'grey' out alarms on display?
+
+***************************/
+
+
 #include <math.h> /* pow */
 
 #define MSG_MAX_LENGTH  200 /* arbitrarily chosen, not in the specs */
+
+/* BMC features; currently named MCH, which will eventually have to be changed everywhere to be more generic */
+#define MCH_FEAT_SENDMSG_RPLY   (1<<0) /* BMC responds separately to send-message before responding to embedded message; also requires longer message timeout */
+#define MCH_FEAT_PLL_MON      (1<<1) /* Monitor additional voltage/temp of PLL */
+#define MCH_FEAT_FPGA_MON     (1<<2) /* Monitor Xilinx */
+#define MCH_FEAT_FOT_MON      (1<<3) /* Monitor transceiver */
+#define MCH_FEAT_SYS_INFO     (1<<4) /* Monitor system info */
 
 typedef struct IpmiSessRec_ *IpmiSess;
 
@@ -31,15 +54,126 @@ typedef struct IpmiSessRec_ {
         uint8_t       seqSend[4];    /* Message sequence number for messages to device, null until session activated; chosen by system software (us); rolls over at 0xFFFFFFFF */
         uint8_t       seqRply[4];    /* Message sequence number for messages from device; rolls over at 0xFFFFFFFF */
 	uint8_t       seq;           /* IPMI sequence (6-bit number); used to confirm reply is for correct request */
+	uint8_t       chan;          /* Channel number, returned by Get Channel Authentication Capabilities response */
+	uint8_t       authSup;       /* Channel authentication types supported, returned by Get Channel Authentication Capabilities response */
+	uint8_t       authReq;       /* Authentication type requested, used in Get Session Challenge and Activate Session requests (and any other authenticated requests) */
+	uint8_t       features;      /* Mask to describe vendor-specific behavior */
+	double        timeout;       /* Asyn read timeout */
         IpmiWriteReadHelper wrf;     /* Callback to driver write/read function */
 } IpmiSessRec;
 
+	
+/* Data structure for Sensor Data Record (one per sensor) IPMI v2.0 Section 43.1
+ * Used for both Full and Compact SDRs
+ * In this implementation, we don't support all of the Full SDR fields
+ */
+typedef struct SdrFullRec_ {
+	uint8_t      id[2];         /* Sensor ID (can change, so key bytes must also be used to identify a sensor) */
+	uint8_t      ver;           /* SDR version (0x51) */
+	uint8_t      recType;       /* Record type, 0x01 for Full Sensor Record */
+        uint8_t      length;        /* Number of remaining record bytes */
+	uint8_t      owner;         /* Sensor owner ID, [7:1] slave address or software ID; [0] 0 = IPMB, 1 = system software */
+	uint8_t      lun;           /* Sensor owner LUN, [7:4] channel number; [3:2] reserved; [1:0] sensor owner LUN */
+	uint8_t      number;        /* Sensor number, unique behind given address and LUN, 0xFF reserved */
+	uint8_t      entityId;      /* Entity ID (physical entity that sensor is associated with) */
+	uint8_t      entityInst;    /* Entity instance, [7] 0 = physical entity, 1 = logical; [6:0] instance number 0x00-0x5F system-relative, 0x60-0x7F device-relative */
+        uint8_t      init;          /* Sensor initialization (see IPMI spec page 472 for details) */
+        uint8_t      cap;           /* Sensor capabilities (see IPMI spec page 473 for details) */
+	uint8_t      sensType;      /* Sensor type code (see IPMI spec table 42-3) */
+	uint8_t      readType;      /* Event/reading type code (see IPMI spec table 42-1) */
+	/* Following fields only applicable to Full SDR */
+	uint8_t      units1;        /* [7:6] analog data format, [5:3] rate unit, [2:1] modifier unit, [0] percentage */
+	uint8_t      units2;        /* Units type code, IPMI 43-15 */
+	uint8_t      units3;        /* Units type code, 0x00 if unused */
+	uint8_t      linear;        /* Linearization [7] reserved, [6:0] formula type */
+	uint8_t      M;             /* M in conversion, LS 8 bits (2's complement signed 10-bit 'M' value) */
+	uint8_t      MTol;          /* [7:6] MS 2 bits of M, [5:0] tolerance 6 bits unsigned (in +/- 1/2 raw counts) */
+	uint8_t      B;             /* B in conversion, LS 8 bits (2's complement signed 10-bit 'B' value) */
+	uint8_t      BAcc;          /* [7:6] MS 2 bits of B, [5:0] accuracy LW 6 bits (unsigned 10-bit Basic Sensor Accuracy in 1/100 % scaled up by accuracy exponent */
+	uint8_t      acc;           /* [7:4] MS 4 bits of accuracy, [3:2] accuracy exponent 2 bits unsigned, [1:0] sensor direction */
+	uint8_t      RexpBexp;      /* [7:4] R (result) exponent 4 bits 2's complement signed, [3:0] B exponent 4 bits, 2's complement signed */
+	uint8_t      strLength;     /* Sensor ID string type/length */
+	uint8_t      anlgChar;      /* Analog characteristics [7:3] reserved, [2] normal min specified, [1] normal max specified [0], nominal reading specified */
+	uint8_t      nominal;       /* Nominal reading (raw units) */
+	uint8_t      normMax;       /* Normal maximum (raw units) */
+	uint8_t      normMin;       /* Normal minimum (raw units) */
+	char         str[17];       /* Sensor ID string, 16 bytes maximum */
+	/* calculated values, only supported for Full SDR */
+	int          m;             
+	int          b;             
+	int          rexp;             
+	int          bexp;             
+
+} SdrFullRec, *SdrFull;
+	
+/* 
+ * Data structure for FRU Device Locator Record, IPMI v2.0 Table 43-7
+ */
+typedef struct SdrFruRec_ {
+	uint8_t      id[2];         /* Sensor ID (can change, so key bytes must also be used to identify a sensor) */
+	uint8_t      ver;           /* SDR version (0x51) */
+	uint8_t      recType;       /* Record type, 0x11 for FRU Device Locator Record */
+        uint8_t      length;        /* Number of remaining record bytes */
+	uint8_t      addr;          /* [7:1] slave address of controller, all 0 if dev on IPMB, [0] reserved */
+	uint8_t      fruId;         /* FRU Device ID/Slave address. For logical FRU device, [7:0] FRU dev ID, for non-intelligent, [7:1] slave address, [0] reserved */
+	uint8_t      lun;           /* [7] logical/physical FRU device, [6:5] reserved, [4:3] LUN for FRU commands, [2:0] private bus ID */
+	uint8_t      chan;          /* [7:4] Channel number to access device, 0 if on IPMB (MS bit in next byte?); [3:0] reserved */
+	uint8_t      devType;       /* Device type code Table 43-12 */
+	uint8_t      devMod;        /* Device type modifier Table 43-12 */
+	uint8_t      entityId;      /* Entity ID (physical entity that sensor is associated with) */
+	uint8_t      entityInst;    /* Entity instance, [7] 0 = physical entity, 1 = logical; [6:0] instance number 0x00-0x5F system-relative, 0x60-0x7F device-relative */
+	uint8_t      strLength;     /* Device ID string type/length Section 43.15*/
+	char         str[17];       /* Device ID string, 16 bytes maximum */
+} SdrFruRec, *SdrFru;
+	
+/* 
+ * Data structure for Management Controller Device Locator Record, IPMI v2.0 Table 43-8
+ */
+typedef struct SdrMgmtRec_ {
+	uint8_t      id[2];         /* Record ID */
+	uint8_t      ver;           /* SDR version */
+	uint8_t      recType;       /* Record type, 0x12 for Management Controller Locator */
+        uint8_t      length;        /* Number of remaining record bytes */
+	uint8_t      addr;          /* [7:1] I2C slave address of device on channel, [0] reserved */
+	uint8_t      chan;          /* [7:4] reserved; [3:0] Channel number for the channel that the management controller is on, use 0 for primary BMC */
+	uint8_t      pwr;           /* Power state notification and Global initialization, see IPMI spec for meaning of each bit */
+	uint8_t      cap;           /* Device capabilities, see IPMI spec for meaning of each bit */
+	/* next 3 bytes reserved */
+	uint8_t      entityId;      /* Entity ID for the FRU associated with this device, 0 if not specified */
+	uint8_t      entityInst;    /* Entity instance */
+	uint8_t      strLength;     /* Device ID string type/length Section 43.15*/
+	char         str[17];       /* Device ID string, 16 bytes maximum */
+} SdrMgmtRec, *SdrMgmt;
+	
+
+/* Data structure for Sensor Data Record Repository and Dynamic Sensor Device */
+typedef struct SdrRepRec_ {
+	uint8_t      ver;           /* SDR Version (0x51) */
+        uint8_t      size[2];       /* Number of sensor data records; LS byte stored first */
+	uint8_t      free[2];       /* Free space in bytes; LS byte stored first */
+	uint32_t     addTs;         /* Timestamp of most recent addition - remove: ; LS byte stored first */
+        uint32_t     delTs;         /* Timestamp of most recent erase - remove: ; LS byte stored first */
+        uint8_t      config[1];     /* 8 bits to describe Respository configuration, mostly supported commands */
+	uint8_t      resId;         /* Reservation ID assigned when reserving SDR */
+/* remaining members used by dynamic sensor device only */
+        uint8_t      devSdrSize;    /* Number of sensor data records in chassis dynamic Device SDR */
+        uint8_t      devSdrDyn;     /* Sensor population dynamic, 1 is dynamic, 0 is static */
+        uint8_t      lun0;          /* Sensors in LUN 0, 1 yes, 0 no */
+        uint8_t      lun1;          /* Sensors in LUN 1, 1 yes, 0 no */
+        uint8_t      lun2;          /* Sensors in LUN 2, 1 yes, 0 no */
+        uint8_t      lun3;          /* Sensors in LUN 3, 1 yes, 0 no */
+} SdrRepRec, *SdrRep;
+
+
+// Find a way to not hard-code array sizes below
 extern uint8_t RMCP_HEADER[4];
 extern uint8_t ASF_MSG[8];
-extern uint8_t IPMI_HEADER[10];
+extern uint8_t IPMI_WRAPPER[10];
+extern uint8_t IPMI_WRAPPER_PWD_KEY[26];
 extern uint8_t IPMI_MSG1[3];
 extern uint8_t GET_AUTH_MSG[6];
 extern uint8_t GET_SESS_MSG[21];
+extern uint8_t GET_SESS_MSG_PWD_KEY[21];
 extern uint8_t ACT_SESS_MSG[26];
 extern uint8_t SET_PRIV_MSG[5];
 extern uint8_t SEND_MSG_MSG[5];
@@ -51,15 +185,6 @@ extern uint8_t CLOSE_SESS_MSG[8];
 extern uint8_t CHAS_CTRL_MSG[5];
 extern uint8_t GET_DEV_SDR_INFO_MSG[5];            
 extern uint8_t BASIC_MSG[4];
-extern uint8_t SET_FRU_ACT_MSG[7];
-extern uint8_t SET_FRU_POLICY_MSG[8];
-extern uint8_t GET_FRU_POLICY_MSG[6];
-extern uint8_t GET_FAN_PROP_MSG[6];
-extern uint8_t GET_FAN_LEVEL_MSG[6];
-extern uint8_t SET_FAN_LEVEL_MSG[8];
-extern uint8_t GET_POWER_LEVEL_MSG[7];
-
-extern uint8_t FRU_I2C_ADDR[102];
 
 /* RMCP message header */ 
 #define RMCP_MSG_VER        0x06  /* RMCP message version */
@@ -67,36 +192,71 @@ extern uint8_t FRU_I2C_ADDR[102];
 #define RMCP_MSG_CLASS_ASF  0x06  /* Message class, ASF  */
 #define RMCP_MSG_CLASS_IPMI 0x07  /* Message class, IPMI */
 #define RMCP_MSG_AUTH_NONE  0x00  /* Message authentication type, 0 for none */
-#define RMCP_MSG_HEADER_LENGTH 4
+#define RMCP_MSG_HEADER_LENGTH sizeof( RMCP_HEADER )
 #define RMCP_MSG_CLASS_OFFSET  3  /* Message class */
 
 /* ASF message */
-#define ASF_MSG_OFFSET         4
+#define ASF_MSG_OFFSET                      RMCP_MSG_HEADER_LENGTH
+#define ASF_MSG_HEADER_LENGTH               8
+#define ASF_RPLY_PONG_PAYLOAD_LENGTH        16
 
-/* IPMI message header */
-#define IPMI_MSG_HEADER_SEQ_INITIAL          1
+/* IPMI message wrapper */
+extern size_t IPMI_WRAPPER_LENGTH;
+extern size_t IPMI_WRAPPER_AUTH_LENGTH;
+#define IPMI_WRAPPER_AUTH_TYPE_OFFSET     0    /* Authentication type */
+#define IPMI_WRAPPER_SEQ_INITIAL          1    /* Our starting sequence number (arbitrary) */
+#define IPMI_WRAPPER_SEQ_OFFSET           1    /* Session sequence number */
+#define IPMI_WRAPPER_SEQ_LENGTH           4    /* Session sequence number length */
+#define IPMI_WRAPPER_ID_OFFSET            5    /* Session ID */
+#define IPMI_WRAPPER_ID_LENGTH            4    /* Session ID length */
+#define IPMI_WRAPPER_AUTH_CODE_OFFSET     9    /* Message authentication code offset (used in authenticated messages only) */
+#define IPMI_WRAPPER_AUTH_CODE_LENGTH     16   /* Message authentication code length */ 
+#define IPMI_WRAPPER_NBYTES_OFFSET        9    /* Number of bytes in IPMI message (includes bridged message) */
+#define IPMI_WRAPPER_AUTH_NBYTES_OFFSET   9 +  IPMI_WRAPPER_AUTH_CODE_LENGTH /* Number of bytes in IPMI message (includes bridged message) */
 
-/* IPMI outgoing message */
-#define IPMI_MSG1_LENGTH                     3
-#define IPMI_MSG_HEADER_LENGTH               10
-#define IPMI_MSG_HEADER_OFFSET               4    /* IPMI message header offset */
-#define IPMI_MSG_ADDR_BMC                    0x20 /* UTC001 MCH BMC address */
-#define IPMI_MSG_ADDR_CM                     0x82 /* UTC001 MCH carrier manager responder address */
-#define IPMI_MSG_ADDR_SW                     0x81 /* Our address (can be 0x81, 0x83, 0x85, 0x87, 0x89) */
+/* IPMI message bytes after wrapper but before payload
+ * Includes IMSG1 and first 3 bytes of IMSG2 (up to but not including completion code)
+ * Just convenient offsets for extracting payload data from replies
+ */
+#define IPMI_MSG_HEADER_LENGTH           IPMI_MSG1_LENGTH + 3 
+#define IPMI_RPLY_HEADER_LENGTH          RMCP_MSG_HEADER_LENGTH + IPMI_WRAPPER_LENGTH      + IPMI_MSG_HEADER_LENGTH
+#define IPMI_RPLY_HEADER_AUTH_LENGTH     RMCP_MSG_HEADER_LENGTH + IPMI_WRAPPER_AUTH_LENGTH + IPMI_MSG_HEADER_LENGTH
+
+/* IPMI message 1 */
+extern size_t IPMI_MSG1_LENGTH;
+
+/* IPMI message 2 common */
+#define IPMI_MSG2_SEQLUN_OFFSET              1
+#define IPMI_SEQLUN_EXTRACT_SEQ(x)          ((x&0xFC)>>2)
+
+/* Authentication types */
+#define IPMI_AUTH_TYPE_SUPPORT(x) (x & 0x37)
+#define IPMI_MSG_AUTH_TYPE_NONE              0
+#define IPMI_MSG_AUTH_TYPE_MD2               1
+#define IPMI_MSG_AUTH_TYPE_MD5               2
+#define IPMI_MSG_AUTH_TYPE_PWD_KEY           4
+#define IPMI_MSG_AUTH_TYPE_OEM               5
+
+/* Privilege levels */
 #define IPMI_MSG_PRIV_LEVEL_NONE             0x00 /* Privilege level: none  */
 #define IPMI_MSG_PRIV_LEVEL_CB               0x01 /* Privilege level: callback  */
 #define IPMI_MSG_PRIV_LEVEL_USER             0x02 /* Privilege level: user  */
 #define IPMI_MSG_PRIV_LEVEL_OPER             0x03 /* Privilege level: operator  */
 #define IPMI_MSG_PRIV_LEVEL_ADMIN            0x04 /* Privilege level: administrator  */
 #define IPMI_MSG_PRIV_LEVEL_OEM              0x05 /* Privilege level: OEM proprietary  */
-#define IPMI_MSG_AUTH_TYPE_NONE              0
-#define IPMI_MSG_AUTH_TYPE_MD5               2
+
+/* Channel numbers and request options */
+#define IPMI_MSG_CHAN_IPMB0                  0
+#define IPMI_MSG_CHAN_IPMBL                  7
+#define IPMI_MSG_NOTRACKING                  0
+#define IPMI_MSG_TRACKING                    (1 << 6)
+#define IPMI_MSG_RAW                         (1 << 7)
 #define IPMI_MSG_CURR_CHAN                   0x0E /* Channel number currently in use */
-#define IPMI_MSG_HDR_SEQ_OFFSET              1    /* Session sequence number */
-#define IPMI_MSG_HDR_SEQ_LENGTH              4    
-#define IPMI_MSG_HDR_ID_OFFSET               5    /* Session ID */
-#define IPMI_MSG_HDR_ID_LENGTH               4    
-#define IPMI_MSG_HDR_NBYTES_OFFSET           9    /* Number of bytes in IPMI message (includes bridged message) */
+
+/* IPMI responder and requester addresses */
+#define IPMI_MSG_ADDR_BMC                    0x20 /* UTC001 MCH BMC address */
+#define IPMI_MSG_ADDR_CM                     0x82 /* UTC001 MCH carrier manager responder address */
+#define IPMI_MSG_ADDR_SW                     0x81 /* Our address (can be 0x81, 0x83, 0x85, 0x87, 0x89) */
 #define IPMI_MSG1_RSADDR_OFFSET              0
 #define IPMI_MSG1_NETFNLUN_OFFSET            1
 #define IPMI_MSG2_RQADDR_OFFSET              0    /* Requester's address (used in bridged IPMI msg 2) */
@@ -108,7 +268,7 @@ extern uint8_t FRU_I2C_ADDR[102];
 #define IPMI_MSG2_CMD_OFFSET                 2    /* Command code */
 #define IPMI_MSG2_CHAN_OFFSET                3    /* Channel to send message over (0 for IPMB) */
 #define IPMI_MSG2_SENSOR_OFFSET              3    /* Sensor number */
-#define IPMI_MSG2_CHAN_OFFSET                3    /* For channel number in bridged request */
+#define IPMI_MSG2_AUTH_TYPE_OFFSET           3    /* For Get Session Challenge and Activate Session */
 #define IPMI_MSG2_PRIV_LEVEL_OFFSET          3
 #define IPMI_MSG2_READ_FRU_ID_OFFSET         3    
 #define IPMI_MSG2_READ_FRU_LSB_OFFSET        4    /* FRU Inventory Offset to read, LS Byte */
@@ -121,22 +281,6 @@ extern uint8_t FRU_I2C_ADDR[102];
 #define IPMI_MSG2_GET_SDR_OFFSET_OFFSET      7    /* Offset into record to start read */
 #define IPMI_MSG2_GET_SDR_CNT_OFFSET         8    /* Count to read in bytes (0xFF means entire record) */
 #define IPMI_MSG2_GET_DEV_SDR_INFO_OP_OFFSET 3    /* 1 get SDR count, 0 get sensor count */
-#define IPMI_MSG2_SET_FRU_ACT_DEACTIVATE     0    /* Command value in Set FRU Activate command */
-#define IPMI_MSG2_SET_FRU_ACT_ACTIVATE       1
-#define IPMI_MSG2_SET_FRU_ACT_FRU_OFFSET     4    /* FRU ID, used in many commands */
-#define IPMI_MSG2_SET_FRU_ACT_CMD_OFFSET     5
-#define IPMI_MSG2_SET_FRU_POLICY_MASK_OFFSET 5
-#define IPMI_MSG2_SET_FRU_POLICY_BITS_OFFSET 6
-#define IPMI_MSG2_SET_FAN_LEVEL_LEVEL_OFFSET 5    /* New fan level to set */
-#define IPMI_MSG2_GET_POWER_LEVEL_TYPE_OFFSET 5
-
-/* Channel numbers and request options */
-#define IPMI_MSG_CHAN_IPMB0                  0
-#define IPMI_MSG_CHAN_IPMBL                  7
-#define IPMI_MSG_NOTRACKING                  0
-#define IPMI_MSG_TRACKING                    (1 << 6)
-#define IPMI_MSG_RAW                         (1 << 7)
-
 
 /* IPMI message command codes (cmd) */
 #define IPMI_MSG_CMD_GET_CHAN_AUTH           0x38
@@ -163,10 +307,6 @@ extern uint8_t FRU_I2C_ADDR[102];
 #define IPMI_MSG_CMD_GET_FRU_POLICY          0x0B
 #define IPMI_MSG_CMD_SET_FRU_ACT             0x0C
 #define IPMI_MSG_CMD_GET_DEVICE_ID           0x01
-#define IPMI_MSG_CMD_GET_POWER_LEVEL         0x12
-#define IPMI_MSG_CMD_GET_FAN_PROP            0x14
-#define IPMI_MSG_CMD_GET_FAN_LEVEL           0x16
-#define IPMI_MSG_CMD_SET_FAN_LEVEL           0x15
 
 /* IPMI message request network function codes */
 #define IPMI_MSG_NETFN_CHASSIS                0x00
@@ -175,40 +315,139 @@ extern uint8_t FRU_I2C_ADDR[102];
 #define IPMI_MSG_NETFN_STORAGE                0x0A
 #define IPMI_MSG_NETFN_PICMG                  0x2C
 
-/* Response message lengths */ 
-#define IPMI_RPLY_PONG_LENGTH                    28
-#define IPMI_RPLY_GET_CHAN_AUTH_LENGTH           30
-#define IPMI_RPLY_GET_SESSION_CHALLENGE_LENGTH   42
-#define IPMI_RPLY_ACTIVATE_SESSION_LENGTH        32
-#define IPMI_RPLY_SET_PRIV_LEVEL_LENGTH          23
+/* Read offset: bridged request, reply is in 1 message packet (NAT) */
+#define IPMI_RPLY_BRIDGED_1REPLY_OFFSET      7
+/* Read offset: bridged request, reply is in 2 message packet2 (VT) */
+#define IPMI_RPLY_BRIDGED_2REPLY_OFFSET      22
+/* Read offset: double bridged request, reply is in 1 message packet (NAT), not sure about this one */
+#define IPMI_RPLY_2BRIDGED_1REPLY_OFFSET     0
 
+#define FOOTER_LENGTH 1  /* checksum */
+
+/* Response payload (aka IMSG2) message lengths 
+ * Includes completion code, but not final checksum)
+ * (set to 0 for those that can vary)
+ */
+#define IPMI_RPLY_IMSG2_GET_CHAN_AUTH_LENGTH           9
+#define IPMI_RPLY_IMSG2_GET_SESSION_CHALLENGE_LENGTH   21
+#define IPMI_RPLY_IMSG2_ACTIVATE_SESSION_LENGTH        11
+#define IPMI_RPLY_IMSG2_SET_PRIV_LEVEL_LENGTH          2
+#define IPMI_RPLY_IMSG2_CLOSE_SESSION_LENGTH           1
+#define IPMI_RPLY_IMSG2_SENSOR_READ_MAX_LENGTH         5  /* length varies */
+#define IPMI_RPLY_IMSG2_GET_SENSOR_THRESH_LENGTH       8  /* need to determine this; using NAT length for now*/
+#define IPMI_RPLY_IMSG2_GET_CHAS_STATUS_LENGTH         4  /* does NOT include optional byte */
+#define IPMI_RPLY_IMSG2_CHAS_CTRL_LENGTH               1
+#define IPMI_RPLY_IMSG2_GET_FRU_INFO_LENGTH            4  /* get fru message length is this + remaining data bytes */
+#define IPMI_RPLY_IMSG2_READ_FRU_DATA_BASE_LENGTH      2
+#define IPMI_RPLY_IMSG2_WRITE_FRU_DATA_LENGTH          2
+#define IPMI_RPLY_IMSG2_GET_SDRREP_INFO_LENGTH         15
+#define IPMI_RPLY_IMSG2_RESERVE_SDRREP_LENGTH          3
+#define IPMI_RPLY_IMSG2_GET_SDR_BASE_LENGTH            3  /* get sdr message length is this + remaining data bytes */
+#define IPMI_RPLY_IMSG2_GET_SDR_LENGTH                 0  /* varies */
+#define IPMI_RPLY_IMSG2_GET_DEV_SDR_INFO_LENGTH        7
+#define IPMI_RPLY_IMSG2_GET_DEV_SDR_LENGTH             0  /* varies; base length is 3 */
+#define IPMI_RPLY_IMSG2_COLD_RESET_LENGTH              1
+#define IPMI_RPLY_IMSG2_SEND_MSG_LENGTH                4
+#define IPMI_RPLY_IMSG2_CLOSE_SESSION_LENGTH         1
+#define IPMI_RPLY_IMSG2_SENSOR_READ_MAX_LENGTH       5 /* length varies */
+#define IPMI_RPLY_IMSG2_GET_SENSOR_THRESH_LENGTH     8 /* need to determine this; using NAT length for now*/
+#define IPMI_RPLY_IMSG2_GET_CHAS_STATUS_LENGTH       4 /* does NOT include optional byte */
+#define IPMI_RPLY_IMSG2_CHAS_CTRL_LENGTH             1
+#define IPMI_RPLY_IMSG2_GET_FRU_INFO_LENGTH          4 /* get fru message length is this + remaining data bytes */
+#define IPMI_RPLY_IMSG2_READ_FRU_DATA_BASE_LENGTH    2
+#define IPMI_RPLY_IMSG2_GET_FRU_INV_INFO_LENGTH      4
+#define IPMI_RPLY_IMSG2_WRITE_FRU_DATA_LENGTH        2
+#define IPMI_RPLY_IMSG2_GET_DEVICE_ID_LENGTH         12
+#define IPMI_RPLY_IMSG2_GET_SDRREP_INFO_LENGTH       15
+#define IPMI_RPLY_IMSG2_RESERVE_SDRREP_LENGTH        3
+#define IPMI_RPLY_IMSG2_GET_SDR_BASE_LENGTH          3 /* get sdr message length is this + remaining data bytes */
+#define IPMI_RPLY_IMSG2_GET_SDR_LENGTH               0  /* varies */
+#define IPMI_RPLY_IMSG2_GET_DEV_SDR_INFO_LENGTH      7
+#define IPMI_RPLY_IMSG2_GET_DEV_SDR_LENGTH           0  /* varies; base length is 3 */
+#define IPMI_RPLY_IMSG2_COLD_RESET_LENGTH            1
+
+/* Get Authentication Capabilities message */
+#define IPMI_RPLY_IMSG2_AUTH_CAP_CHAN_OFFSET           1  /* Get Authentication Capabilities response - channel number */
+#define IPMI_RPLY_IMSG2_AUTH_CAP_AUTH_OFFSET           2  /* Get Authentication Capabilities response - authentication type support */
+
+/* Get Session Challenge message */
+#define IPMI_RPLY_IMSG2_GET_SESS_TEMP_ID_OFFSET        1  /* Temporary session ID */
+#define IPMI_RPLY_IMSG2_SESSION_ID_LENGTH              4  /* For both permanent and temporary session ID (sess chall and act sess message replies) */
+#define IPMI_RPLY_IMSG2_GET_SESS_CHALLENGE_STR_OFFSET  5  /* Challenge string */
+#define IPMI_RPLY_CHALLENGE_STR_LENGTH                 16
+
+/* Activate Session message */
+#define IPMI_RPLY_IMSG2_ACT_SESS_AUTH_TYPE_OFFSET      1  /* Authentication type */
+#define IPMI_RPLY_IMSG2_ACT_SESS_ID_OFFSET             2  /* Session ID for remainder of session */
+#define IPMI_RPLY_IMSG2_ACT_SESS_INIT_SEND_SEQ_OFFSET  6  /* Start sequence number for messages to MCH */
+#define IPMI_RPLY_INIT_SEND_SEQ_LENGTH                 4
+#define IPMI_RPLY_IMSG2_ACT_SESS_MAX_PRIV_OFFSET       10 /* Maximum privilege level allowed for session */
+#define IPMI_RPLY_HDR_SESS_SEQ_OFFSET                  1  /* From-MCH session sequence number (in reply to non-bridged message) */
+#define IPMI_RPLY_SEQ_LENGTH                           4
+
+/* Get Chassis Status message */
+#define IPMI_RPLY_IMSG2_GET_CHAS_POWER_STATE_OFFSET    1  /* Current power state */
+#define IPMI_RPLY_IMSG2_GET_CHAS_LAST_EVENT_OFFSET     2  /* Last power event */
+#define IPMI_RPLY_IMSG2_GET_CHAS_MISC_STATE_OFFSET     3  /* Misc chassis state */
+#define IPMI_GET_CHAS_POWER_STATE(x) (x & ~0x80)
+#define IPMI_GET_CHAS_LAST_EVENT(x)  (x & ~0xE0)
+#define IPMI_GET_CHAS_MISC_STATE(x)  (x & ~0xF0)
+
+/* Get Device ID message */
+#define IPMI_RPLY_IMSG2_GET_DEVICE_ID_MANUF_ID_OFFSET  7    /* Returned from Get Device ID Command */
+#define IPMI_RPLY_IPMI_VERS_OFFSET                     8     /* Returned from Get Device ID Command */
+#define IPMI_RPLY_IMSG2_GET_DEVICE_ID_IPMI_VERS_OFFSET 5     /* Returned from Get Device ID Command */
+#define IPMI_RPLY_MANUF_ID_LENGTH   3    
+#define IPMI_VER_LSD(x) (x & 0xF0)>>4   /* Extract IPMI version, least significant digit, eg 0x51 = version 1.5 */
+#define IPMI_VER_MSD(x)  x & 0x0F       /* Extract IPMI version, most significant digit */
+#define IPMI_MANUF_ID(x) x & 0x0FFFFF   /* Extract manufacturer ID */
+
+/* Get SDR Repository Info message */
+#define IPMI_RPLY_IMSG2_SDRREP_VER_OFFSET              1     /* SDR Repository Info */    
+#define IPMI_RPLY_IMSG2_SDRREP_CNT_LSB_OFFSET          2     /* Number of records in repository, LSB */
+#define IPMI_RPLY_IMSG2_SDRREP_CNT_MSB_OFFSET          3     /* Number of records in repository, MSB */
+#define IPMI_RPLY_IMSG2_SDRREP_ADD_TS_OFFSET           6     /* Timestamp of most recent addition, LSB first */
+#define IPMI_RPLY_IMSG2_SDRREP_DEL_TS_OFFSET           10    /* Timestamp of most recent deletion, LSB first */
+#define IPMI_RPLY_IMSG2_DEV_SDR_INFO_CNT_OFFSET        1     /* Number of SDRs for device */
+#define IPMI_RPLY_IMSG2_DEV_SDR_INFO_FLAGS_OFFSET      2     /* SDR flags */
 #define IPMI_TS_LENGTH 4 /* Number of bytes in Timestamp */
 
-/* For responses to bridged messages (returns 2 messages which we read as 1); offset from beginning of first message */
-#define IPMI_RPLY_BRIDGED_SEQ_OFFSET         27     /* From-MCH sequence number */
-#define IPMI_RPLY_BRIDGED_SEQLUN_OFFSET      41     /* MS 6 bits: IPMI sequence, LS 2 bits: LUN */
+/* Get SDR message */
+#define IPMI_RPLY_IMSG2_GET_SDR_NEXT_ID_LSB_OFFSET     1     /* ID of next sensor in repository, LSB */
+#define IPMI_RPLY_IMSG2_GET_SDR_NEXT_ID_MSB_OFFSET     2     /* ID of next sensor in repository, MSB */
+#define IPMI_RPLY_IMSG2_GET_SDR_DATA_OFFSET            3     /* Requested SDR data */
+#define SDR_MAX_READ_SIZE 22 /*not all systems can deliver full SDR in one message, ipmitool uses 22 for VT (and maybe others */
 
-#define IPMI_SENSOR_READING_DISABLED(x)   x & 1<<5
-#define IPMI_SENSOR_SCANNING_DISABLED(x) ~x & 1<<6
+/* Reserve SDR message */
+#define IPMI_RPLY_IMSG2_GET_SDR_RES_LSB_OFFSET         1     /* Reservation ID returned by Reserve SDR Rep */
+#define IPMI_RPLY_IMSG2_GET_SDR_RES_MSB_OFFSET         2     /* Reservation ID returned by Reserve SDR Rep */
 
-#define IPMI_SENSOR_THRESH_LNC_READABLE(x) x & 1<<0
-#define IPMI_SENSOR_THRESH_LC_READABLE(x)  x & 1<<1
-#define IPMI_SENSOR_THRESH_LNR_READABLE(x) x & 1<<2
-#define IPMI_SENSOR_THRESH_UNC_READABLE(x) x & 1<<3
-#define IPMI_SENSOR_THRESH_UC_READABLE(x)  x & 1<<4
-#define IPMI_SENSOR_THRESH_UNR_READABLE(x) x & 1<<5
+/* Get FRU Inventory Area Info message */
+#define IPMI_RPLY_IMSG2_FRU_AREA_SIZE_LSB_OFFSET       1     /* FRU inventory area size in bytes, LSB */
+#define IPMI_RPLY_IMSG2_FRU_AREA_SIZE_MSB_OFFSET       2     /* FRU inventory area size in bytes, MSB */
+#define IPMI_RPLY_IMSG2_FRU_AREA_ACCESS_OFFSET         3     /* Bit 0 indicates if device is accessed by bytes (0) or words (1) */
+#define IPMI_RPLY_IMSG2_FRU_DATA_READ_OFFSET           2     /* FRU data */
 
-#define IPMI_DATA_TYPE(x)          x & 3<<6
+/* Get Sensor Reading message */
+#define IPMI_RPLY_IMSG2_SENSOR_READING_OFFSET          1     /* Sensor reading (1 byte) */
+#define IPMI_RPLY_IMSG2_DISCRETE_SENSOR_READING_OFFSET 3     /* Discrete multi-state sensor value in threshold/assertions byte */
+#define IPMI_RPLY_IMSG2_SENSOR_ENABLE_BITS_OFFSET      2     /* Sensor enable bits: event msgs; scanning; reading/state */
+#define IPMI_RPLY_IMSG2_SENSOR_THRESH_MASK_OFFSET      1     /* Mask of readable thresholds */
+#define IPMI_RPLY_IMSG2_SENSOR_THRESH_LNC_OFFSET       2     /* Lower non-critical threshold */
+#define IPMI_RPLY_IMSG2_SENSOR_THRESH_LC_OFFSET        3     /* Lower critical threshold */
+#define IPMI_RPLY_IMSG2_SENSOR_THRESH_LNR_OFFSET       4     /* Lower non-recoverable threshold */
+#define IPMI_RPLY_IMSG2_SENSOR_THRESH_UNC_OFFSET       5     /* Upper non-critical threshold */
+#define IPMI_RPLY_IMSG2_SENSOR_THRESH_UC_OFFSET        6     /* Upper critical threshold */
+#define IPMI_RPLY_IMSG2_SENSOR_THRESH_UNR_OFFSET       7     /* Upper non-recoverable threshold */
+
+#define IPMI_DATA_LANG_CODE_ENGLISH1 0
+#define IPMI_DATA_LANG_CODE_ENGLISH2 25
+
+#define IPMI_DATA_TYPE(x)         (x & 0xC0) >> 6
 #define IPMI_DATA_LENGTH(x)        x & 0x3F
-#define IPMI_DATA_LANG_ENGLISH(x)  x==0 || x==25                 
+#define IPMI_DATA_LANG_ENGLISH(x)  (x==IPMI_DATA_LANG_CODE_ENGLISH1) || (x==IPMI_DATA_LANG_CODE_ENGLISH2)             
 
-#define IPMI_MANUF_ID(x) x & 0x0FFFFF
-
-/* IPMI version, least- and most-significant digits, eg 0x51 = version 1.5 */
-#define IPMI_VER_LSD(x) (x & 0xF0)>>4
-#define IPMI_VER_MSD(x) x & 0x0F
-
-/* Completion codes, IPMI spec Table 5-2 */
+/* Completion codes, IPMI v2.0 Table 5-2 */
 #define IPMI_COMP_CODE_NORMAL                   0x00
 #define IPMI_COMP_CODE_NODE_BUSY                0xC0
 #define IPMI_COMP_CODE_INVALID_COMMAND          0xC1
@@ -239,6 +478,26 @@ extern uint8_t FRU_I2C_ADDR[102];
 #define IPMI_COMP_CODE_COMMAND_SPECIFIC_MAX     0xBE
 #define IPMI_COMP_CODE_UNSPECIFIED              0xFF
 
+/* Command-specific completion codes */
+#define IPMI_COMP_CODE_GET_SESS_INVALID_USER    0x81
+#define IPMI_COMP_CODE_GET_SESS_NULL_USER       0x82
+
+/* Sensor definitions and constants */
+#define IPMI_SENSOR_READING_DISABLED(x)   x & 1<<5
+#define IPMI_SENSOR_SCANNING_DISABLED(x) ~x & 1<<6
+#define IPMI_SDR_SENSOR_THRESH_ACCESS(x) (x & 0xC) >> 2
+#define IPMI_SDR_SENSOR_THRESH_NONE              0
+#define IPMI_SDR_SENSOR_THRESH_READABLE          1
+#define IPMI_SDR_SENSOR_THRESH_READABLE_SETTABLE 2
+#define IPMI_SDR_SENSOR_THRESH_FIXED_UNREADABLE  3
+#define IPMI_SENSOR_THRESH_IS_READABLE(x) ((x == IPMI_SDR_SENSOR_THRESH_READABLE) || (x == IPMI_SDR_SENSOR_THRESH_READABLE_SETTABLE))
+#define IPMI_SENSOR_THRESH_LNC_READABLE(x) x & 1<<0
+#define IPMI_SENSOR_THRESH_LC_READABLE(x)  x & 1<<1
+#define IPMI_SENSOR_THRESH_LNR_READABLE(x) x & 1<<2
+#define IPMI_SENSOR_THRESH_UNC_READABLE(x) x & 1<<3
+#define IPMI_SENSOR_THRESH_UC_READABLE(x)  x & 1<<4
+#define IPMI_SENSOR_THRESH_UNR_READABLE(x) x & 1<<5
+
 /* Sensor Data Record (SDR) types*/
 #define SDR_TYPE_FULL_SENSOR      0x01
 #define SDR_TYPE_COMPACT_SENSOR   0x02
@@ -252,7 +511,7 @@ extern uint8_t FRU_I2C_ADDR[102];
 #define SDR_TYPE_BMC_MSG_CHAN     0x14
 #define SDR_TYPE_OEM              0xC0
 
-/*SDR data*/
+/* SDR data */
 #define SDR_ID_LAST_SENSOR     0xFFFF
 #define SDR_MAX_LENGTH         64
 #define SDR_FRU_MAX_LENGTH     33
@@ -304,7 +563,7 @@ extern uint8_t FRU_I2C_ADDR[102];
 #define SDR_COMPACT_STR_OFFSET        32
 
 #define SENSOR_LINEAR(x)           (x & 0x7F)
-#define SENSOR_CONV_M_B(x,y)       (x + ( (y & 0xC0) << 8))
+#define SENSOR_CONV_M_B(x,y)       (x + ( (y & 0xC0) << 2))
 #define TWOS_COMP_SIGNED_NBIT(x,n) (x > (pow(2,n)/2 - 1)) ? x - pow(2,n) : x     /* Extract n-bit signed number stored as two's complement */
 #define ONES_COMP_SIGNED_NBIT(x,n) (x > (pow(2,n)/2 - 1)) ? x - pow(2,n) + 1 : x /* Extract n-bit signed number stored as one's complement */
 #define SENSOR_CONV_REXP(x)        ((x & 0xF0) >> 4)
@@ -379,7 +638,6 @@ extern uint8_t FRU_I2C_ADDR[102];
 
 /* Sensor types */
 #define MAX_SENSOR_TYPE            0xFF
-
 #define SENSOR_TYPE_TEMP           0x01
 #define SENSOR_TYPE_VOLTAGE        0x02
 #define SENSOR_TYPE_CURRENT        0x03
@@ -454,8 +712,57 @@ extern uint8_t FRU_I2C_ADDR[102];
 #define ENTITY_ID_PROCESSOR_FRONT_BUS  0x34
 
 
-/* FRU data */
+/* FRU data storage, specified in IPMI Platform Management FRU 
+ * Information Storage Definition V1.0, Document Revision 1.1
+ */
+typedef struct FruFieldRec_ {
+	uint8_t     type;         /* Type of data */
+	uint8_t     rlength;      /* Length of raw data (bytes) */
+	uint8_t    *rdata;        /* Raw data */
+	uint8_t     length;       /* Length of data after converted to ASCII (bytes) */
+	uint8_t    *data;         /* Data */
+} FruFieldRec, *FruField;
 
+/* Chassis area doesn't have a language field
+ * Serial number always encoded in English
+ */
+typedef struct FruChassisRec_ {
+	uint8_t      offset;       /* Offset into FRU storage */
+	uint8_t      ver;          /* Format version (0x01) */
+	uint8_t      length;       /* Length of FRU area */
+	uint8_t      type;         /* Chassis type */
+	FruFieldRec  part;         /* Part number */
+	FruFieldRec  sn;           /* Serial number */
+        /* optional custom fields */	
+} FruChassisRec, *FruChassis;
+
+typedef struct FruBoardRec_ {
+	uint8_t      offset;       /* Offset into FRU storage */
+	uint8_t      ver;          /* Format version (0x01) */
+	uint8_t      length;       /* Length of FRU area */
+	uint8_t      lang;         /* Language code */
+	uint8_t      date;         /* Manufacturer date/time (minutes from 00:00 1/1/96) */
+	FruFieldRec  manuf;        /* Manufacturer */
+	FruFieldRec  prod;         /* Product name */
+	FruFieldRec  sn;           /* Serial number */
+	FruFieldRec  part;         /* Part number */
+        /* more */	
+} FruBoardRec, *FruBoard;
+
+typedef struct FruProdRec_ {
+	uint8_t      offset;       /* Offset into FRU storage */
+	uint8_t      ver;          /* Format version (0x01) */
+	uint8_t      length;       /* Length of FRU area */
+        uint8_t      lang;         /* Language code */
+	FruFieldRec  manuf;        /* Manufacturer */
+	FruFieldRec  prod;         /* Product name */
+	FruFieldRec  part;         /* Part number */
+	FruFieldRec  version;      /* Version number */
+	FruFieldRec  sn;           /* Serial number */
+        /* more */	
+} FruProdRec, *FruProd;
+
+/* FRU data */
 #define MSG_FRU_DATA_READ_SIZE 0x10
 
 /* Common header (mandatory) */
@@ -532,11 +839,19 @@ extern uint8_t FRU_I2C_ADDR[102];
  * checksum
  */
 
+/* MultiRecord area (optional) */
+#define FRU_DATA_MULTIREC_AREA_HEADER_RECORD_TYPE_OFFSET     0
+#define FRU_DATA_MULTIREC_AREA_HEADER_END_OF_LIST_OFFSET     1
+#define FRU_DATA_MULTIREC_AREA_HEADER_RECORD_LENGTH_OFFSET   2
+#define FRU_DATA_MULTIREC_AREA_HEADER_RECORD_CS_OFFSET       3
+#define FRU_DATA_MULTIREC_AREA_HEADER_HEADER_CS_OFFSET       4
+#define FRU_DATA_MULTIREC_END_OF_LIST(x) (x & 0x80) >> 7
+
 /* FRU info field data types */
-#define FRU_DATA_TYPE_BINARY    0    /* binary of unspecified */
-#define FRU_DATA_TYPE_BCDPLUS   1<<6
-#define FRU_DATA_TYPE_6BITASCII 2<<6
-#define FRU_DATA_TYPE_LANG      3<<6 /* 8-bit ASCII + Latin 1 if language is English;
+#define FRU_DATA_TYPE_BINARY    0    /* binary or unspecified */
+#define FRU_DATA_TYPE_BCDPLUS   1
+#define FRU_DATA_TYPE_6BITASCII 2
+#define FRU_DATA_TYPE_LANG      3    /* 8-bit ASCII + Latin 1 if language is English;
                                       * otherwise 2-byte UNICODE with LS byte first. 
                                       */
 /* Chassis types */
