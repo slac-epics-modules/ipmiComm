@@ -22,10 +22,14 @@ include $(TOP)/configure/CONFIG
 #  Optimization of db files using dbst (DEFAULT: NO)
 #DB_OPT = YES.
 
-DB += module_basic.db
-DB += module_pm.db
-DB += module_cu.db
-DB += shelf.db
+DB += fru_basic.db
+DB += fru_extended.db
+DB += fru_pm.db
+DB += fru_cu.db
+
+DB += shelf_microtca_12slot.db
+
+DB += server_supermicro.db
 
 #----------------------------------------------------
 # Create and install (or just install) into <top>/db
