@@ -7,7 +7,7 @@ record(ai, "$(dev):$(prefix)$(attr)$(sensinst)") {
   field(INP, "#B$(fruid) C$(type) N$(sensinst) @$(link)+sens")
   field(PREC, "1")
   field(PINI, "YES")
-  alias("$(dev):$(aliasprefix)$(attr)$(sensinst)")
+$(noalias="")  alias("$(dev):$(aliasprefix)$(attr)$(sensinst)")
 }
 
 # sensor 'presence' record to indicate whether sensor 
@@ -20,5 +20,5 @@ record(bi, "$(dev):$(prefix)$(attr)$(sensinst)P") {
   field(ZNAM, "Not present")
   field(ONAM, "Present")
   field(PINI, "YES")
-  alias("$(dev):$(aliasprefix)$(attr)$(sensinst)P")
+$(noalias="")  alias("$(dev):$(aliasprefix)$(attr)$(sensinst)P")
 }
