@@ -182,11 +182,11 @@ int
 mchMsgCheckSizes(size_t destSize, int offset, size_t srcSize)
 {
 	if ( 0 >= srcSize ) {
-		printf("mchMsgCheckSizes: message size %i less than zero\n", srcSize);
+	  printf("mchMsgCheckSizes: message size %i less than zero\n", (int)srcSize);
 		return -1;
 	}
 	else if ( (offset + srcSize) > destSize ) {
-		printf("mchMsgCheckSizes: copy size %i larger than destination %i \n", offset+srcSize, destSize);
+	  printf("mchMsgCheckSizes: copy size %i larger than destination %i \n", offset+(int)srcSize, (int)destSize);
 		return -1;
 	}
 	
@@ -510,7 +510,7 @@ uint8_t  rsAddr, rqAddr;
 		goto bail;
 
 	if ( (rval = mchMsgCheckSizes( sizeof( response ), roffs, payloadSize )) ) {
-		printf("mchMsgGetSdrRepInfo size error roffs %i payloadSize %i responseSize %i\n", roffs, payloadSize, responseSize);
+	  printf("mchMsgGetSdrRepInfo size error roffs %i payloadSize %i responseSize %i\n", (int)roffs, (int)payloadSize, (int)responseSize);
 		goto bail;
 	}
 
@@ -986,7 +986,7 @@ size_t   messageSize;
 
 uint8_t  response[MSG_MAX_LENGTH] = { 0 }; 
 size_t   roffs, responseSize, payloadSize = IPMI_RPLY_GET_FAN_PROP_LENGTH; 
-int      rval, offs, bridged;
+int      rval, offs=0, bridged;
 uint8_t  rsAddr, rqAddr;
 uint8_t  cmd   = IPMI_MSG_CMD_GET_FAN_PROP;
 uint8_t  netfn = IPMI_MSG_NETFN_PICMG;
@@ -1101,7 +1101,7 @@ size_t   messageSize;
 
 uint8_t  response[MSG_MAX_LENGTH] = { 0 }; 
 size_t   roffs, responseSize, payloadSize = IPMI_RPLY_GET_FAN_LEVEL_LENGTH; 
-int      rval, offs, bridged;
+int      rval, offs=0, bridged;
 uint8_t  rsAddr, rqAddr;
 uint8_t  cmd   = IPMI_MSG_CMD_GET_FAN_LEVEL;
 uint8_t  netfn = IPMI_MSG_NETFN_PICMG;
@@ -1251,7 +1251,7 @@ size_t   messageSize;
 
 uint8_t  response[MSG_MAX_LENGTH] = { 0 }; 
 size_t   roffs, responseSize, payloadSize = IPMI_RPLY_SET_FAN_LEVEL_LENGTH; 
-int      rval, offs, bridged;
+int      rval, offs=0, bridged;
 uint8_t  rsAddr, rqAddr;
 uint8_t  cmd   = IPMI_MSG_CMD_SET_FAN_LEVEL;
 uint8_t  netfn = IPMI_MSG_NETFN_PICMG;
@@ -1363,7 +1363,7 @@ size_t   messageSize;
 
 uint8_t  response[MSG_MAX_LENGTH] = { 0 }; 
 size_t   roffs, responseSize, payloadSize = IPMI_RPLY_GET_POWER_LEVEL_LENGTH; 
-int      rval, offs, bridged;
+int      rval, offs=0, bridged;
 uint8_t  rsAddr, rqAddr;
 uint8_t  cmd   = IPMI_MSG_CMD_GET_POWER_LEVEL;
 uint8_t  netfn = IPMI_MSG_NETFN_PICMG;
