@@ -1,3 +1,8 @@
+27Apr2016 (SH)
+
+src/drvMch.c: Restrict debug verbosity on startup to only during
+              initial connection and identifying device
+
 Release: ipmiComm-R3-0-0
 
 18Apr2016 (SH)

@@ -1436,6 +1436,9 @@ int i;
 
 	mchSeqInit( mchData->ipmiSess );
 
+	/* Turn on debug messages during initial messages with device */
+	mchStatSet( inst, MCH_MASK_DBG, MCH_DBG_SET(MCH_DBG_LOW) );
+
 	/* Initiate communication session with MCH */
 	if ( mchCommStart( mchSess, mchData->ipmiSess ) ) {
 		printf("Error initiating session with %s; cannot complete initialization\n",mchSess->name);
@@ -1447,6 +1450,9 @@ int i;
 	       	printf("Failed to identify %s MCH type; cannot complete initialization\n",mchSess->name);	
 		goto bail;
 	}
+
+	/* Turn off debug messages after initial messages with device */
+	mchStatSet( inst, MCH_MASK_DBG, MCH_DBG_SET(MCH_DBG_OFF) );
 
        	/* Get SDR data */
        	if ( mchSdrGetDataAll( mchData ) ) {
@@ -1542,9 +1548,6 @@ int      inst;
        	mchSess->timeout = ipmiSess->timeout = RPLY_TIMEOUT_SENDMSG_RPLY; /* Default, until determine type */
 	mchSess->session = 1;   /* Default: enable session with MCH */
 
-	/* Turn on debug messages during initial messages with device */
-	mchStatSet( inst, MCH_MASK_DBG, MCH_DBG_SET(MCH_DBG_LOW) );
-
 	/* Start task to periodically ping MCH */
 	sprintf( taskName, "%s-PING", mch->name ); 
 	mchSess->pingThreadId = epicsThreadMustCreate( taskName, epicsThreadPriorityMedium, epicsThreadGetStackSize(epicsThreadStackMedium), mchPing, mch );
@@ -1559,8 +1562,6 @@ int      inst;
 	}
 	else
 		printf("No response from %s; cannot complete initialization\n",mch->name);
-
-	mchStatSet( inst, MCH_MASK_DBG, MCH_DBG_SET(MCH_DBG_OFF) );
 }
 
 static long
