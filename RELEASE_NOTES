@@ -1,4 +1,5 @@
 ipmiComm-R3-0-1:  16-May-2016 S. Hoobler
+		  configure/RELEASE: Use asyn-R4-25_1-0
 		  src/drvMch.c: Restrict debug verbosity on startup to only during 
 			initial connection and identifying device
 
