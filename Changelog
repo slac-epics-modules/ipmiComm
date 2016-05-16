@@ -1,3 +1,6 @@
+16May2016 (SH)
+configure/RELEASE: Use asyn-R4-25_1-0
+
 27Apr2016 (SH)
 
 src/drvMch.c: Restrict debug verbosity on startup to only during
