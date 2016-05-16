@@ -1,3 +1,7 @@
+ipmiComm-R3-0-1:  16-May-2016 S. Hoobler
+		  src/drvMch.c: Restrict debug verbosity on startup to only during 
+			initial connection and identifying device
+
 ipmiComm-R3-0-0:  18-Apr-2016 S. Hoobler
 		  Add support for Supermicro
                   Refactoring and reorgnization
