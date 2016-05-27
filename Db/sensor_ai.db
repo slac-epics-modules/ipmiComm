@@ -6,6 +6,8 @@ record(ai, "$(dev):$(prefix)$(attr)$(sensinst)") {
   field(DTYP, "MCHsensor")
   field(INP, "#B$(fruid) C$(type) N$(sensinst) @$(link)+sens")
   field(PREC, "1")
+  field(SDIS, "$(dev):$(prefix)$(attr)$(sensinst)P")
+  field(DISV, "0")
   field(PINI, "YES")
 $(noalias="")  alias("$(dev):$(aliasprefix)$(attr)$(sensinst)")
 }
