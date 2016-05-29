@@ -564,7 +564,8 @@ uint8_t  iwrapper[iwrapperSize];
 	switch ( auth ) {
 
 		default:
-			printf("ipmiMsgBuild: unsupported authentication type %i\n", sess->authReq );
+// comment out this message for now; is a bit of a nuisance
+//			printf("ipmiMsgBuild: unsupported authentication type %i\n", sess->authReq );
 			return 0;
 
 		case IPMI_MSG_AUTH_TYPE_NONE:

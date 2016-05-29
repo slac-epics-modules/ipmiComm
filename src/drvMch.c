@@ -1154,7 +1154,7 @@ uint8_t message[MSG_MAX_LENGTH]  = { 0 };
 uint8_t response[MSG_MAX_LENGTH] = { 0 };
 size_t  responseSize, responseLen; /* expected, actual */
 int     cos; /* change of state */
-int     inst = mchSess->instance, i = 0;
+int     inst = mchSess->instance, i = 0,j  = 0;
 
 	memcpy( message, RMCP_HEADER, sizeof( RMCP_HEADER ) );
 
@@ -1186,10 +1186,19 @@ int     inst = mchSess->instance, i = 0;
 				mchStatSet( inst, MCH_MASK_ONLN, MCH_MASK_ONLN );
 				cos = 1;
 			}
+			/* Every 60 seconds (while mch online) , set flag to check if system configuration has changed */
 			if ( i > 60/PING_PERIOD ) {
 				mchStatSet( inst, MCH_MASK_CNFG_CHK, MCH_MASK_CNFG_CHK );
 				i = 0;
 			}
+			/* Every 20 seconds (while mch online), scan sensor records */
+            if ( j > 20/PING_PERIOD ) {
+				if ( drvSensorScan[inst] ) 
+					scanIoRequest( drvSensorScan[inst] );
+				j = 0;
+			}
+			i++;
+			j++;
 		}
 
 		if ( cos ) {
@@ -1198,7 +1207,6 @@ int     inst = mchSess->instance, i = 0;
 		}
 
 		epicsThreadSleep( PING_PERIOD );
-		i++;
 	}
 }
 
@@ -1461,8 +1469,11 @@ int i;
        	}
 
 	/* Get FRU data; errors are not fatal, but could cause missing FRU data */
-	if ( mchFruGetDataAll( mchData ) )
-       		printf("Warning: errors getting %s FRU data; some data may be missing\n",mchSess->name);
+	mchFruGetDataAll( mchData );
+ 
+		/* Comment this out for now; it always happens at the end of initialization and it is confusing
+		printf("Warning: errors getting %s FRU data; some data may be missing\n",mchSess->name);
+		*/
 
 	/* Get Sensor/FRU association */
 	for ( i = 0; i < mchSys->sensCount; i++ )
@@ -1547,6 +1558,9 @@ int      inst;
 
        	mchSess->timeout = ipmiSess->timeout = RPLY_TIMEOUT_SENDMSG_RPLY; /* Default, until determine type */
 	mchSess->session = 1;   /* Default: enable session with MCH */
+
+	/* For sensor record scanning */
+	scanIoInit( &drvSensorScan[inst] );
 
 	/* Start task to periodically ping MCH */
 	sprintf( taskName, "%s-PING", mch->name ); 

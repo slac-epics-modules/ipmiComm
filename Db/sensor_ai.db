@@ -2,12 +2,12 @@
 # DESC, EGU set by device support
 record(ai, "$(dev):$(prefix)$(attr)$(sensinst)") {
   field(DESC, "")
-  field(SCAN, "10 second")
+  field(SCAN, "I/O Intr")
   field(DTYP, "MCHsensor")
   field(INP, "#B$(fruid) C$(type) N$(sensinst) @$(link)+sens")
   field(PREC, "1")
-  field(SDIS, "$(dev):$(prefix)$(attr)$(sensinst)P")
-  field(DISV, "0")
+  field(SDIS, "$(dev):$(prefix)$(attr)$(sensinst)P.SEVR")
+  field(DISV, "2")
   field(PINI, "YES")
 $(noalias="")  alias("$(dev):$(aliasprefix)$(attr)$(sensinst)")
 }
@@ -20,6 +20,7 @@ record(bi, "$(dev):$(prefix)$(attr)$(sensinst)P") {
   field(DTYP, "MCHsensor")
   field(INP, "#B$(fruid) C$(type) N$(sensinst) @$(link)+spres")
   field(ZNAM, "Not present")
+  field(ZSV,  "MAJOR")
   field(ONAM, "Present")
   field(PINI, "YES")
 $(noalias="")  alias("$(dev):$(aliasprefix)$(attr)$(sensinst)P")

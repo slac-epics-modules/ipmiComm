@@ -18,7 +18,8 @@
          --------
          *   init_ai_record           - Record initialization
          *   read_ai                  - Read analog input
-
+		 *   ai_ioint_info            - Add to i/o scan list          
+		 *
 	   Supported operations:
 
              * "sens": read sensor
@@ -26,7 +27,7 @@
 	 devAiFru
          --------
          *   init_fru_ai                  - Record initialization
-         *   fru_ai_ioint_info            - Record initialization
+         *   fru_ai_ioint_info            - Add to i/o scan list  
          *   init_fru_ai_record           - Record initialization
          *   read_fru_ai                  - Read analog input
 
@@ -201,6 +202,7 @@ static long ERROR      = -1;
 /* Device support prototypes */
 static long init_ai_record(struct aiRecord *pai);
 static long read_ai(struct aiRecord *pai);
+static long ai_ioint_info(int cmd, struct aiRecord *pai, IOSCANPVT *iopvt);
 
 static long init_bo_record(struct  boRecord *pbo);
 static long write_bo(struct boRecord *pbo);
@@ -246,7 +248,7 @@ typedef struct {
 } MCH_DEV_SUP_SET;
 
 /* Add reporting */
-MCH_DEV_SUP_SET devAiMch         = {6, NULL, NULL,              init_ai_record,           NULL,                    read_ai,           NULL};
+MCH_DEV_SUP_SET devAiMch         = {6, NULL, NULL,              init_ai_record,           ai_ioint_info,           read_ai,           NULL};
 MCH_DEV_SUP_SET devBoMch         = {6, NULL, NULL,              init_bo_record,           NULL,                    write_bo,          NULL};
 MCH_DEV_SUP_SET devMbboMch       = {6, NULL, NULL,              init_mbbo_record,         NULL,                    write_mbbo,        NULL};
 MCH_DEV_SUP_SET devBiMch         = {6, NULL, init_bi,           init_bi_record,           bi_ioint_info,           read_bi,           NULL};
@@ -535,6 +537,30 @@ init_record_find(MchDev mch, MchRec recPvt, char *node, char *task, long *status
 		*status = S_dev_noDeviceFound;
 		return -1;
 	}
+}
+
+/*
+** Add this record to our IOSCANPVT list.
+*/
+static long
+ai_ioint_info(int cmd, struct aiRecord *pai, IOSCANPVT *iopvt)
+{
+MchRec   recPvt  = pai->dpvt; /* Info stored with record */
+MchDev   mch;
+MchData  mchData;
+int      inst;
+long     status  = SUCCESS;
+char     str[40];
+
+	if ( !recPvt )
+		return NO_CONVERT;
+
+	mch = recPvt->mch;  
+	mchData = mch->udata;
+	inst = mchData->mchSess->instance;
+
+	*iopvt = drvSensorScan[inst];
+	return status;
 }
 
 static long 

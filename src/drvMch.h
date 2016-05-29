@@ -13,6 +13,9 @@
 
 extern uint32_t mchStat[MAX_MCH];
 
+/* Used for sensor scanning; one list per MCH */
+IOSCANPVT drvSensorScan[MAX_MCH];
+
 /* Vadatech typically sends 2 replies; NAT sends 1 */
 #define RPLY_TIMEOUT_VT    0.50
 #define RPLY_TIMEOUT_NAT   0.25
