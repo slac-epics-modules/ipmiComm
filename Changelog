@@ -1,8 +1,7 @@
 28May2016 (SH)
-Create branch for working at PAL; will likely
-merge these changes back to the HEAD in future:
-ipmiComm-R3-0-1-branch-pal
+Create branch for working at PAL: ipmiComm-R3-0-1-branch-pal
 
+28May2016 (SH)
 -To avoid 10 second scan task over-runs, change sensors
  to scan on i/o event and trigger processing from mchPing routine
  every 20 seconds
