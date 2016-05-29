@@ -1,3 +1,7 @@
+26May2016 (SH)
+Only process sensor records when 'present'. Change to:
+Db/sensor_ai.db
+
 16May2016 (SH)
 configure/RELEASE: Use asyn-R4-25_1-0
 
