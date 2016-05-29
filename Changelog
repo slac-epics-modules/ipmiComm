@@ -1,8 +1,7 @@
 28May2016 (SH)
-Create branch for working at PAL: ipmiComm-R3-0-1-branch-pal
+Release: ipmiComm-R3-0-2
 
-28May2016 (SH)
--To avoid 10 second scan task over-runs, change sensors
+-To avoid 10 second scan task over-runs (seen at PAL), change sensors
  to scan on i/o event and trigger processing from mchPing routine
  every 20 seconds
 -Comment out a couple warnings that happen regularly and so are confusing
