@@ -18,7 +18,7 @@ BASE_MODULE_VERSION=
 # Define the version of modules needed by
 # IOC apps or other Support apps
 # =============================================================
-ASYN_MODULE_VERSION=asyn-R4-21-spear1
+ASYN_MODULE_VERSION=asyn-R4-25-spear1
 
 # ============================================================
 # Support module locations
