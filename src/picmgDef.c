@@ -2,6 +2,14 @@
 #include <ipmiMsg.h>
 #include <picmgDef.h>
 
+/* Get PICMG Properties */
+uint8_t GET_PICMG_PROP_MSG[] = { IPMI_MSG_ADDR_BMC,          /* Requester's address */
+                                 0,                           /* Message sequence number */
+                                 IPMI_MSG_CMD_GET_PICMG_PROP,  /* Command code */
+                                 0,                           /* PICMG Identifier, 0x00 is used */
+                                 0 };                         /* For checksum */
+
+
 /* Set FRU Activation */
 uint8_t SET_FRU_ACT_MSG[] = { IPMI_MSG_ADDR_BMC,           /* Requester's address */            
                               0,                           /* Message sequence number */         
@@ -62,6 +70,37 @@ uint8_t GET_POWER_LEVEL_MSG[] = {  IPMI_MSG_ADDR_BMC,         /* Requester's add
 			         0,                           /* PICMG Identifier, 0x00 is used */
                                  0,                           /* FRU ID */	
                                  0,                           /* Power type: steady state, desired, early, desired early */	
+                                 0 };                         /* For checksum */
+
+/* Get address info - implementing all optional fields */
+uint8_t GET_ADDR_INFO_MSG[] = {  IPMI_MSG_ADDR_BMC,           /* Requester's address */            
+                                 0,                           /* Message sequence number */         
+                                 IPMI_MSG_CMD_GET_ADDR_INFO,  /* Command code */         
+			         0,                           /* PICMG Identifier, 0x00 is used */
+                                 0,                           /* FRU ID */	
+                                 0,                           /* Address key type */	
+                                 0,                           /* Address key */	
+                                 0,                           /* Site type */	
+                                 0 };                         /* For checksum */
+
+/* Get address info using HW address; does not implement optional last field */
+uint8_t GET_ADDR_INFO_HWADDR_MSG[] = {  IPMI_MSG_ADDR_BMC,           /* Requester's address */            
+                                 0,                           /* Message sequence number */         
+                                 IPMI_MSG_CMD_GET_ADDR_INFO,  /* Command code */         
+			         0,                           /* PICMG Identifier, 0x00 is used */
+                                 0,                           /* FRU ID */	
+                                 0,                           /* Address key type */	
+                                 0,                           /* Address key */	
+                                 0 };                         /* For checksum */
+
+/* Get address info using HW address; does not implement optional last field */
+uint8_t GET_ADDR_INFO_IPMB0_MSG[] = {  IPMI_MSG_ADDR_BMC,           /* Requester's address */            
+                                 0,                           /* Message sequence number */         
+                                 IPMI_MSG_CMD_GET_ADDR_INFO,  /* Command code */         
+			         0,                           /* PICMG Identifier, 0x00 is used */
+                                 0,                           /* FRU ID */	
+                                 PICMG_ADDR_KEY_TYPE_IPMB0,   /* Address key type */	
+                                 0,                           /* Address key */	
                                  0 };                         /* For checksum */
 
 /* I2C addresses, compiled by NAT 

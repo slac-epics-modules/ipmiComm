@@ -21,11 +21,28 @@ ipmiReallocZeros(void *dest, size_t size)
 {
 
 	if ( !( dest = realloc( dest, size ) ) ) {
-printf("**********realloc failed\n");
+printf("**********ipmiReallocZeros failed\n");
 		dest = NULL;
 		goto bail;
 	}
 	memset( dest, 0, size );
+
+bail:
+	return dest;
+}
+
+void *
+ipmiReallocZerosNewMemory(void *dest, size_t old_size, size_t new_size)
+{
+
+//printf("ipmiReallocZerosNewMemory dest %i old_size %i new_size %i\n", dest, old_size, new_size );
+
+	if ( !( dest = realloc( dest, new_size ) ) ) {
+printf("**********ipmiReallocZerosNewMemory failed for size %i\n", new_size);
+		dest = NULL;
+		goto bail;
+	}
+	memset( dest + old_size, 0, new_size - old_size );
 
 bail:
 	return dest;
@@ -62,7 +79,6 @@ uint16_t value = 0;
 		value = 0;
 	else
 		value += incr; 
-
 	/* Copy incremented value to array */
 	for ( i = 0 ; i < nBytes ; i++) 
 		*data++ = (value >> i*8) & 0xFF;	
@@ -359,6 +375,10 @@ codeDone:
 				case IPMI_MSG_CMD_COLD_RESET:            
 					sprintf( cmdStr, "Cold Reset" );
 					break;
+				case IPMI_MSG_CMD_GET_DEVICE_ID:         
+					sprintf( cmdStr, "Get Device ID" );
+					break;
+
 			}
 			break;
 
@@ -434,8 +454,8 @@ codeDone:
 					sprintf( cmdStr, "Set FRU Activation" );
 					break;
 
-				case IPMI_MSG_CMD_GET_DEVICE_ID:         
-					sprintf( cmdStr, "Get Device ID" );
+				case IPMI_MSG_CMD_GET_ADDR_INFO:
+					sprintf( cmdStr, "Get Address Info" );
 					break;
 
 				case IPMI_MSG_CMD_GET_POWER_LEVEL:       
@@ -470,7 +490,8 @@ ipmiMsgSetImsg1Auth(IpmiSess sess, uint8_t cmd, uint8_t *auth, size_t *iwrapperS
          * authentication type none in message header even if session will use
          * another type
          */
-	if ( (cmd == IPMI_MSG_CMD_GET_CHAN_AUTH) || (cmd == IPMI_MSG_CMD_GET_SESSION_CHALLENGE) || (sess->authReq == IPMI_MSG_AUTH_TYPE_NONE) ) {
+	if ( (cmd == IPMI_MSG_CMD_GET_CHAN_AUTH) || (cmd == IPMI_MSG_CMD_GET_SESSION_CHALLENGE) 
+		|| (sess->authReq == IPMI_MSG_AUTH_TYPE_NONE) ) {
 		*auth          = IPMI_MSG_AUTH_TYPE_NONE;
 		*iwrapperSize   = IPMI_WRAPPER_LENGTH;
 		*offset_nbytes = /*RMCP_MSG_HEADER_LENGTH +*/ IPMI_WRAPPER_NBYTES_OFFSET;
@@ -491,7 +512,8 @@ ipmiMsgSetSeqId(IpmiSess sess, uint8_t *message, uint8_t cmd)
 {
 int i;
 	/* Session sequence number is not incremented (or used) for messages outside of a session */
-	if ( cmd != IPMI_MSG_CMD_GET_CHAN_AUTH && cmd != IPMI_MSG_CMD_GET_SESSION_CHALLENGE && cmd != IPMI_MSG_CMD_ACTIVATE_SESSION && cmd != IPMI_MSG_CMD_SET_PRIV_LEVEL && cmd != 0 )
+	if ( cmd != IPMI_MSG_CMD_GET_CHAN_AUTH && cmd != IPMI_MSG_CMD_GET_SESSION_CHALLENGE && 
+	    cmd != IPMI_MSG_CMD_ACTIVATE_SESSION && cmd != IPMI_MSG_CMD_SET_PRIV_LEVEL && cmd != 0 )
 		incr4Uint8Array( sess->seqSend , 1 );
 
 	/* Close Session command contains the session ID */
@@ -564,8 +586,7 @@ uint8_t  iwrapper[iwrapperSize];
 	switch ( auth ) {
 
 		default:
-// comment out this message for now; is a bit of a nuisance
-//			printf("ipmiMsgBuild: unsupported authentication type %i\n", sess->authReq );
+			printf("ipmiMsgBuild: unsupported authentication type %i\n", auth );
 			return 0;
 
 		case IPMI_MSG_AUTH_TYPE_NONE:
@@ -590,7 +611,8 @@ uint8_t  iwrapper[iwrapperSize];
 	}
 
 	/* Number of bytes in message */
-	iwrapper[offset_nbytes] = (b1msg1 && b2msg1) ? 3*imsg1Size + imsg2Size + b1msg2Size + b2msg2Size : (b1msg1) ? 2*imsg1Size + imsg2Size + b1msg2Size : imsg1Size + imsg2Size;
+	iwrapper[offset_nbytes] = (b1msg1 && b2msg1) ? 3*imsg1Size + imsg2Size + b1msg2Size + b2msg2Size 
+	    : (b1msg1) ? 2*imsg1Size + imsg2Size + b1msg2Size : imsg1Size + imsg2Size;
 
 	n = sizeof(RMCP_HEADER) + iwrapperSize + iwrapper[offset_nbytes];
 
@@ -688,7 +710,8 @@ asynUser  *pasynUser;
 
        	memset( response, 0, *responseSize ); /* Initialize response to 0s in order to detect empty bytes ? */
 
-	status = pasynOctetSyncIO->writeRead( pasynUser, (const char *)message, messageSize, (char *)response, *responseSize, timeout, &numSent, responseLen, &eomReason );
+	status = pasynOctetSyncIO->writeRead( pasynUser, (const char *)message, messageSize, 
+	    (char *)response, *responseSize, timeout, &numSent, responseLen, &eomReason );
 
 	pasynOctetSyncIO->disconnect( pasynUser );
 
@@ -931,23 +954,57 @@ uint8_t  netfn = IPMI_MSG_NETFN_STORAGE;
 	return sess->wrf( device, sess, message, messageSize, data, responseSize, cmd, netfn, roffs, 0 );
 }
 
+/* Get device, sess Sensor Data Record (SDR) Info 
+ *
+ *   RETURNS: status from sess->wrf
+ *            0 on success
+ *            non-zero for error
+ *
+int
+ipmiMsgGetDevSdrInfo(void *device, IpmiSess sess, uint8_t *data, int bridged, uint8_t rsAddr, uint8_t rqAddr, uint8_t parm, size_t *responseSize, int roffs)
+{
+uint8_t  message[MSG_MAX_LENGTH] = { 0 };
+uint8_t  imsg2Size = sizeof( GET_DEV_SDR_INFO_MSG );
+uint8_t  imsg2[imsg2Size];
+size_t   messageSize;
+uint8_t  cmd   = IPMI_MSG_CMD_GET_DEV_SDR_INFO;
+uint8_t  netfn = IPMI_MSG_NETFN_SENSOR_EVENT;
+
+	memcpy( imsg2, GET_DEV_SDR_INFO_MSG, imsg2Size );
+	imsg2[IPMI_MSG2_CMD_OFFSET] = cmd;
+
+	if ( bridged ) / may need to distinguish between once and twice-bridged messages
+		ipmiBuildSendMsg( sess, message, &messageSize, cmd, netfn, rsAddr, rqAddr, imsg2, imsg2Size, 0 );
+	else
+		messageSize = ipmiMsgBuild( sess, message, cmd, netfn, imsg2, imsg2Size, 0, 0, 0, 0, 0, 0 );
+
+	return sess->wrf( device, sess, message, messageSize, data, responseSize, cmd, netfn, roffs, 0 );
+}
+*/
+
 /* Get SDR (Sensor Data Record) Repository Info 
+ *
+ * Used for both Get SDR (parm = 0) and Get device, sess SDR (parm = 1). 
+ * Only differences in the message are the network function and command code.
  *
  *   RETURNS: status from sess->wrf
  *            0 on success
  *            non-zero for error
  */
 int
-ipmiMsgGetSdrRepInfo(void *device, IpmiSess sess, uint8_t *data, int bridged, uint8_t rsAddr, uint8_t rqAddr, size_t *responseSize, int roffs)
+ipmiMsgGetSdrRepInfo(void *device, IpmiSess sess, uint8_t *data, int bridged, uint8_t rsAddr, uint8_t rqAddr, size_t *responseSize, int roffs, uint8_t parm)
 {
 uint8_t  message[MSG_MAX_LENGTH] = { 0 };
-uint8_t  imsg2Size = sizeof( BASIC_MSG );
+uint8_t  imsg2Size = (parm == IPMI_SDRREP_PARM_GET_DEV_SDR) ? sizeof( GET_DEV_SDR_INFO_MSG ) : sizeof( BASIC_MSG );
 uint8_t  imsg2[imsg2Size];
 size_t   messageSize;
-uint8_t  cmd   = IPMI_MSG_CMD_GET_SDRREP_INFO;
-uint8_t  netfn = IPMI_MSG_NETFN_STORAGE;
+uint8_t  cmd   = (parm==IPMI_SDRREP_PARM_GET_DEV_SDR) ? IPMI_MSG_CMD_GET_DEV_SDR_INFO : IPMI_MSG_CMD_GET_SDRREP_INFO;
+uint8_t  netfn = (parm==IPMI_SDRREP_PARM_GET_DEV_SDR) ? IPMI_MSG_NETFN_SENSOR_EVENT   : IPMI_MSG_NETFN_STORAGE;
 
-	memcpy( imsg2, BASIC_MSG, imsg2Size );
+	if ( parm == IPMI_SDRREP_PARM_GET_DEV_SDR )
+		memcpy( imsg2, GET_DEV_SDR_INFO_MSG, imsg2Size );
+	else
+		memcpy( imsg2, BASIC_MSG, imsg2Size );
 	imsg2[IPMI_MSG2_CMD_OFFSET] = cmd;
 
 	if ( bridged ) // may need to distinguish between once and twice-bridged messages
@@ -960,19 +1017,22 @@ uint8_t  netfn = IPMI_MSG_NETFN_STORAGE;
 
 /* Reserve SDR (Sensor Data Record) Repository 
  *
+ * Used for both Get SDR (parm = 0) and Get device, sess SDR (parm = 1). 
+ * Only differences in the message are the network function and command code.
+ *
  *   RETURNS: status from sess->wrf
  *            0 on success
  *            non-zero for error
  */
 int
-ipmiMsgReserveSdrRep(void *device, IpmiSess sess, uint8_t *data, int bridged, uint8_t rsAddr, uint8_t rqAddr, size_t *responseSize, int roffs)
+ipmiMsgReserveSdrRep(void *device, IpmiSess sess, uint8_t *data, int bridged, uint8_t rsAddr, uint8_t rqAddr, size_t *responseSize, int roffs, uint8_t parm)
 {
 uint8_t  message[MSG_MAX_LENGTH] = { 0 };
 uint8_t  imsg2Size = sizeof( BASIC_MSG );
 uint8_t  imsg2[imsg2Size];
 size_t   messageSize;
-uint8_t  cmd   = IPMI_MSG_CMD_RESERVE_SDRREP;
-uint8_t  netfn = IPMI_MSG_NETFN_STORAGE;
+uint8_t  cmd   = (parm==IPMI_SDRREP_PARM_GET_DEV_SDR) ? IPMI_MSG_CMD_RESERVE_DEV_SDRREP : IPMI_MSG_CMD_RESERVE_SDRREP;
+uint8_t  netfn = (parm==IPMI_SDRREP_PARM_GET_DEV_SDR) ? IPMI_MSG_NETFN_SENSOR_EVENT     : IPMI_MSG_NETFN_STORAGE;
 
 	memcpy( imsg2, BASIC_MSG, imsg2Size );
 	imsg2[IPMI_MSG2_CMD_OFFSET] = cmd;
@@ -999,14 +1059,14 @@ uint8_t  netfn = IPMI_MSG_NETFN_STORAGE;
  *            non-zero for error
  */
 int
-ipmiMsgGetSdr(void *device, IpmiSess sess, uint8_t *data, int bridged, uint8_t rsAddr, uint8_t rqAddr, uint8_t *id, uint8_t *res, uint8_t offset, uint8_t readSize, uint8_t parm, uint8_t recordSize, size_t *responseSize, int roffs)
+ipmiMsgGetSdr(void *device, IpmiSess sess, uint8_t *data, int bridged, uint8_t rsAddr, uint8_t rqAddr, uint8_t *id, uint8_t *res, uint8_t offset, uint8_t readSize, size_t *responseSize, int roffs, uint8_t parm)
 {
 uint8_t  message[MSG_MAX_LENGTH] = { 0 };
 uint8_t  imsg2Size = sizeof( GET_SDR_MSG );
 uint8_t  imsg2[imsg2Size];
 size_t   messageSize;
-uint8_t  cmd   = parm ? IPMI_MSG_CMD_GET_DEV_SDR    : IPMI_MSG_CMD_GET_SDR;
-uint8_t  netfn = parm ? IPMI_MSG_NETFN_SENSOR_EVENT : IPMI_MSG_NETFN_STORAGE;
+uint8_t  cmd   = (parm==IPMI_SDRREP_PARM_GET_DEV_SDR) ? IPMI_MSG_CMD_GET_DEV_SDR    : IPMI_MSG_CMD_GET_SDR;
+uint8_t  netfn = (parm==IPMI_SDRREP_PARM_GET_DEV_SDR) ? IPMI_MSG_NETFN_SENSOR_EVENT : IPMI_MSG_NETFN_STORAGE;
 
 	memcpy( imsg2, GET_SDR_MSG, imsg2Size );
 	imsg2[IPMI_MSG2_CMD_OFFSET] = cmd;
@@ -1018,33 +1078,6 @@ uint8_t  netfn = parm ? IPMI_MSG_NETFN_SENSOR_EVENT : IPMI_MSG_NETFN_STORAGE;
 	imsg2[IPMI_MSG2_GET_SDR_ID_MSB_OFFSET]  = id[1];
 	imsg2[IPMI_MSG2_GET_SDR_OFFSET_OFFSET]  = offset;
 	imsg2[IPMI_MSG2_GET_SDR_CNT_OFFSET]     = readSize;
-
-	if ( bridged ) // may need to distinguish between once and twice-bridged messages
-		ipmiBuildSendMsg( sess, message, &messageSize, cmd, netfn, rsAddr, rqAddr, imsg2, imsg2Size, 0 );
-	else
-		messageSize = ipmiMsgBuild( sess, message, cmd, netfn, imsg2, imsg2Size, 0, 0, 0, 0, 0, 0 );
-
-	return sess->wrf( device, sess, message, messageSize, data, responseSize, cmd, netfn, roffs, 0 );
-}
-
-/* Get device, sess Sensor Data Record (SDR) Info 
- *
- *   RETURNS: status from sess->wrf
- *            0 on success
- *            non-zero for error
- */
-int
-ipmiMsgGetDevSdrInfo(void *device, IpmiSess sess, uint8_t *data, int bridged, uint8_t rsAddr, uint8_t rqAddr, uint8_t parm, size_t *responseSize, int roffs)
-{
-uint8_t  message[MSG_MAX_LENGTH] = { 0 };
-uint8_t  imsg2Size = sizeof( GET_DEV_SDR_INFO_MSG );
-uint8_t  imsg2[imsg2Size];
-size_t   messageSize;
-uint8_t  cmd   = IPMI_MSG_CMD_GET_DEV_SDR_INFO;
-uint8_t  netfn = IPMI_MSG_NETFN_SENSOR_EVENT;
-
-	memcpy( imsg2, GET_DEV_SDR_INFO_MSG, imsg2Size );
-	imsg2[IPMI_MSG2_CMD_OFFSET] = cmd;
 
 	if ( bridged ) // may need to distinguish between once and twice-bridged messages
 		ipmiBuildSendMsg( sess, message, &messageSize, cmd, netfn, rsAddr, rqAddr, imsg2, imsg2Size, 0 );
@@ -1139,6 +1172,318 @@ uint8_t  netfn = IPMI_MSG_NETFN_APP_REQUEST;
 
 	return sess->wrf( device, sess, message, messageSize, data, responseSize, cmd, netfn, roffs, 0 );
 }
+/* Get device, sess ID
+ *
+ *   RETURNS: status from sess->wrf
+ *            0 on success
+ *            non-zero for error
+ */
+int
+ipmiMsgBroadcastGetDeviceId(void *device, IpmiSess sess, uint8_t *data, int bridged, uint8_t rsAddr, uint8_t rqAddr, size_t *responseSize, int roffs)
+{
+uint8_t  message[MSG_MAX_LENGTH] = { 0 };
+uint8_t  imsg2Size = sizeof( BASIC_MSG );
+uint8_t  imsg2[imsg2Size];
+size_t   messageSize;
+uint8_t  cmd   = IPMI_MSG_CMD_GET_DEVICE_ID;
+uint8_t  netfn = IPMI_MSG_NETFN_APP_REQUEST;
+
+        memcpy( imsg2, BASIC_MSG, imsg2Size );
+        imsg2[IPMI_MSG2_CMD_OFFSET] = cmd;
+   
+        if ( bridged ) // may need to distinguish between once and twice-bridged messages
+                ipmiBuildSendMsg( sess, message+1, &messageSize, cmd, netfn, rsAddr, rqAddr, imsg2, imsg2Size, 0 );
+        else
+                messageSize = ipmiMsgBuild( sess, message, cmd, netfn, imsg2, imsg2Size, 0, 0, 0, 0, 0, 0 );
+
+        return sess->wrf( device, sess, message, messageSize, data, responseSize, cmd, netfn, roffs, 0 );
+}
+
+/* Name this PICMG? */
+/* Get Address Info -  this is version that attempts to get physical location
+ *                     information for a specific device using IPMB-0 address
+ *
+ *   RETURNS: status from sess->wrf
+ *            0 on success
+ *            non-zero for error
+ */
+int
+ipmiMsgGetAddressInfoIpmb0(void *device, IpmiSess sess, uint8_t *data, int bridged, uint8_t rsAddr, uint8_t rqAddr, size_t *responseSize, int roffs, 
+			     uint8_t fru, uint8_t key)
+{
+uint8_t  message[MSG_MAX_LENGTH] = { 0 };
+uint8_t  imsg2Size = sizeof( GET_ADDR_INFO_MSG );
+uint8_t  imsg2[imsg2Size];
+size_t   messageSize;
+uint8_t  cmd   = IPMI_MSG_CMD_GET_ADDR_INFO;
+uint8_t  netfn = IPMI_MSG_NETFN_PICMG;
+
+	memcpy( imsg2, GET_ADDR_INFO_MSG, imsg2Size );
+	imsg2[IPMI_MSG2_RQADDR_OFFSET] = IPMI_MSG_ADDR_SW;
+	imsg2[IPMI_MSG2_CMD_OFFSET]    = cmd;
+
+	imsg2[PICMG_IMSG2_GET_ADDR_INFO_FRUID_OFFSET]     = fru;
+	imsg2[PICMG_IMSG2_GET_ADDR_INFO_KEY_TYPE_OFFSET]  = PICMG_ADDR_KEY_TYPE_IPMB0;
+	imsg2[PICMG_IMSG2_GET_ADDR_INFO_KEY_OFFSET]       = key;
+// if using different routines for different types of get hw address requests, may not need to pass these
+// values as arguments; can be hard-coded in routine
+
+	if ( bridged ) // may need to distinguish between once and twice-bridged messages
+		ipmiBuildSendMsg( sess, message, &messageSize, cmd, netfn, rsAddr, rqAddr, imsg2, imsg2Size, 0 );
+	else
+		messageSize = ipmiMsgBuild( sess, message, cmd, netfn, imsg2, imsg2Size, 0, 0, 0, 0, 0, 0 );
+
+	return sess->wrf( device, sess, message, messageSize, data, responseSize, cmd, netfn, roffs, 0 );
+}
+
+/* Name this PICMG? */
+/* Get Address Info -  this is version that attempts to get physical location
+ *                     information for a specific device
+ *
+ *   RETURNS: status from sess->wrf
+ *            0 on success
+ *            non-zero for error
+ */
+int
+ipmiMsgGetAddressInfoHwAddr(void *device, IpmiSess sess, uint8_t *data, int bridged, uint8_t rsAddr, uint8_t rqAddr, size_t *responseSize, int roffs, 
+			     uint8_t fru, uint8_t keytype, uint8_t key, uint8_t sitetype)
+{
+uint8_t  message[MSG_MAX_LENGTH] = { 0 };
+uint8_t  imsg2Size = sizeof( GET_ADDR_INFO_MSG );
+uint8_t  imsg2[imsg2Size];
+size_t   messageSize;
+uint8_t  cmd   = IPMI_MSG_CMD_GET_ADDR_INFO;
+uint8_t  netfn = IPMI_MSG_NETFN_PICMG;
+
+	memcpy( imsg2, GET_ADDR_INFO_MSG, imsg2Size );
+	imsg2[IPMI_MSG2_RQADDR_OFFSET] = IPMI_MSG_ADDR_SW;
+	imsg2[IPMI_MSG2_CMD_OFFSET]    = cmd;
+
+	imsg2[PICMG_IMSG2_GET_ADDR_INFO_FRUID_OFFSET]     = fru;
+	imsg2[PICMG_IMSG2_GET_ADDR_INFO_KEY_TYPE_OFFSET]  = keytype;
+	imsg2[PICMG_IMSG2_GET_ADDR_INFO_KEY_OFFSET]       = key;
+	imsg2[PICMG_IMSG2_GET_ADDR_INFO_SITE_TYPE_OFFSET] = sitetype;
+// if using different routines for different types of get hw address requests, may not need to pass these
+// values as arguments; can be hard-coded in routine
+
+	if ( bridged ) // may need to distinguish between once and twice-bridged messages
+		ipmiBuildSendMsg( sess, message, &messageSize, cmd, netfn, rsAddr, rqAddr, imsg2, imsg2Size, 0 );
+	else
+		messageSize = ipmiMsgBuild( sess, message, cmd, netfn, imsg2, imsg2Size, 0, 0, 0, 0, 0, 0 );
+
+	return sess->wrf( device, sess, message, messageSize, data, responseSize, cmd, netfn, roffs, 0 );
+}
+
+/* Name this PICMG? */
+/* Get Address Info - this is version that does not seek information
+ *                    about a specific FRU/hardware, and will receive info
+ *                    about the IPM Controller that implements the command
+ *   RETURNS: status from sess->wrf
+ *            0 on success
+ *            non-zero for error
+ */
+int
+ipmiMsgGetAddressInfoIpmc(void *device, IpmiSess sess, uint8_t *data, int bridged, uint8_t rsAddr, uint8_t rqAddr, size_t *responseSize, int roffs)
+{
+uint8_t  message[MSG_MAX_LENGTH] = { 0 };
+uint8_t  imsg2Size = sizeof( GET_PICMG_PROP_MSG );
+uint8_t  imsg2[imsg2Size];
+size_t   messageSize;
+uint8_t  cmd   = IPMI_MSG_CMD_GET_ADDR_INFO;
+uint8_t  netfn = IPMI_MSG_NETFN_PICMG;
+
+	memcpy( imsg2, GET_PICMG_PROP_MSG, imsg2Size );
+	imsg2[IPMI_MSG2_RQADDR_OFFSET] = IPMI_MSG_ADDR_SW;
+	imsg2[IPMI_MSG2_CMD_OFFSET]    = cmd;
+
+	if ( bridged ) // may need to distinguish between once and twice-bridged messages
+		ipmiBuildSendMsg( sess, message, &messageSize, cmd, netfn, rsAddr, rqAddr, imsg2, imsg2Size, 0 );
+	else
+		messageSize = ipmiMsgBuild( sess, message, cmd, netfn, imsg2, imsg2Size, 0, 0, 0, 0, 0, 0 );
+
+	return sess->wrf( device, sess, message, messageSize, data, responseSize, cmd, netfn, roffs, 0 );
+}
+
+/* Get PICMG properties
+ *
+ *   RETURNS: status from sess->wrf
+ *            0 on success
+ *            non-zero for error
+ */
+int
+ipmiMsgGetPicmgProp(void *device, IpmiSess sess, uint8_t *data, int bridged, uint8_t rsAddr, uint8_t rqAddr, size_t *responseSize, int roffs)
+{
+uint8_t  message[MSG_MAX_LENGTH] = { 0 };
+uint8_t  imsg2Size = sizeof( GET_PICMG_PROP_MSG );
+uint8_t  imsg2[imsg2Size];
+size_t   messageSize;
+uint8_t  cmd   = IPMI_MSG_CMD_GET_PICMG_PROP;
+uint8_t  netfn = IPMI_MSG_NETFN_PICMG;
+
+	memcpy( imsg2, GET_PICMG_PROP_MSG, imsg2Size );
+	imsg2[IPMI_MSG2_RQADDR_OFFSET] = IPMI_MSG_ADDR_SW;
+	imsg2[IPMI_MSG2_CMD_OFFSET]    = cmd;
+
+	if ( bridged ) // may need to distinguish between once and twice-bridged messages
+		ipmiBuildSendMsg( sess, message, &messageSize, cmd, netfn, rsAddr, rqAddr, imsg2, imsg2Size, 0 );
+	else
+		messageSize = ipmiMsgBuild( sess, message, cmd, netfn, imsg2, imsg2Size, 0, 0, 0, 0, 0, 0 );
+
+	return sess->wrf( device, sess, message, messageSize, data, responseSize, cmd, netfn, roffs, 0 );
+}
+
+/* Get power level - PICMG command
+ *
+ *   RETURNS: status from sess->wrf
+ *            0 on success
+ *            non-zero for error
+ */
+int
+ipmiMsgGetPowerLevel(void *device, IpmiSess sess, uint8_t *data, int bridged, uint8_t rsAddr, uint8_t rqAddr, size_t *responseSize, int roffs, uint8_t fruId, uint8_t parm )
+{
+uint8_t  message[MSG_MAX_LENGTH] = { 0 };
+uint8_t  imsg2Size = sizeof( GET_POWER_LEVEL_MSG );
+uint8_t  imsg2[imsg2Size];
+size_t   messageSize;
+uint8_t  cmd   = IPMI_MSG_CMD_GET_POWER_LEVEL;
+uint8_t  netfn = IPMI_MSG_NETFN_PICMG;
+
+	memcpy( imsg2, GET_POWER_LEVEL_MSG, imsg2Size );
+	imsg2[IPMI_MSG2_RQADDR_OFFSET] = IPMI_MSG_ADDR_SW;
+	imsg2[IPMI_MSG2_CMD_OFFSET]    = cmd;
+	imsg2[IPMI_MSG2_SET_FRU_ACT_FRU_OFFSET] = fruId;
+	imsg2[PICMG_RPLY_IMSG2_GET_POWER_LEVEL_TYPE_OFFSET] = parm;
+
+	if ( bridged ) // may need to distinguish between once and twice-bridged messages
+		ipmiBuildSendMsg( sess, message, &messageSize, cmd, netfn, rsAddr, rqAddr, imsg2, imsg2Size, 0 );
+	else
+		messageSize = ipmiMsgBuild( sess, message, cmd, netfn, imsg2, imsg2Size, 0, 0, 0, 0, 0, 0 );
+
+	return sess->wrf( device, sess, message, messageSize, data, responseSize, cmd, netfn, roffs, 0 );
+}
+
+/* Get fan level - PICMG command
+ *
+ *   RETURNS: status from sess->wrf
+ *            0 on success
+ *            non-zero for error
+ */
+
+int
+ipmiMsgGetFanLevel(void *device, IpmiSess sess, uint8_t *data, int bridged, uint8_t rsAddr, uint8_t rqAddr, size_t *responseSize, int roffs, uint8_t fruId)
+{
+uint8_t  message[MSG_MAX_LENGTH] = { 0 };
+uint8_t  imsg2Size = sizeof( GET_FAN_LEVEL_MSG );
+uint8_t  imsg2[imsg2Size];
+size_t   messageSize;
+uint8_t  cmd   = IPMI_MSG_CMD_GET_FAN_LEVEL;
+uint8_t  netfn = IPMI_MSG_NETFN_PICMG;
+
+	memcpy( imsg2, GET_FAN_LEVEL_MSG, imsg2Size );
+	imsg2[IPMI_MSG2_RQADDR_OFFSET] = IPMI_MSG_ADDR_SW;
+	imsg2[IPMI_MSG2_CMD_OFFSET]    = cmd;
+	imsg2[IPMI_MSG2_SET_FRU_ACT_FRU_OFFSET] = fruId;
+
+	if ( bridged ) // may need to distinguish between once and twice-bridged messages
+		ipmiBuildSendMsg( sess, message, &messageSize, cmd, netfn, rsAddr, rqAddr, imsg2, imsg2Size, 0 );
+	else
+		messageSize = ipmiMsgBuild( sess, message, cmd, netfn, imsg2, imsg2Size, 0, 0, 0, 0, 0, 0 );
+
+	return sess->wrf( device, sess, message, messageSize, data, responseSize, cmd, netfn, roffs, 0 );
+}
+
+/* Set fan level - PICMG command
+ *
+ *   RETURNS: status from sess->wrf
+ *            0 on success
+ *            non-zero for error
+ */
+
+int
+ipmiMsgSetFanLevel(void *device, IpmiSess sess, uint8_t *data, int bridged, uint8_t rsAddr, uint8_t rqAddr, size_t *responseSize, int roffs, uint8_t fruId, uint8_t level)
+{
+uint8_t  message[MSG_MAX_LENGTH] = { 0 };
+uint8_t  imsg2Size = sizeof( GET_FAN_LEVEL_MSG );
+uint8_t  imsg2[imsg2Size];
+size_t   messageSize;
+uint8_t  cmd   = IPMI_MSG_CMD_GET_FAN_LEVEL;
+uint8_t  netfn = IPMI_MSG_NETFN_PICMG;
+
+	memcpy( imsg2, GET_FAN_LEVEL_MSG, imsg2Size );
+	imsg2[IPMI_MSG2_RQADDR_OFFSET] = IPMI_MSG_ADDR_SW;
+	imsg2[IPMI_MSG2_CMD_OFFSET]    = cmd;
+	imsg2[IPMI_MSG2_SET_FRU_ACT_FRU_OFFSET] = fruId;
+	imsg2[IPMI_MSG2_SET_FAN_LEVEL_OFFSET] = level;
+
+	if ( bridged ) // may need to distinguish between once and twice-bridged messages
+		ipmiBuildSendMsg( sess, message, &messageSize, cmd, netfn, rsAddr, rqAddr, imsg2, imsg2Size, 0 );
+	else
+		messageSize = ipmiMsgBuild( sess, message, cmd, netfn, imsg2, imsg2Size, 0, 0, 0, 0, 0, 0 );
+
+	return sess->wrf( device, sess, message, messageSize, data, responseSize, cmd, netfn, roffs, 0 );
+}
+
+/* Set FRU Activation - PICMG command
+ *
+ *   RETURNS: status from sess->wrf
+ *            0 on success
+ *            non-zero for error
+ */
+
+int
+ipmiMsgSetFruAct(void *device, IpmiSess sess, uint8_t *data, int bridged, uint8_t rsAddr, uint8_t rqAddr, size_t *responseSize, int roffs, uint8_t fruId, int parm)
+{
+uint8_t  message[MSG_MAX_LENGTH] = { 0 };
+uint8_t  imsg2Size = sizeof( SET_FRU_ACT_MSG );
+uint8_t  imsg2[imsg2Size];
+size_t   messageSize;
+uint8_t  cmd   = IPMI_MSG_CMD_SET_FRU_ACT;
+uint8_t  netfn = IPMI_MSG_NETFN_PICMG;
+
+	memcpy( imsg2, GET_FAN_LEVEL_MSG, imsg2Size );
+	imsg2[IPMI_MSG2_RQADDR_OFFSET] = IPMI_MSG_ADDR_SW;
+	imsg2[IPMI_MSG2_CMD_OFFSET]    = cmd;
+	imsg2[IPMI_MSG2_SET_FRU_ACT_FRU_OFFSET] = fruId;
+	imsg2[IPMI_MSG2_SET_FRU_ACT_CMD_OFFSET] = parm;
+
+printf("*************ipmi set fru act parm %i\n", parm);
+	if ( bridged ) // may need to distinguish between once and twice-bridged messages
+		ipmiBuildSendMsg( sess, message, &messageSize, cmd, netfn, rsAddr, rqAddr, imsg2, imsg2Size, 0 );
+	else
+		messageSize = ipmiMsgBuild( sess, message, cmd, netfn, imsg2, imsg2Size, 0, 0, 0, 0, 0, 0 );
+
+	return sess->wrf( device, sess, message, messageSize, data, responseSize, cmd, netfn, roffs, 0 );
+}
+
+/* Get PICMG properties
+ *
+ *   RETURNS: status from sess->wrf
+ *            0 on success
+ *            non-zero for error
+ */
+int
+ipmiMsgGetFanProp(void *device, IpmiSess sess, uint8_t *data, int bridged, uint8_t rsAddr, uint8_t rqAddr, size_t *responseSize, int roffs, uint8_t fruId)
+{
+uint8_t  message[MSG_MAX_LENGTH] = { 0 };
+uint8_t  imsg2Size = sizeof( GET_FAN_PROP_MSG );
+uint8_t  imsg2[imsg2Size];
+size_t   messageSize;
+uint8_t  cmd   = IPMI_MSG_CMD_GET_FAN_PROP;
+uint8_t  netfn = IPMI_MSG_NETFN_PICMG;
+
+	memcpy( imsg2, GET_FAN_PROP_MSG, imsg2Size );
+	imsg2[IPMI_MSG2_RQADDR_OFFSET] = IPMI_MSG_ADDR_SW;
+	imsg2[IPMI_MSG2_CMD_OFFSET]    = cmd;
+	imsg2[IPMI_MSG2_SET_FRU_ACT_FRU_OFFSET] = fruId;
+
+	if ( bridged ) // may need to distinguish between once and twice-bridged messages
+		ipmiBuildSendMsg( sess, message, &messageSize, cmd, netfn, rsAddr, rqAddr, imsg2, imsg2Size, 0 );
+	else
+		messageSize = ipmiMsgBuild( sess, message, cmd, netfn, imsg2, imsg2Size, 0, 0, 0, 0, 0, 0 );
+
+	return sess->wrf( device, sess, message, messageSize, data, responseSize, cmd, netfn, roffs, 0 );
+}
+	
 
 void
 ipmiBuildSendMsg(IpmiSess sess, uint8_t *message, size_t *messageSize, uint8_t cmd, uint8_t netfn, uint8_t rsAddr, uint8_t rqAddr, uint8_t *msg2, size_t msg2Size, uint8_t lun)

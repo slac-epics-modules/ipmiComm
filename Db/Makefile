@@ -27,7 +27,12 @@ DB += fru_extended.db
 DB += fru_pm.db
 DB += fru_cu.db
 
+DB += fru_atca_amc.db
+DB += fru_atca_rtm.db
+
 DB += shelf_microtca_12slot.db
+
+DB += shelf_atca_7slot.db
 
 DB += server_supermicro.db
 

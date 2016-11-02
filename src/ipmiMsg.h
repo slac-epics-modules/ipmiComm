@@ -7,8 +7,11 @@ extern "C" {
 
 #include <drvMch.h>
 
-/* Call realloc to allocate memory block; Use memset to set block to all zeros */
+/* Call realloc to allocate memory block; 
+ * Use memset to set block to all zeros or just new memory
+ */
 void *ipmiReallocZeros(void *dest, size_t size);
+void *ipmiReallocZerosNewMemory(void *dest, size_t old_size, size_t new_size);
 
 /* Convert 2-element array (which stores LS byte first) to integer */
 uint16_t arrayToUint16(uint8_t *data );
@@ -120,17 +123,33 @@ int ipmiMsgGetFruInvInfo(void *device, IpmiSess sess, uint8_t *data, int bridged
 
 int ipmiMsgReadFru(void *device, IpmiSess sess, uint8_t *data, int bridged, uint8_t rsAddr, uint8_t rqAddr, uint8_t id, uint8_t *readOffset, uint8_t readSize, size_t *responseSize, int offs);
 
-int ipmiMsgGetSdrRepInfo(void *device, IpmiSess sess, uint8_t *data, int bridged, uint8_t rsAddr, uint8_t rqAddr, size_t *responseSize, int offs);
+int ipmiMsgGetSdrRepInfo(void *device, IpmiSess sess, uint8_t *data, int bridged, uint8_t rsAddr, uint8_t rqAddr, size_t *responseSize, int offs, uint8_t parm);
 
-int ipmiMsgReserveSdrRep(void *device, IpmiSess sess, uint8_t *data, int bridged, uint8_t rsAddr, uint8_t rqAddr, size_t *responseSize, int offs);
+int ipmiMsgReserveSdrRep(void *device, IpmiSess sess, uint8_t *data, int bridged, uint8_t rsAddr, uint8_t rqAddr, size_t *responseSize, int offs, uint8_t parm);
 
-int ipmiMsgGetDevSdrInfo(void *device, IpmiSess sess, uint8_t *data, int bridged, uint8_t rsAddr, uint8_t rqAddr, uint8_t parm, size_t *responseSize, int offs);
-
-int ipmiMsgGetSdr(void *device, IpmiSess sess, uint8_t *data, int bridged, uint8_t rsAddr, uint8_t rqAddr,  uint8_t *id, uint8_t *res, uint8_t offset, uint8_t readSize, uint8_t parm, uint8_t recordSize, size_t *responseSize, int offs);
+int ipmiMsgGetSdr(void *device, IpmiSess sess, uint8_t *data, int bridged, uint8_t rsAddr, uint8_t rqAddr,  uint8_t *id, uint8_t *res, uint8_t offset, uint8_t readSize, size_t *responseSize, int offs, uint8_t parm);
 				
 int ipmiMsgReadSensor(void *device, IpmiSess sess, uint8_t *data, uint8_t bridged, uint8_t rsAddr, uint8_t rqAddr, uint8_t sens, uint8_t lun, size_t *responseSize, int offs);
 
 int ipmiMsgGetSensorThresholds(void *device, IpmiSess sess, uint8_t *data, uint8_t bridged, uint8_t rsAddr, uint8_t rqAddr, uint8_t sens, uint8_t lun, size_t *responseSize, int offs);
+
+int ipmiMsgGetAddressInfoHwAddr(void *device, IpmiSess sess, uint8_t *data, int bridged, uint8_t rsAddr, uint8_t rqAddr, size_t *responseSize, int roffs, uint8_t fru, uint8_t keytpe, uint8_t key, uint8_t sitetype);
+
+int ipmiMsgGetAddressInfoIpmb0(void *device, IpmiSess sess, uint8_t *data, int bridged, uint8_t rsAddr, uint8_t rqAddr, size_t *responseSize, int roffs, uint8_t fru, uint8_t key);
+
+int ipmiMsgGetAddressInfoIpmc(void *device, IpmiSess sess, uint8_t *data, int bridged, uint8_t rsAddr, uint8_t rqAddr, size_t *responseSize, int roffs);
+
+int ipmiMsgGetFanProp(void *device, IpmiSess sess, uint8_t *data, int bridged, uint8_t rsAddr, uint8_t rqAddr, size_t *responseSize, int roffs, uint8_t fruId);
+
+int ipmiMsgGetPicmgProp(void *device, IpmiSess sess, uint8_t *data, int bridged, uint8_t rsAddr, uint8_t rqAddr, size_t *responseSize, int roffs);
+
+int ipmiMsgGetPowerLevel(void *device, IpmiSess sess, uint8_t *data, int bridged, uint8_t rsAddr, uint8_t rqAddr, size_t *responseSize, int roffs, uint8_t fruId, uint8_t parm);
+
+int ipmiMsgGetFanLevel(void *device, IpmiSess sess, uint8_t *data, int bridged, uint8_t rsAddr, uint8_t rqAddr, size_t *responseSize, int roffs, uint8_t fruId);
+
+int ipmiMsgSetFanLevel(void *device, IpmiSess sess, uint8_t *data, int bridged, uint8_t rsAddr, uint8_t rqAddr, size_t *responseSize, int roffs, uint8_t fruId, uint8_t level);
+
+int ipmiMsgSetFruAct(void *device, IpmiSess sess, uint8_t *data, int bridged, uint8_t rsAddr, uint8_t rqAddr, size_t *responseSize, int roffs, uint8_t fruId, int parm);
 
 #ifdef __cplusplus
 };

@@ -9,6 +9,10 @@ extern "C" {
 
 /* IMPORTANT: For all routines below, caller must perform locking */
 
+void mchSetSizeOffs(IpmiSess ipmiSess, size_t payloadSize, size_t *roffs, size_t *responseSize, int *bridged, uint8_t *rsAddr, uint8_t *rqAddr);
+
+int mchMsgCheckSizes(size_t destSize, int offset, size_t srcSize);
+
 int mchMsgGetChanAuth(MchSess mchSess, IpmiSess ipmiSess, uint8_t *response);
 
 int mchMsgGetSess(MchSess mchSess, IpmiSess ipmiSess, uint8_t *response);
@@ -25,35 +29,23 @@ int mchMsgChassisControl(MchData mchData, uint8_t *data, uint8_t parm);
 
 int mchMsgGetChassisStatus(MchData mchData, uint8_t *data);
 
-int mchMsgGetFruInvInfo(MchData mchData, uint8_t *data, uint8_t id);
+int mchMsgGetFruInvInfoWrapper(MchData mchData, uint8_t *data, Fru fru);
 
-int mchMsgReadFru(MchData mchData, uint8_t *data, uint8_t id, uint8_t *readOffset, uint8_t readSize);
+int mchMsgReadFruWrapper(MchData mchData, uint8_t *data, Fru fru, uint8_t *readOffset, uint8_t readSize);
 
-int mchMsgGetSdrRepInfo(MchData mchData, uint8_t *data);
+int mchMsgGetSdrRepInfoWrapper(MchData mchData, uint8_t *data, uint8_t parm, uint8_t addr);
 
-int mchMsgReserveSdrRep(MchData mchData, uint8_t *data);
+int mchMsgReserveSdrRepWrapper(MchData mchData, uint8_t *data, uint8_t parm, uint8_t addr);
 
-int mchMsgGetSdr(MchData mchData, uint8_t *data, uint8_t *id, uint8_t *res, uint8_t offset, uint8_t readSize, uint8_t parm, uint8_t recordSize);
+int mchMsgGetSdrWrapper(MchData mchData, uint8_t *data,  uint8_t *id, uint8_t *res, uint8_t offset, uint8_t readSize, uint8_t parm, uint8_t rsAddr);
 
-int mchMsgGetDevSdrInfo(MchData mchData, uint8_t *data, uint8_t parm);
+//int mchMsgGetDevSdrInfo(MchData mchData, uint8_t *data, int bridged, uint8_t rsAddr, uint8_t parm);
 				
-int mchMsgReadSensor(MchData mchData, uint8_t *data, uint8_t sens, uint8_t lun, size_t *responseSize);
+int mchMsgReadSensorWrapper(MchData mchData, uint8_t *data, Sensor sens, size_t *sensReadMsgSize);
 
-int mchMsgGetSensorThresholds(MchData mchData, uint8_t *data, uint8_t sens, uint8_t lun);
+int mchMsgGetSensorThresholdsWrapper(MchData mchData, uint8_t *data, Sensor sens);
 
-int mchMsgSetFruActHelper(MchData mchData, uint8_t *data, uint8_t fruId, int parm);
-
-int mchMsgGetFruActPolicyHelper(MchData mchData, uint8_t *data, uint8_t fruId);
-
-int mchMsgGetDeviceId(MchData mchData, uint8_t *data, int bridged, uint8_t rsAddr);
-
-int mchMsgGetFanPropHelper(MchData mchData, uint8_t *data, uint8_t fruId);
-
-int mchMsgGetFanLevelHelper(MchData mchData, uint8_t *data, uint8_t fruId, uint8_t fanProp, uint8_t *level);
-
-int mchMsgSetFanLevelHelper(MchData mchData, uint8_t *data, uint8_t fruId, uint8_t level);
-
-int mchMsgGetPowerLevelVt(MchData mchData, uint8_t *data, uint8_t fruId, uint8_t parm);
+int mchMsgGetDeviceIdWrapper(MchData mchData, uint8_t *data, uint8_t rsAddr);
 
 #ifdef __cplusplus
 };

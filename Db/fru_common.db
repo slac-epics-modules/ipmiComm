@@ -16,6 +16,7 @@ record(bi, "$(dev):$(id)$(unit):P") {
 # Vadatech 'hotswap' sensor, provides FRU M-state
 record(mbbi, "$(dev):$(id)$(unit):MSTATE") {
   field(SCAN, "10 second")
+#  field(SCAN, "I/O Intr")
   field(DTYP, "MCHsensor")
   field(INP,  "#B$(fruid) C240 N1 @$(link)+hs")
   field(ONVL, "0x01")
@@ -161,7 +162,7 @@ record(ai, "$(dev):$(id)$(unit):EPWRDES") {
 record(ai, "$(dev):$(id)$(unit):PWRDLY") {
   field(DESC, "FRU delay to stable power")
   field(DTYP, "FRUinfo")
-  field(INP, "#B$(fruid) C0 N0  @$(link)+pwr")
+  field(INP, "#B$(fruid) C4 N0  @$(link)+pwr")
   field(EGU, "s")
   field(FLNK, "$(dev):$(id)$(unit):PWRDYN")
   alias("$(dev):$(id)$(unit)_PWRDLY")

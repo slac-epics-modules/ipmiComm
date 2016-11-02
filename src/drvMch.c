@@ -15,6 +15,8 @@
 #include <cantProceed.h>
 #include <epicsThread.h>
 #include <dbScan.h>
+#include <registryFunction.h>
+#include <registry.h>
 
 #include <drvMch.h>
 #include <drvMchMsg.h>
@@ -22,31 +24,36 @@
 #include <picmgDef.h>
 
 #undef DEBUG 
+#define DEBUG
 
 #define PING_PERIOD  5
+
+const void *mchCbRegistryId = (void*)&mchCbRegistryId;
 
 char mchDescString[MCH_TYPE_MAX][MCH_DESC_MAX_LENGTH] =
                 {   "Unknown device\0", 
                     "MicroTCA Crate, VT MCH\0",
                     "MicroTCA Crate, NAT MCH\0",
                     "Supermicro Server\0",
-                    "",
-                    "",
+                    "ATCA Crate, Pentair",
+                    "ATCA Crate, Artesyn",
                     "",
                     "",
                     "",
                     ""
                 };
 
-
 int mchCounter = 0;
 
 epicsMutexId mchStatMtx[MAX_MCH];
 uint32_t     mchStat[MAX_MCH] = { 0 };
 
+/* change some of these to static! */
 static int mchSdrGetDataAll(MchData mchData);
 static int mchFruGetDataAll(MchData mchData);
-int  mchCnfg(MchData mchData);
+int mchGetFruLkup(MchData mchData, int index);
+static int  mchCnfg(MchData mchData);
+
 
 static void
 mchSeqInit(IpmiSess ipmiSess)
@@ -59,6 +66,12 @@ int i;
 	ipmiSess->seqRply[0] = IPMI_WRAPPER_SEQ_INITIAL;
         for ( i = 1; i < IPMI_RPLY_SEQ_LENGTH - 1 ; i++)
                 ipmiSess->seqRply[i] = 0;	
+
+	for ( i = 0; i < IPMI_WRAPPER_SEQ_LENGTH ; i++)
+	        ipmiSess->seqSend[i] = 0;
+
+	for ( i = 0; i < IPMI_WRAPPER_ID_LENGTH ; i++)
+		ipmiSess->id[i] = 0;
 }
 
 static void
@@ -91,31 +104,40 @@ static int
 mchCommStart(MchSess mchSess, IpmiSess ipmiSess)
 {	
 uint8_t response[MSG_MAX_LENGTH] = { 0 };
-int     i;
+int     i, dbg = MCH_DBG( mchStat[mchSess->instance] );
 
-	if ( MCH_DBG( mchStat[mchSess->instance] ) )
+	if ( dbg )
 		printf("%s Connecting...\n", mchSess->name);
 
 	mchSeqInit( ipmiSess );
 
-	if ( mchMsgGetChanAuth( mchSess, ipmiSess, response ) )
+	if ( mchMsgGetChanAuth( mchSess, ipmiSess, response ) ) {
+		if ( dbg )
+			printf("%s Get Channel Authentication failed\n", mchSess->name);
 		return -1;	
+	}
 
 	mchSetAuth( mchSess, ipmiSess, response[IPMI_RPLY_IMSG2_AUTH_CAP_AUTH_OFFSET] );
 
-	if ( mchMsgGetSess( mchSess, ipmiSess, response ) )
+	if ( mchMsgGetSess( mchSess, ipmiSess, response ) ) {
+		if ( dbg )
+			printf("%s Get Session failed\n", mchSess->name);
 		return -1;
+	}
 
         /* Extract temporary session ID */
         for ( i = 0; i < IPMI_RPLY_IMSG2_SESSION_ID_LENGTH ; i++)
                 ipmiSess->id[i] = response[IPMI_RPLY_IMSG2_GET_SESS_TEMP_ID_OFFSET + i];
 
         /* Extract challenge string */
-        for ( i = 0; i < IPMI_RPLY_CHALLENGE_STR_LENGTH ; i++)
-                ipmiSess->str[i] = response[IPMI_RPLY_IMSG2_GET_SESS_CHALLENGE_STR_OFFSET + i];
+        for ( i = 0; i < IPMI_RPLY_CHALLENGE_STR_LENGTH ; i++)                
+		ipmiSess->str[i] = response[IPMI_RPLY_IMSG2_GET_SESS_CHALLENGE_STR_OFFSET + i];
 
-	if ( mchMsgActSess( mchSess, ipmiSess, response ) )
+	if ( mchMsgActSess( mchSess, ipmiSess, response ) ) {
+		if ( dbg )
+			printf("%s Activate session failed\n", mchSess->name);
 		goto bail;;
+	}
 
         /* Extract session ID */
         for ( i = 0; i < IPMI_RPLY_IMSG2_SESSION_ID_LENGTH ; i++)
@@ -126,8 +148,11 @@ int     i;
                 ipmiSess->seqSend[i] = response[IPMI_RPLY_IMSG2_ACT_SESS_INIT_SEND_SEQ_OFFSET + i];
 
 	/* Need a non-hard-coded way to determine privelige level */
-	if ( mchMsgSetPriv( mchSess, ipmiSess, response, IPMI_MSG_PRIV_LEVEL_OPER ) )
+	if ( mchMsgSetPriv( mchSess, ipmiSess, response, IPMI_MSG_PRIV_LEVEL_OPER ) ) {
+		if ( dbg )
+			printf("%s Set session privilege failed\n", mchSess->name);
 		goto bail;
+	}
 
 	return 0;
 
@@ -150,13 +175,9 @@ bail:
 int
 mchNewSession(MchSess mchSess, IpmiSess ipmiSess)
 {
-int i, rval = -1;
+int rval = -1;
 
-	for ( i = 0; i < IPMI_WRAPPER_SEQ_LENGTH ; i++)
-	        ipmiSess->seqSend[i] = 0;
-
-	for ( i = 0; i < IPMI_WRAPPER_ID_LENGTH ; i++)
-		ipmiSess->id[i] = 0;
+	mchSeqInit( ipmiSess );
 
 	if ( MCH_ONLN( mchStat[mchSess->instance] ) )
 		rval = mchCommStart( mchSess, ipmiSess );
@@ -240,6 +261,56 @@ int i = 0, j = 0;
 	}
 }
 
+static void
+hexAsciiConvert(uint8_t *input, uint8_t *output, uint8_t n_output)
+{
+int i, j = 0, k;
+uint8_t a;
+
+	for ( i = 0; i < n_output/2; i++ ) {
+
+		for ( k = 1; k > -1; k-- ) {
+
+			a = (input[i] & (0xF<<(k*4))) >> k*4;
+
+			if ( a == 0 )
+				output[j] = '0';
+			else if ( a == 1 ) 
+				output[j] = '1';
+			else if ( a == 2 ) 
+				output[j] = '2';
+			else if ( a == 3 ) 
+				output[j] = '3';
+			else if ( a == 4 ) 
+				output[j] = '4';
+			else if ( a == 5 ) 
+				output[j] = '5';
+			else if ( a == 6 ) 
+				output[j] = '6';
+			else if ( a == 7 ) 
+				output[j] = '7';
+			else if ( a == 8 ) 
+				output[j] = '8';
+			else if ( a == 9 ) 
+				output[j] = '9';
+			else if ( a == 10 ) 
+				output[j] = 'A';
+			else if ( a == 11 ) 
+				output[j] = 'B';
+			else if ( a == 12 ) 
+				output[j] = 'C';
+			else if ( a == 13 ) 
+				output[j] = 'D';
+			else if ( a == 14 ) 
+				output[j] = 'E';
+			else if ( a == 15 ) 
+				output[j] = 'F';
+
+			j++;
+		} 
+	}
+}
+
 /* If error, set field->length to zero to indicate no valid data */
 static int
 mchFruFieldConvertData(FruField field, uint8_t lang)
@@ -253,7 +324,23 @@ int i;
 			return -1;
 
 		case FRU_DATA_TYPE_BINARY:
-			printf("FRU field data type binary or unspecified. Add support!\n");
+			printf("\nFRU field data type binary or unspecified. Add support!\n");
+			field->length = 2*field->rlength;
+printf("field length %i\n", field->length);
+			if ( !( field->data = ipmiReallocZeros( field->data, field->length ) ) ) {
+				printf("No memory for FRU field data\n");
+				field->length = 0;
+				return -1;
+			}
+			else {
+printf("field data: ");
+for ( i = 0; i < field->rlength; i++ )
+printf("0x%02x ", field->rdata[i]);
+printf("\n");
+				hexAsciiConvert( field->rdata, field->data, field->length );
+				return 0;
+			}
+
 
 		case FRU_DATA_TYPE_BCDPLUS:
 
@@ -420,7 +507,7 @@ mchFruBoardDataGet(FruBoard board, uint8_t *raw, unsigned *offset)
  * Caller must perform locking.
  */
 static int
-mchFruDataGet(MchData mchData, Fru fru, uint8_t id) 
+mchFruDataGet(MchData mchData, Fru fru) 
 {
 MchSess    mchSess = mchData->mchSess;
 int        inst    = mchSess->instance;
@@ -433,7 +520,7 @@ unsigned   offset;   /* Offset into FRU data */
 int        rval;
 
 	/* Get FRU Inventory Info */
-	if ( mchMsgGetFruInvInfo( mchData, response, id ) )
+	if ( mchMsgGetFruInvInfoWrapper( mchData, response, fru ) )
 		return -1;
 
 	fru->size[0] = response[IPMI_RPLY_IMSG2_FRU_AREA_SIZE_LSB_OFFSET];
@@ -444,10 +531,10 @@ int        rval;
 		return 0;
 
 	if ( MCH_DBG( mchStat[inst] ) )
-		printf("%s mchFruDataGet: FRU %i inventory info size %i\n", mchSess->name, id, sizeInt);
+		printf("%s mchFruDataGet: FRU addr 0x%02x ID %i inventory info size %i\n", mchSess->name, fru->sdr.addr, fru->sdr.fruId, sizeInt);
 
 	if ( !(raw = ipmiReallocZeros( raw, sizeInt ) ) ) {
-		printf("mchFruDataGet: No memory for FRU %i data\n",id);
+		printf("mchFruDataGet: No memory for FRU addr 0x%02x ID %i data\n", fru->sdr.addr, fru->sdr.fruId);
 		return -1;
 	}
 
@@ -463,7 +550,7 @@ int        rval;
 	for ( i = 0; i < nread; i++ ) {
 		fru->read = i;
 
-		rval = mchMsgReadFru( mchData, response, id, fru->readOffset, MSG_FRU_DATA_READ_SIZE );
+		rval = mchMsgReadFruWrapper( mchData, response, fru, fru->readOffset, MSG_FRU_DATA_READ_SIZE );
 		if ( rval ) {
 			if ( IPMI_COMP_CODE_REQUESTED_DATA == rval )
 				break;
@@ -474,12 +561,12 @@ int        rval;
 	}
 
 	if ( MCH_DBG( mchStat[inst] ) >= MCH_DBG_HIGH ) {
-		printf("%s FRU %i raw data, size %i: \n", mchSess->name, id, sizeInt);
+		printf("%s FRU addr 0x%02x ID %i raw data, size %i: \n", mchSess->name, fru->sdr.addr, fru->sdr.fruId, sizeInt);
 		for ( i = 0; i < sizeInt; i++)
 			printf("0x%02x ",raw[i]);
 		printf("\n");
 
-		printf("%s FRU %i raw data, size %i: \n", mchSess->name, id, sizeInt);
+		printf("%s FRU addr 0x%02x ID %i raw data, size %i: \n", mchSess->name, fru->sdr.addr, fru->sdr.fruId, sizeInt);
 		for ( i = 0; i < sizeInt; i++)
 			printf("%c ",raw[i]);
 		printf("\n");
@@ -494,12 +581,21 @@ int        rval;
 	return 0;
 }
 
+
+int
+mchGetFruLkup(MchData mchData, int index)
+{
+int i;
+	for ( i = 0; i < MAX_FRU_MGMT; i++ ) {
+		if ( mchData->mchSys->fruLkup[i] == index )
+			return i;
+	}
+	return -1;
+}
+
 /* 
  * Get data for all FRUs. Must be done after SDR data has been stored in FRU struct.
  * If FRU is cooling unit, get fan properties.
- *
- * FRUs are indexed by FRU number
- * Later, change this to also discover FRUs that do not have SDRs (like our SLAC board)?
  *
  * Caller must perform locking.
  */
@@ -508,44 +604,38 @@ mchFruGetDataAll(MchData mchData)
 {
 MchSess mchSess = mchData->mchSess;
 MchSys  mchSys  = mchData->mchSys;
-uint8_t response[MSG_MAX_LENGTH] = { 0 };
 uint8_t i;
 Fru fru;
 int rval = 0;
 
-	for ( i = 0; i < MAX_FRU ; i++ ) {
+	if ( mchData->mchSys->mchcb->assign_site_info )
+		mchData->mchSys->mchcb->assign_site_info( mchData );
+
+	if ( mchData->mchSys->mchcb->assign_fru_lkup )
+		mchData->mchSys->mchcb->assign_fru_lkup( mchData );
+
+	for ( i = 0; i < mchSys->fruCount ; i++ ) {
 
 	       	fru = &mchSys->fru[i];
-	
+
 		if ( fru->sdr.recType ) {
 
-			if ( mchFruDataGet( mchData, fru , i ) )
+			if ( mchFruDataGet( mchData, fru ) )
 				rval = -1;
 
-			/* If not MCH, do not do MicroTCA-specific tasks; later change this to callbacks */
-			if ( !MCH_IS_MICROTCA( mchSess->type ) ) {
-			}
-			else if ( (i >= UTCA_FRU_TYPE_CU_MIN) && (i <= UTCA_FRU_TYPE_CU_MAX) ) {
-
-				if ( mchMsgGetFanPropHelper( mchData, response, fru->sdr.fruId ) )
-					rval = -1;
-				fru->fanMin  = response[IPMI_RPLY_IMSG2_GET_FAN_PROP_MIN_OFFSET];
-				fru->fanMax  = response[IPMI_RPLY_IMSG2_GET_FAN_PROP_MAX_OFFSET];
-				fru->fanNom  = response[IPMI_RPLY_IMSG2_GET_FAN_PROP_NOM_OFFSET];
-				fru->fanProp = response[IPMI_RPLY_IMSG2_GET_FAN_PROP_PROP_OFFSET];
-
-				if ( MCH_DBG( mchStat[mchSess->instance] ) >= MCH_DBG_MED )
-					printf("FRU %i fan properties min %i max %i nom %i prop 0x%02x\n", i, fru->fanMin, fru->fanMax, fru->fanNom, fru->fanProp);
-			}
-		}
+			if ( mchData->mchSys->mchcb->fru_data_suppl )
+				rval = mchData->mchSys->mchcb->fru_data_suppl( mchData, i );
+		}	
 	}
+
+
 	if ( MCH_DBG( mchStat[mchSess->instance] ) >= MCH_DBG_MED ) {
 		printf("%s mchFruGetDataAll: FRU Summary:\n", mchSess->name);
-		for ( i = 0; i < MAX_FRU  ; i++) {
+		for ( i = 0; i < mchSys->fruCount; i++) {
 			fru = &mchSys->fru[i];
 			if ( fru->sdr.fruId || (arrayToUint16( fru->size ) > 0) )
-				printf("SDR FRU ID %i %s was found, id %02x instance %02x, addr %02x dev %02x lun %02x\n", 
-				fru->sdr.fruId, fru->board.prod.data, fru->sdr.entityId, fru->sdr.entityInst, fru->sdr.addr, fru->sdr.fruId, fru->sdr.lun);
+				printf("SDR FRU index %i ID %i %s was found, ent id 0x%02x instance 0x%02x, addr 0x%02x id 0x%02x lun %i lkup %i\n", 
+				i, fru->sdr.fruId, fru->board.prod.data, fru->sdr.entityId, fru->sdr.entityInst, fru->sdr.addr, fru->sdr.fruId, fru->sdr.lun, mchGetFruLkup( mchData, i));
 		}
 	}
 
@@ -555,10 +645,11 @@ int rval = 0;
 /* 
  * Get sensor/FRU association
  *
- * -Given a sensor index, find the FRU ID (which equals FRU index) and store 
- *  it in the sensor structure. For AMC and RTM non-FRU entities, identify
- *  the associated FRU and do the same. For NAT hot-swap sensors, parse 
- *  description string to find associated FRU ID.
+ * -Given a sensor index, identify the associated FRU or Management Controller 
+ *  and store its identity in the sensor structure. 
+ *  For NicroTCA AMC and RTM non-FRU entities, identify the associated 
+ *  FRU and do the same. For NAT hot-swap sensors, parse description string 
+ *  to find associated FRU ID.
  *
  * Note: these indices refer to our arrays of Sensors and FRUs--
  * they do not refer to the IPMI sensor number or IPMI SDR Record ID
@@ -567,86 +658,32 @@ int rval = 0;
  * Caller must perform locking.
  */
 static void
-mchSensorGetFru(int type, MchSys mchSys, uint8_t index)
+mchSensorGetFru(MchData mchData, uint8_t index)
 {
-int  i, natid, id;
-char buff[9];
-Sensor sens = &mchSys->sens[index];
-SdrFull sdr = &sens->sdr;
+MchSys mchSys = mchData->mchSys;
+Sensor sens   = &mchSys->sens[index];
 
-	sens->fruId = sens->mgmtIndex = -1; /* Set default indices to indicate no corresponding fru/mgmt */
+	/* Set default indices to indicate no corresponding fru/mgmt */
+	sens->fruId = sens->fruIndex = sens->mgmtIndex = -1; 
 
-	/* Supermicro does not use FRU device locator records, so no means to read a FRU ID
-	 * Associate all Supermicro sensors with single FRU, arbitrarily choose...0?
-	 */
-	if ( MCH_IS_SUPERMICRO( type ) ) {
-		sens->fruId = 0;
-		return;
-	}
-
-	/* NAT associates hotswap aka M-state sensors with carrier manager but
-         * Vadatech associates them with the actual FRU described by the sensor.
-	 * For NAT, parse sensor description to get associated FRU number
-         */
-	if ( MCH_IS_NAT( type ) && (sdr->sensType == SENSOR_TYPE_HOTSWAP) ) {
-		if ( 2 != sscanf( (const char *)(sdr->str), "HS %d %s", &natid, buff ) )
-			return;
-		sens->fruId = natid;
-		return;
-	}
-
-	/* Loop through FRUs and Management Controllers
-	 * Start at 1 for MicroTCA because FRU 0 is reserved logical 
-	 * entity with same entityId and entityInst as MCH 1 
-	 */
-	for ( i = 0; i < MAX_FRU_MGMT; i++ ) {
-
-		if ( (i == 0) && MCH_IS_MICROTCA( type ) ) {
-		}
-		else {
-			if ( i < MAX_FRU ) {
-
-				if ( (sens->sdr.entityId == mchSys->fru[i].sdr.entityId) && (sens->sdr.entityInst == mchSys->fru[i].sdr.entityInst ) ) {
-					sens->fruId = mchSys->fru[i].sdr.fruId; /* FRU ID for associated FRU */
-					return;
-				}
-			}
-			else {
-				id = i - MAX_FRU;
-				if ( (sens->sdr.entityId == mchSys->mgmt[id].sdr.entityId) && (sens->sdr.entityInst == mchSys->mgmt[id].sdr.entityInst) ) {
-					sens->mgmtIndex = id;
-					return;
-				}
-			}
-		}
-	}
-
-	/* If not MCH, do not do MicroTCA-specific tasks; later change this to callbacks */
-	if ( !MCH_IS_MICROTCA( type ) )
-		return;
-
-	/* Find entities that do not have SDRs */
-	if ( sens->sdr.entityId == VT_ENTITY_ID_AMC ) {
-		sens->fruId = UTCA_FRU_TYPE_AMC_MIN + sens->sdr.entityInst - 0x60 - 1;
-		return;
-	}
-	else if ( sens->sdr.entityId == VT_ENTITY_ID_RTM ) {
-	       	sens->fruId = UTCA_FRU_TYPE_RTM_MIN + sens->sdr.entityInst - 0x60 - 1;
-		return;
-	}
+	if ( mchSys->mchcb->sensor_get_fru )
+		mchSys->mchcb->sensor_get_fru( mchData, sens );
+/*** figure out if can decommission sens->fruId in lieu of sens->fruIndex */
 }
 
 /* Caller must perform locking */
 static int
-mchSdrRepGetInfoMsg(MchData mchData, uint8_t *response) {
+mchSdrRepGetInfoMsg(MchData mchData, uint8_t *response, uint8_t parm, uint8_t addr) 
+{
 
-	return mchMsgGetSdrRepInfo( mchData, response );
+	return mchMsgGetSdrRepInfoWrapper( mchData, response, parm, addr );
 
 }
 
 /* Caller must perform locking */
 static void
-mchSdrRepGetTs(uint8_t *response, uint32_t *addTs, uint32_t *delTs) {
+mchSdrRepGetTs(uint8_t *response, uint32_t *addTs, uint32_t *delTs) 
+{
 
        	*addTs = ntohl( *(uint32_t *)(response + IPMI_RPLY_IMSG2_SDRREP_ADD_TS_OFFSET) );
        	*delTs = ntohl( *(uint32_t *)(response + IPMI_RPLY_IMSG2_SDRREP_DEL_TS_OFFSET) );
@@ -664,7 +701,7 @@ uint32_t  add, del;
 uint32_t *addTs = &mchSys->sdrRep.addTs, *delTs = &mchSys->sdrRep.delTs;
 uint8_t   buff[MSG_MAX_LENGTH] = { 0 };
 
-	if ( mchSdrRepGetInfoMsg( mchData, buff ) )
+	if ( mchSdrRepGetInfoMsg( mchData, buff, IPMI_SDRREP_PARM_GET_SDR, IPMI_MSG_ADDR_BMC ) )
 		return 0;
 
 	mchSdrRepGetTs( buff, &add, &del );
@@ -689,34 +726,361 @@ uint8_t   buff[MSG_MAX_LENGTH] = { 0 };
  * Caller must perform locking.
  */
 static int
-mchSdrRepGetInfo(MchData mchData)
+mchSdrRepGetInfo(MchData mchData, uint8_t parm, uint8_t addr, SdrRep sdrRep, uint32_t *sdrCount)
 {
-MchSys  mchSys  = mchData->mchSys;
 uint8_t response[MSG_MAX_LENGTH] = { 0 };
 uint8_t flags;
+int     rval;
 
-	if ( mchSdrRepGetInfoMsg( mchData, response ) )
-		return -1;
+	rval = mchSdrRepGetInfoMsg( mchData, response, parm, addr );
 
-	mchSys->sdrRep.ver     = response[IPMI_RPLY_IMSG2_SDRREP_VER_OFFSET];
-	mchSys->sdrRep.size[0] = response[IPMI_RPLY_IMSG2_SDRREP_CNT_LSB_OFFSET];
-	mchSys->sdrRep.size[1] = response[IPMI_RPLY_IMSG2_SDRREP_CNT_MSB_OFFSET];
+	if (  parm == IPMI_SDRREP_PARM_GET_SDR ) {
 
-	mchSdrRepGetTs( response, &mchSys->sdrRep.addTs, &mchSys->sdrRep.delTs );
+		if ( rval )
+			return -1;
 
-	mchMsgGetDevSdrInfo( mchData, response, 1 );
+		sdrRep->ver     = response[IPMI_RPLY_IMSG2_SDRREP_VER_OFFSET];
+		sdrRep->size[0] = response[IPMI_RPLY_IMSG2_SDRREP_CNT_LSB_OFFSET];
+		sdrRep->size[1] = response[IPMI_RPLY_IMSG2_SDRREP_CNT_MSB_OFFSET];
 
-	if ( response[0] ) // completion code
-		return 0; /* We don't currently support dev sdr, so don't return error */
+		*sdrCount = arrayToUint16( sdrRep->size );
 
-       	mchSys->sdrRep.devSdrSize = response[IPMI_RPLY_IMSG2_DEV_SDR_INFO_CNT_OFFSET];
-	flags = response[IPMI_RPLY_IMSG2_DEV_SDR_INFO_FLAGS_OFFSET];
-       	mchSys->sdrRep.devSdrDyn  = DEV_SENSOR_DYNAMIC(flags);
-       	mchSys->sdrRep.lun0       = DEV_SENSOR_LUN0(flags);
-       	mchSys->sdrRep.lun1       = DEV_SENSOR_LUN1(flags);
-       	mchSys->sdrRep.lun2       = DEV_SENSOR_LUN2(flags);
-       	mchSys->sdrRep.lun3       = DEV_SENSOR_LUN3(flags);
+		mchSdrRepGetTs( response, &sdrRep->addTs, &sdrRep->delTs );
+	}
+	else {
 
+		if ( response[0] ) // completion code
+			return -1;
+
+		*sdrCount = sdrRep->devSdrSize = response[IPMI_RPLY_IMSG2_DEV_SDR_INFO_CNT_OFFSET];
+		flags = response[IPMI_RPLY_IMSG2_DEV_SDR_INFO_FLAGS_OFFSET];
+		sdrRep->devSdrDyn  = DEV_SENSOR_DYNAMIC(flags);
+		sdrRep->lun0       = DEV_SENSOR_LUN0(flags);
+		sdrRep->lun1       = DEV_SENSOR_LUN1(flags);
+		sdrRep->lun2       = DEV_SENSOR_LUN2(flags);
+		sdrRep->lun3       = DEV_SENSOR_LUN3(flags);
+	}
+
+	return 0;
+}
+
+static void
+mchStoreAssocDevEntInfo(Entity entity, DevEntAssoc dassoc, uint8_t cntnrAddr, uint8_t id, uint8_t inst, uint8_t cntndAddr, uint8_t cntndChan, int parm, int *count)
+{
+uint8_t ownerAddr = dassoc->ownerAddr;
+uint8_t ownerChan = dassoc->ownerChan;
+
+	if ( parm ) {
+
+		entity[*count].entityId   = id;
+		entity[*count].entityInst = inst;
+
+		/* If container address not defined in SDR, use owner address
+		 * that was used when querying this FRU or management controller */
+		if ( cntnrAddr == 0 ) {
+			entity[*count].addr = ownerAddr;
+			entity[*count].chan = ownerChan;
+		}
+		else {
+			entity[*count].addr = cntndAddr;
+			entity[*count].chan = cntndChan;
+		}
+
+#ifdef DEBUG
+printf("mchStoreAssocDevEntInfo: Found assoc dev rel entity owner 0x%02x contained id 0x%02x inst 0x%02x index %i entity point addr %i %i\n", 
+    entity[*count].addr, entity[*count].entityId, entity[*count].entityInst, *count, (int)(&entity[*count]), (int)entity);
+#endif
+	}
+
+	(*count)++;
+}
+
+static void
+mchStoreAssocEntInfo(Entity entity, uint8_t id, uint8_t inst, int parm, int *count)
+{
+
+	if ( parm ) {
+
+		entity[*count].entityId   = id;
+		entity[*count].entityInst = inst;
+
+	}
+
+	(*count)++;
+}
+
+/* Parm of 0 return count of contained entities
+ * Parm of 1 stores contained entity info 
+ */
+static int
+mchGetAssocEntInfo(MchSys mchSys, Entity entity, uint8_t addr, uint8_t chan, uint8_t entityId, uint8_t entityInst, int parm)
+{
+EntAssoc       eassoc;
+DevEntAssoc    dassoc;
+SdrEntAssoc    esdr;
+SdrDevEntAssoc dsdr;
+int i, j, range, count = 0;
+
+	for ( i = 0; i < mchSys->devEntAssocCount; i++ ) {
+		dassoc = &mchSys->devEntAssoc[i];
+		dsdr   = &dassoc->sdr;
+
+printf("dassoc %i dsdr %i\n", dassoc, dsdr);
+printf("dassoc->ownerAddr %i dassoc->ownerChan %i\n", dassoc->ownerAddr, dassoc->ownerChan);
+printf("dsdr->cntnrAddr %i dsdr->cntnrChan %i\n", dsdr->cntnrAddr, dsdr->cntnrChan );
+printf("dsdr->cntnrId %i dsdr->cntnrInst %i\n", dsdr->cntnrId, dsdr->cntnrInst );
+
+		if ( ((addr == dassoc->ownerAddr)  || (addr == dsdr->cntnrAddr)) &&
+		     ((chan == dassoc->ownerChan)  || (chan == dsdr->cntnrChan)) &&
+		     (entityId   == dsdr->cntnrId) &&
+		     (entityInst == dsdr->cntnrInst) ) {
+			
+			if ( ENTITY_ASSOC_FLAGS_RANGE( dsdr->flags ) ) { /* If contained entities are stored in range */
+				
+				range = dsdr->cntndInst2 - dsdr->cntndInst1;
+
+				for ( j = 0; j < range; j++ )
+
+					mchStoreAssocDevEntInfo( entity, dassoc, dsdr->cntnrAddr, dsdr->cntndId1, dsdr->cntndInst1 + j, 
+								 dsdr->cntndAddr1, dsdr->cntndChan1, parm, &count );
+
+				if ( dsdr->cntndInst2 > 0 ) { /* If second range is also populated */
+
+					range = dsdr->cntndInst4 - dsdr->cntndInst3;
+
+					for ( j = 0; j < range; j++ )
+
+						mchStoreAssocDevEntInfo( entity, dassoc, dsdr->cntnrAddr, dsdr->cntndId1, dsdr->cntndInst2 + j, 
+									dsdr->cntndAddr2, dsdr->cntndChan2, parm, &count );
+				}
+			}
+			else { /* If contained entities are stored in list */
+
+				mchStoreAssocDevEntInfo( entity, dassoc, dsdr->cntnrAddr, dsdr->cntndId1, dsdr->cntndInst1, 
+								 dsdr->cntndAddr1, dsdr->cntndChan1, parm, &count );
+
+				if ( dsdr->cntndInst2 > 0 ) /* Second in list exists */
+
+					mchStoreAssocDevEntInfo( entity, dassoc, dsdr->cntnrAddr, dsdr->cntndId2, dsdr->cntndInst2, 
+								dsdr->cntndAddr2, dsdr->cntndChan2, parm, &count );
+
+				if ( dsdr->cntndInst3 > 0 ) /* Third in list exists */
+
+					mchStoreAssocDevEntInfo( entity, dassoc, dsdr->cntnrAddr, dsdr->cntndId3, dsdr->cntndInst3, 
+								dsdr->cntndAddr3, dsdr->cntndChan3, parm, &count );
+
+				if ( dsdr->cntndInst4 > 0 ) /* Fourth in list exists */
+
+					mchStoreAssocDevEntInfo( entity, dassoc, dsdr->cntnrAddr, dsdr->cntndId4, dsdr->cntndInst4, 
+								dsdr->cntndAddr4, dsdr->cntndChan4, parm, &count );
+			}
+
+			if ( 0 == ENTITY_ASSOC_FLAGS_LINK( dassoc->sdr.flags ) )
+				break; /* Should be no further assocated entities for this container */
+		}
+       	}
+
+	for ( i = 0; i < mchSys->entAssocCount; i++ ) {
+		eassoc = &mchSys->entAssoc[i];
+		esdr   = &eassoc->sdr;
+
+		if ( (entityId   == eassoc->sdr.cntnrId) &&
+		     (entityInst == eassoc->sdr.cntnrInst) ) {
+			
+			if ( ENTITY_ASSOC_FLAGS_RANGE( esdr->flags ) ) { /* If contained entities are stored in range */
+				
+				range = esdr->cntndInst2 - esdr->cntndInst1;
+
+				for ( j = 0; j < range; j++ )
+
+					mchStoreAssocEntInfo( entity, esdr->cntndId1, esdr->cntndInst1 + j, parm, &count );
+
+				if ( esdr->cntndInst2 > 0 ) { /* If second range is also populated */
+
+					range = esdr->cntndInst4 - esdr->cntndInst3;
+
+					for ( j = 0; j < range; j++ )
+
+						mchStoreAssocEntInfo( entity, esdr->cntndId2, esdr->cntndInst2 + j, parm, &count );
+				}
+			}
+			else { /* If contained entities are stored in list */
+
+				mchStoreAssocEntInfo( entity, esdr->cntndId1, esdr->cntndInst1, parm, &count );
+
+				if ( esdr->cntndInst2 > 0 ) /* Second in list exists */
+
+					mchStoreAssocEntInfo( entity, esdr->cntndId2, esdr->cntndInst2, parm, &count );
+
+				if ( esdr->cntndInst3 > 0 ) /* Third in list exists */
+
+					mchStoreAssocEntInfo( entity, esdr->cntndId3, esdr->cntndInst3, parm, &count );
+
+				if ( esdr->cntndInst4 > 0 ) /* Fourth in list exists */
+
+					mchStoreAssocEntInfo( entity, esdr->cntndId4, esdr->cntndInst4, parm, &count );
+			}
+
+			if ( 0 == ENTITY_ASSOC_FLAGS_LINK( eassoc->sdr.flags ) )
+				break; /* Should be no further assocated entities for this container */
+		}
+       	}
+
+	if ( parm )
+		return 0;
+	else
+		return count; 
+}
+
+static void
+mchSdrGetAssocEntInfo(MchData mchData, int parm)
+{
+MchSys mchSys  = mchData->mchSys;
+int  rval, i;
+Fru  fru;
+Mgmt mgmt;
+
+/* Modify to not duplicate between fru and mgmt */
+
+	for ( i = 0; i < mchSys->fruCount; i++ ) {
+		fru = &mchSys->fru[i];
+
+		rval = mchGetAssocEntInfo( mchSys, fru->entity, fru->sdr.addr, fru->sdr.chan, fru->sdr.entityId, fru->sdr.entityInst, parm);
+
+		if ( 0 == parm ) {
+			if ( (fru->entityCount = rval) > 0 ) {
+				if ( 0 == (fru->entity = calloc( rval, sizeof( EntityRec ) ) ) )
+					cantProceed("FATAL ERROR: No memory for FRU entity structure for %s\n", mchData->mchSess->name);
+				printf("calloced fru %i\n", (int)(fru->entity));
+			}
+		}
+	}
+
+	for ( i = 0; i < mchSys->mgmtCount; i++ ) {
+		mgmt = &mchSys->mgmt[i];
+		rval = mchGetAssocEntInfo( mchSys, mgmt->entity, mgmt->sdr.addr, mgmt->sdr.chan, mgmt->sdr.entityId, mgmt->sdr.entityInst, parm);
+
+		if ( 0 == parm ) {
+			if ( (mgmt->entityCount = rval) > 0 ) {
+				if ( 0 == (mgmt->entity = calloc( rval, sizeof( EntityRec ) ) ) )
+					cantProceed("FATAL ERROR: No memory for MGMT entity structure for %s\n", mchData->mchSess->name);
+			}
+		}
+	}
+}
+
+static void
+mchSdrGetAssocEnt(MchData mchData)
+{
+
+	mchSdrGetAssocEntInfo( mchData, 0 );
+	mchSdrGetAssocEntInfo( mchData, 1 );
+
+}
+
+/* 
+ * Store SDR for one Entity Assocation Record into Entity Assoc data structure
+ *
+ * Caller must perform locking.
+ */
+static void
+mchSdrEntAssoc(SdrEntAssoc sdr, uint8_t *raw)
+{
+int n;
+
+	n = SDR_HEADER_LENGTH + raw[SDR_LENGTH_OFFSET];
+
+	sdr->id[0]      = raw[SDR_ID_LSB_OFFSET];
+	sdr->id[1]      = raw[SDR_ID_MSB_OFFSET];
+	sdr->ver        = raw[SDR_VER_OFFSET];
+	sdr->recType    = raw[SDR_REC_TYPE_OFFSET];
+	sdr->length     = raw[SDR_LENGTH_OFFSET];
+
+	sdr->cntnrId    = raw[SDR_CNTNR_ENTITY_ID_OFFSET];   
+	sdr->cntnrInst  = raw[SDR_CNTNR_ENTITY_INST_OFFSET]; 
+	sdr->flags         = raw[SDR_ENTITY_ASSOC_FLAGS_OFFSET];         
+	sdr->cntndId1   = raw[SDR_CNTND_ENTITY_ID1_OFFSET];  
+	sdr->cntndInst1 = raw[SDR_CNTND_ENTITY_INST1_OFFSET];
+	sdr->cntndId2   = raw[SDR_CNTND_ENTITY_ID2_OFFSET];  
+	sdr->cntndInst2 = raw[SDR_CNTND_ENTITY_INST2_OFFSET];
+	sdr->cntndId3   = raw[SDR_CNTND_ENTITY_ID3_OFFSET];  
+	sdr->cntndInst3 = raw[SDR_CNTND_ENTITY_INST3_OFFSET];
+	sdr->cntndId4   = raw[SDR_CNTND_ENTITY_ID4_OFFSET];  
+	sdr->cntndInst4 = raw[SDR_CNTND_ENTITY_INST4_OFFSET];
+}
+
+/* 
+ * Store SDR for one Device-relative Entity Assocation Record into Device-relative Entity Assoc data structure
+ *
+ * Caller must perform locking.
+ */
+static void
+mchSdrDevEntAssoc(SdrDevEntAssoc sdr, uint8_t *raw, uint8_t owner)
+{
+int n;
+
+	n = SDR_HEADER_LENGTH + raw[SDR_LENGTH_OFFSET];
+
+	sdr->id[0]      = raw[SDR_ID_LSB_OFFSET];
+	sdr->id[1]      = raw[SDR_ID_MSB_OFFSET];
+	sdr->ver        = raw[SDR_VER_OFFSET];
+	sdr->recType    = raw[SDR_REC_TYPE_OFFSET];
+	sdr->length     = raw[SDR_LENGTH_OFFSET];
+
+	sdr->cntnrId    = raw[SDR_CNTNR_ENTITY_ID_OFFSET];   
+	sdr->cntnrInst  = raw[SDR_CNTNR_ENTITY_INST_OFFSET]; 
+	sdr->cntnrAddr     = raw[SDR_DEV_CNTNR_ADDR_OFFSET];    
+	sdr->cntnrChan     = raw[SDR_DEV_CNTNR_CHAN_OFFSET];    
+	sdr->flags         = raw[SDR_DEV_ENTITY_ASSOC_FLAGS_OFFSET];        
+	sdr->cntndAddr1    = raw[SDR_DEV_CNTND_ADDR1_OFFSET];  
+	sdr->cntndChan1    = raw[SDR_DEV_CNTND_CHAN1_OFFSET];  
+	sdr->cntndId1   = raw[SDR_DEV_CNTND_ENTITY_ID1_OFFSET];  
+	sdr->cntndInst1 = raw[SDR_DEV_CNTND_ENTITY_INST1_OFFSET];
+	sdr->cntndAddr2    = raw[SDR_DEV_CNTND_ADDR2_OFFSET];  
+	sdr->cntndChan2    = raw[SDR_DEV_CNTND_CHAN2_OFFSET];  
+	sdr->cntndId2   = raw[SDR_DEV_CNTND_ENTITY_ID2_OFFSET];  
+	sdr->cntndInst2 = raw[SDR_DEV_CNTND_ENTITY_INST2_OFFSET];
+	sdr->cntndAddr3    = raw[SDR_DEV_CNTND_ADDR3_OFFSET];  
+	sdr->cntndChan3    = raw[SDR_DEV_CNTND_CHAN3_OFFSET];  
+	sdr->cntndId3   = raw[SDR_DEV_CNTND_ENTITY_ID3_OFFSET];  
+	sdr->cntndInst3 = raw[SDR_DEV_CNTND_ENTITY_INST3_OFFSET];
+	sdr->cntndAddr4    = raw[SDR_DEV_CNTND_ADDR4_OFFSET];  
+	sdr->cntndChan4    = raw[SDR_DEV_CNTND_CHAN4_OFFSET];  
+	sdr->cntndId4   = raw[SDR_DEV_CNTND_ENTITY_ID4_OFFSET];  
+	sdr->cntndInst4 = raw[SDR_DEV_CNTND_ENTITY_INST4_OFFSET];
+
+printf("found dev-rel entity assord container id 0x%02x inst 0x%02x addr 0x%02x chan %i, flags %i\n", sdr->cntnrId, sdr->cntnrInst, sdr->cntnrAddr, sdr->cntnrChan, sdr->flags );
+}
+
+/* Check if this FRU has already been stored in data
+ * structure. If so, return -1, else 0
+ */
+static int
+mchSdrFruDuplicate(MchSys mchSys, uint8_t *raw)
+{
+int i;
+SdrFruRec tmp;
+FruRec     fru;
+
+	tmp.addr       = raw[SDR_FRU_ADDR_OFFSET];
+	tmp.lun        = raw[SDR_FRU_LUN_OFFSET];
+	tmp.chan       = raw[SDR_FRU_CHAN_OFFSET];
+	tmp.entityId   = raw[SDR_FRU_ENTITY_ID_OFFSET];
+	tmp.entityInst = raw[SDR_FRU_ENTITY_INST_OFFSET];
+
+	for ( i = 0; i < mchSys->fruCount; i++ ) {
+
+		fru = mchSys->fru[i];
+
+		if ( (tmp.addr       == fru.sdr.addr)     &&
+		     (tmp.lun        == fru.sdr.lun)      &&
+		     (tmp.chan       == fru.sdr.chan)     &&
+		     (tmp.entityId   == fru.sdr.entityId) &&
+		     (tmp.entityInst == fru.sdr.entityInst) ) {
+
+			return -1;
+		}
+	}
 	return 0;
 }
 
@@ -750,6 +1114,32 @@ int n, l, i;
 	for ( i = 0; i < l; i++ )
 	       	sdr->str[i] = raw[SDR_FRU_STR_OFFSET + i];
        	sdr->str[i+1] = '\0';
+
+}
+
+/* Check if this management controller has already been stored in data
+ * structure. If so, return -1, else 0
+ */
+static int
+mchSdrMgmtCtrlDuplicate(MchSys mchSys, uint8_t *raw)
+{
+int i;
+SdrMgmtRec tmp;
+MgmtRec    mgmt;
+
+	tmp.addr       = raw[SDR_MGMT_ADDR_OFFSET];
+	tmp.chan       = IPMI_CHAN_NUMBER( raw[SDR_MGMT_CHAN_OFFSET] );
+
+	for ( i = 0; i < mchSys->mgmtCount; i++ ) {
+
+		mgmt = mchSys->mgmt[i];
+
+		if ( (tmp.addr == mgmt.sdr.addr)    &&
+		     (tmp.chan == mgmt.sdr.chan) ) {
+			return -1;
+		}
+	}
+	return 0;
 }
 
 /* 
@@ -761,6 +1151,7 @@ static void
 mchSdrMgmtCtrlDev(SdrMgmt sdr, uint8_t *raw)
 {
 int n, l, i;
+
 	n = SDR_HEADER_LENGTH + raw[SDR_LENGTH_OFFSET];
 
 	sdr->id[0]      = raw[SDR_ID_LSB_OFFSET];
@@ -768,8 +1159,8 @@ int n, l, i;
 	sdr->ver        = raw[SDR_VER_OFFSET];
 	sdr->recType    = raw[SDR_REC_TYPE_OFFSET];
 	sdr->length     = raw[SDR_LENGTH_OFFSET];
-	sdr->addr       = raw[SDR_MGMT_ADDR_OFFSET];
-	sdr->chan       = raw[SDR_MGMT_CHAN_OFFSET];
+	sdr->addr       = /*IPMI_DEVICE_SLAVE_ADDR( */raw[SDR_MGMT_ADDR_OFFSET] /*)*/;
+	sdr->chan       = IPMI_CHAN_NUMBER( raw[SDR_MGMT_CHAN_OFFSET] );
 	sdr->pwr        = raw[SDR_MGMT_PWR_OFFSET];
 	sdr->cap        = raw[SDR_MGMT_CAP_OFFSET];
 	sdr->entityId   = raw[SDR_MGMT_ENTITY_ID_OFFSET];
@@ -777,9 +1168,42 @@ int n, l, i;
 	sdr->strLength  = raw[SDR_MGMT_STR_LENGTH_OFFSET];
 			
 	l = IPMI_DATA_LENGTH( sdr->strLength );
+
 	for ( i = 0; i < l; i++ )
 	       	sdr->str[i] = raw[SDR_MGMT_STR_OFFSET + i];
        	sdr->str[i+1] = '\0';
+}
+
+/* Check if this sensor has already been stored in data
+ * structure. If so, return -1, else 0
+ */
+static int
+mchSdrSensDuplicate(MchSys mchSys, uint8_t *raw)
+{
+int i;
+SdrFullRec tmp;
+SensorRec  sens;
+
+	tmp.owner      = raw[SDR_OWNER_OFFSET];
+	tmp.lun        = raw[SDR_LUN_OFFSET];
+	tmp.number     = raw[SDR_NUMBER_OFFSET];
+	tmp.entityId   = raw[SDR_ENTITY_ID_OFFSET];
+	tmp.entityInst = raw[SDR_ENTITY_INST_OFFSET];
+
+	for ( i = 0; i < mchSys->sensCount; i++ ) {
+
+		sens = mchSys->sens[i];
+
+		if ( (tmp.owner      == sens.sdr.owner)    &&
+		     (tmp.lun        == sens.sdr.lun)      &&
+		     (tmp.number     == sens.sdr.number)   &&
+		     (tmp.entityId   == sens.sdr.entityId) &&
+		     (tmp.entityInst == sens.sdr.entityInst) ) {
+
+			return -1;
+		}
+	}
+	return 0;
 }
 
 /* 
@@ -854,22 +1278,25 @@ int m = 0, b = 0;
        	}     
 
 #ifdef DEBUG
-printf("mchSdrFullSens: owner 0x%02x lun %i sdr number %i type 0x%02x, m %i, b %i, rexp %i bexp %i\n", 
-	sdr->owner, sdr->lun, sdr->number, sdr->sensType, sdr->m, sdr->b, sdr->rexp, sdr->bexp);
+printf("mchSdrFullSens: owner 0x%02x lun %i sdr number %i type 0x%02x, m %i, b %i, rexp %i bexp %i, is logical entity %i\n", 
+	sdr->owner, sdr->lun, sdr->number, sdr->sensType, sdr->m, sdr->b, sdr->rexp, sdr->bexp, SDR_ENTITY_LOGICAL(sdr->entityInst));
 if ( l > 0 )
 printf("string %s\n", sdr->str);
 #endif
+
 }
 
 /* If sensor ..., return error and indicate 'unavailable' in sensor data structure */
 /* This is stricter than it used to be!! Now any non-zero comp code leads to discarding sensor; need to make sure this is okay */
 int
-mchGetSensorReadingStat(MchData mchData, Sensor sens, uint8_t *response, uint8_t number, uint8_t lun, size_t *sensReadMsgLength)
+mchGetSensorReadingStat(MchData mchData, uint8_t *response, Sensor sens)//, uint8_t number, uint8_t lun, size_t *sensReadMsgLength)
 {
 uint8_t bits;
 uint8_t rval;
+size_t  tmp = sens->readMsgLength; /* Initially set to requested msg length, 
+					then mchMsgReadSensorWrapper sets it to actual message length */
 
-	rval = mchMsgReadSensor( mchData, response, number, lun, sensReadMsgLength );
+	rval = mchMsgReadSensorWrapper( mchData, response, sens, &tmp ); //number, lun, sensReadMsgLength );
 
 	/* If error code ... */
 	if ( rval ) {
@@ -877,11 +1304,13 @@ uint8_t rval;
 			sens->unavail = 1;
 		return -1;
 	}
+	else
+		sens->readMsgLength = tmp;
 
 	bits = response[IPMI_RPLY_IMSG2_SENSOR_ENABLE_BITS_OFFSET];
 	if ( IPMI_SENSOR_READING_DISABLED(bits) || IPMI_SENSOR_SCANNING_DISABLED(bits) ) {
 		if ( MCH_DBG( mchStat[mchData->mchSess->instance] ) )
-			printf("%s mchGetSensorReadingStat: sensor %i reading/state unavailable or scanning disabled. Bits: %02x\n", mchData->mchSess->name, number, bits);
+			printf("%s mchGetSensorReadingStat: sensor %i reading/state unavailable or scanning disabled. Bits: %02x\n", mchData->mchSess->name, sens->sdr.number, bits);
 		return -1;
 	}
 
@@ -911,7 +1340,7 @@ size_t   sensReadMsgLength;
 	}
 
 	/* If sensor does not exist, do not read thresholds, etc. */
-	mchGetSensorReadingStat( mchData, sens, response, sens->sdr.number, (sens->sdr.lun & 0x3) , &sensReadMsgLength );/*) {*/	
+	mchGetSensorReadingStat( mchData, response, sens);//sens->sdr.number, (sens->sdr.lun & 0x3) , &sensReadMsgLength );/*) {*/	
 
 	if ( sens->unavail )
 		return;
@@ -922,7 +1351,7 @@ size_t   sensReadMsgLength;
 
 	if ( IPMI_SENSOR_THRESH_IS_READABLE( IPMI_SDR_SENSOR_THRESH_ACCESS( sens->sdr.cap ) ) ) {
 
-		if (  mchMsgGetSensorThresholds( mchData, response, sens->sdr.number, (sens->sdr.lun & 0x3) ) ) {
+		if (  mchMsgGetSensorThresholdsWrapper( mchData, response, sens ) ) {
 			if ( MCH_DBG( mchStat[mchData->mchSess->instance] ) )
 				printf("%s mchGetSensorInfo: mchMsgGetSensorThresholds error, assume no thresholds are readable\n", mchData->mchSess->name);
 			return;
@@ -942,6 +1371,104 @@ size_t   sensReadMsgLength;
 	}
 }
 
+/* 'owner' and 'chan' args are address/channel of owner; used only for device-relative entity assocation record
+ * 
+ */
+
+static void
+mchSdrStoreData(MchData mchData, uint8_t *raw, uint8_t type, uint8_t owner, uint8_t chan)
+{
+MchSys   mchSys  = mchData->mchSys;
+Sensor   sens   = 0;
+Fru      fru;
+Mgmt     mgmt;
+EntAssoc entAssoc;
+DevEntAssoc devEntAssoc;
+
+	switch ( type ) {
+
+		default:
+			break;
+
+		/* Store SDR data; for now we only support Compact/Full Sensor Records, 
+		 * FRU Device Locator Records, and Management Controller Device Locator Records 
+		 */
+
+		case SDR_TYPE_FULL_SENSOR:
+		
+			if ( mchSdrSensDuplicate( mchSys, raw ) )
+				break;
+			sens = &mchSys->sens[mchSys->sensCount];
+			mchSdrFullSens( &sens->sdr , raw, type );
+			sens->instance = 0; /* Initialize instance to 0 */
+			mchGetSensorInfo( mchData, sens );
+			sens->cnfg = 0;
+			mchSys->sensCount++;
+
+			break;
+
+		case SDR_TYPE_COMPACT_SENSOR:
+
+			if ( mchSdrSensDuplicate( mchSys, raw ) )
+				break;
+			sens = &mchSys->sens[mchSys->sensCount];
+			mchSdrFullSens( &sens->sdr , raw, type );
+			sens->instance = 0; /* Initialize instance to 0 */
+			mchGetSensorInfo( mchData, sens );
+			sens->cnfg = 0;
+			mchSys->sensCount++;
+
+			break;
+
+		case SDR_TYPE_FRU_DEV:
+
+			if ( mchSdrFruDuplicate( mchSys, raw ) )
+				break;
+			fru = &mchSys->fru[mchSys->fruCount];
+			mchSdrFruDev( &fru->sdr, raw );
+			fru->instance = 0;     /* Initialize instance to 0 */
+			mchSys->fruCount++;
+
+			break;
+
+                case SDR_TYPE_MGMT_CTRL_DEV:
+
+                        if ( mchSdrMgmtCtrlDuplicate( mchSys, raw ) )
+                                break;
+                        mgmt = &mchSys->mgmt[mchSys->mgmtCount];
+                        mchSdrMgmtCtrlDev( &mgmt->sdr, raw );
+                        mchSys->mgmtCount++;
+
+                        break;
+
+		/* need to check duplicates for entity assoc records ? */
+		case SDR_TYPE_ENTITY_ASSOC:
+			entAssoc = &mchSys->entAssoc[mchSys->entAssocCount];
+			mchSdrEntAssoc( &entAssoc->sdr, raw );
+			mchSys->entAssocCount++;
+
+			break;
+
+		case SDR_TYPE_DEV_ENTITY_ASSOC:
+			devEntAssoc = &mchSys->devEntAssoc[mchSys->devEntAssocCount];
+			devEntAssoc->ownerAddr = owner;
+			devEntAssoc->ownerChan = chan;
+			mchSdrDevEntAssoc( &devEntAssoc->sdr, raw, owner );
+
+			if ( (devEntAssoc->sdr.cntnrAddr != 0) && (devEntAssoc->sdr.cntnrAddr != owner) ) {
+				printf("WARNING: %s Device-relative entity assocation record whose address 0x%02x does not match container address 0x%02x\n",
+				    mchData->mchSess->name, devEntAssoc->sdr.cntnrAddr, owner);
+			}
+			if ( (devEntAssoc->sdr.cntnrChan != 0) && (devEntAssoc->sdr.cntnrChan != chan) ) {
+				printf("WARNING: %s Device-relative entity assocation record whose chan 0x%02x does not match container chan 0x%02x\n",
+				    mchData->mchSess->name, devEntAssoc->sdr.cntnrChan, chan);
+			}
+			mchSys->devEntAssocCount++;
+
+			break;
+	}
+}
+
 /*
  * Read sensor data records. Call ipmiMsgGetSdr twice per record;
  * once to get record length, then to read record. This prevents timeouts,
@@ -950,54 +1477,56 @@ size_t   sensReadMsgLength;
  * Caller must perform locking.
  */				  
 static int				  
-mchSdrGetDataAll(MchData mchData)
+mchSdrGetData(MchData mchData, uint8_t parm, uint8_t addr, uint8_t chan, SdrRep sdrRep)
 {
 MchSess  mchSess = mchData->mchSess;
 MchSys   mchSys  = mchData->mchSys;
 uint8_t  response[MSG_MAX_LENGTH] = { 0 };
-uint16_t sdrCount;
+uint32_t sdrCount;
 uint8_t  id[2]  = { 0 };
 uint8_t  res[2] = { 0 };
 Sensor   sens   = 0;
 uint8_t  offset = 0;
 uint8_t  type   = 0;
 uint8_t *raw    = 0;
-int      err    = 0;
 int      size; /* SDR record read size (after header) */
-int      i, iFull = 0, iFru = 0, iMgmt = 0, fruId;
-int      rval = -1;
-int      inst = mchSess->instance;
-Fru      fru;
-Mgmt     mgmt;
-int      remainder = 0;
+uint32_t sdrCount_i  = mchSys->sdrCount; /* Initial SDR count */
+int      rval = -1, err = 0, i, remainder = 0;
 
-	if ( mchSdrRepGetInfo( mchData ) )
+	if ( mchSdrRepGetInfo( mchData, parm, addr, sdrRep, &sdrCount ) )
 		return rval;
 
-	sdrCount = arrayToUint16( mchSys->sdrRep.size );
-
-	if ( !(raw = ipmiReallocZeros( raw, sdrCount*SDR_MAX_LENGTH ) ) ) {
-		printf("mchSdrGetDataAll: No memory for raw SDR data for %s\n", mchSess->name);
+	/* Allocate sensor memory for full number of SDRs
+	 * This is more than number of sensors, but has benefit 
+	 * of being able to store each sensor's ata as we read it
+	 */
+	if ( !(mchSys->sens = ipmiReallocZerosNewMemory( mchSys->sens, sdrCount_i*sizeof(*sens), (sdrCount_i+sdrCount)*sizeof(*sens) ) ) ) {
+		printf("mchSdrGetData: No memory for sensor data for %s\n", mchSess->name);
 		goto bail;
 	}
-
-	if ( mchMsgReserveSdrRep( mchData, response ) ) {
-		printf("mchSdrGetDataAll: Error reserving SDR repository %s\n", mchSess->name);
+	if ( mchMsgReserveSdrRepWrapper( mchData, response, parm, addr ) ) {
+		printf("mchSdrGetData: Error reserving SDR repository %s\n", mchSess->name);
 		goto bail;
 	}
 
 	res[0] = response[IPMI_RPLY_IMSG2_GET_SDR_RES_LSB_OFFSET];
 	res[1] = response[IPMI_RPLY_IMSG2_GET_SDR_RES_MSB_OFFSET];
 
-       	for ( i = 0; i < sdrCount; i++) {
+       	for ( i = 0; i < sdrCount; i++) { /* memset raw to zeros on each sdr? */
+
+		if ( !(raw = ipmiReallocZeros( raw, SDR_MAX_LENGTH ) ) ) {
+			printf("mchSdrGetData: No memory for raw SDR data for %s\n", mchSess->name);
+			goto bail;
+		}
+
 		offset = 0;
 
-		/* readSize = 5 because 5th byte is remaining record length; 0xFF reads entire record */
-       		if ( (mchMsgGetSdr( mchData, response, id, res, offset, 5, 0, 0 )) ) {
+		size = 5; /* readSize = 5 because 5th byte is remaining record length; 0xFF reads entire record */
+       		if ( (mchMsgGetSdrWrapper( mchData, response, id, res, offset, size, parm, addr )) ) {
 			i--;
 			if ( err++ > 5 ) {
-			        printf("mchSdrGetDataAll: too many errors reading SDR for %s\n", mchSess->name);
-				goto bail;
+			        printf("mchSdrGetData: too many errors reading SDR for %s\n", mchSess->name);
+				continue;
 			}
 		}
 		else {
@@ -1013,17 +1542,17 @@ int      remainder = 0;
 			}
 
 			while ( size > 0 ) {
-				if ( mchMsgGetSdr( mchData, response, id, res, offset, size, 0, 0 /* recordsize, can be removed */ ) ) {
+				if ( mchMsgGetSdrWrapper( mchData, response, id, res, offset, size, parm, addr ) ) {
 					i--;
 					if ( err++ > 5 ) {
-						printf("mchSdrGetDataAll: too many errors reading SDR for %s", mchSess->name);
-						goto bail;
+						printf("mchSdrGetData: too many errors reading SDR for %s", mchSess->name);
+						continue;
 					}
 					break;
 				}
 
 				else {
-					memcpy( raw + (i*SDR_MAX_LENGTH) + offset, response + IPMI_RPLY_IMSG2_GET_SDR_DATA_OFFSET, size );
+					memcpy( raw + + offset, response + IPMI_RPLY_IMSG2_GET_SDR_DATA_OFFSET, size );
 					offset += size;
 				}
 
@@ -1037,25 +1566,7 @@ int      remainder = 0;
 				}
 			}
 
-			switch ( type ) {
-
-				default:
-					break;
-
-				case SDR_TYPE_FULL_SENSOR:
-					mchSys->sensCount++;
-					break;
-
-				case SDR_TYPE_COMPACT_SENSOR:
-					mchSys->sensCount++;
-					break;
-
-				case SDR_TYPE_FRU_DEV:
-					break;
-
-				case SDR_TYPE_MGMT_CTRL_DEV:
-					break;
-			}
+			mchSdrStoreData( mchData, raw, type, addr, chan );
 			id[0]  = response[IPMI_RPLY_IMSG2_GET_SDR_NEXT_ID_LSB_OFFSET];
 			id[1]  = response[IPMI_RPLY_IMSG2_GET_SDR_NEXT_ID_MSB_OFFSET];
 
@@ -1064,43 +1575,88 @@ int      remainder = 0;
 		}
        	}
 
-	sdrCount = i;
+	mchSys->sdrCount += sdrCount;
+	rval = 0;
 
-// no need for both sdrCount and sens; change to only use one or at least stop using sdrCount once sens is assigned
+bail:
 
-	if ( !(mchSys->sens = ipmiReallocZeros( mchSys->sens, mchSys->sensCount*sizeof(*sens) ) ) ) {
-		printf("mchSdrGetDataAll: No memory for sensor data for %s\n", mchSess->name);
-		goto bail;
+	if ( raw )
+		free( raw );
+	return rval;
+}
+
+static int				  
+mchSdrGetDataAll(MchData mchData)
+{
+MchSess  mchSess = mchData->mchSess;
+MchSys   mchSys  = mchData->mchSys;
+int      i, j, rval = 0; /* think about how to handle rval */
+Mgmt     mgmt;
+uint8_t  addr = 0;
+int      inst = mchSess->instance;
+Sensor   sens   = 0;
+Fru      fru;
+uint8_t  response[MSG_MAX_LENGTH] = { 0 };
+EntAssoc entAssoc;
+DevEntAssoc devEntAssoc;
+uint8_t  chan = 0;
+
+	/* First get BMC SDR Rep info */
+	if ( mchSdrGetData( mchData, IPMI_SDRREP_PARM_GET_SDR, IPMI_MSG_ADDR_BMC, chan, &mchSys->sdrRep ) ) {
+		printf("mchSdrGetData: Error in reading primary SDR\n");
+		return rval;
+	}
+	for ( i = 0; i < mchSys->mgmtCount; i++ ) {
+
+		mgmt = &mchSys->mgmt[i];
+		addr = mgmt->sdr.addr;
+		chan = mgmt->sdr.chan;
+
+		/* Skip primary BMC; already queried */
+		if ( addr == IPMI_MSG_ADDR_BMC )
+			continue;
+
+		if ( mchMsgGetDeviceIdWrapper( mchData, response, addr ) ) {
+			printf("mchSdrGetDataAll: Error from Get Device ID command to mgmt controller at addr 0x%02x\n", addr);
+			continue;
+		}
+
+		/* If supports SDR... */
+		if ( (IPMI_DEV_CAP_SDRREP( response[IPMI_RPLY_IMSG2_GET_DEVICE_ID_SUPPORT_OFFSET] ) ) ) { 
+			if ( mchSdrGetData( mchData, IPMI_SDRREP_PARM_GET_SDR, addr, chan, &mgmt->sdrRep ) ) {
+				printf("mchSdrGetDataAll: Error in reading mgmt %i SDR\n", i);
+			}
+		}
+		/* Else if supports device SDR... */
+		else if ( IPMI_DEVICE_PROVIDES_DEVICE_SDR(response[IPMI_RPLY_IMSG2_GET_DEVICE_ID_DEVICE_VERS_OFFSET]) ) { 
+
+			if ( mchSdrGetData( mchData, IPMI_SDRREP_PARM_GET_DEV_SDR, addr, chan, &mgmt->sdrRep ) ) {
+				printf("mchSdrGetDataAll: Error in reading mgmt %i SDR\n", i);
+			}
+			else
+				printf("mchSdrGetDataAll: Successfully read mgmt %i SDR\n", i);
+		}
+
+		/* If provides FRU info, create a FRU instance for it in our data structure */
+		if ( (IPMI_DEV_CAP_FRU_INV( response[IPMI_RPLY_IMSG2_GET_DEVICE_ID_SUPPORT_OFFSET] ) ) ) { 
+
+			fru = &mchSys->fru[mchSys->fruCount];
+			mchSys->fruCount++;
+			fru->sdr.addr  = mgmt->sdr.addr;
+			fru->sdr.chan  = mgmt->sdr.chan;
+			fru->sdr.fruId = 0; /* Arbitrarily set to 0 */
+			fru->sdr.entityId   = mgmt->sdr.entityId;
+			fru->sdr.entityInst = mgmt->sdr.entityInst;
+			fru->sdr.recType    = mgmt->sdr.recType; /* Because recType is used as validity check in various places */			
+		}
 	}
 
-	/* Store SDR data; for now we only support Compact/Full Sensor Records and FRU Device Locator Records */
-	for ( i = 0; i < sdrCount; i++) {
-		type = raw[i*SDR_MAX_LENGTH + SDR_REC_TYPE_OFFSET];
-
-		if ( (type == SDR_TYPE_FULL_SENSOR) || (type == SDR_TYPE_COMPACT_SENSOR) ) {
-			mchSdrFullSens( &(mchSys->sens[iFull].sdr) , raw + i*SDR_MAX_LENGTH, type );
-			mchSys->sens[iFull].instance = 0; /* Initialize instance to 0 */
-
-			mchGetSensorInfo( mchData, &mchSys->sens[iFull] );
-			mchSys->sens[iFull].cnfg = 0;
-
-			iFull++;
-		}
-	        else if ( type == SDR_TYPE_FRU_DEV ) {
-			fruId = raw[SDR_FRU_ID_OFFSET + i*SDR_MAX_LENGTH];
-			mchSdrFruDev( &(mchSys->fru[fruId].sdr), raw + i*SDR_MAX_LENGTH );
-			mchSys->fru[fruId].instance = 0;     /* Initialize instance to 0 */
-			iFru++;
-		}
-	        else if ( type == SDR_TYPE_MGMT_CTRL_DEV ) {
-			mchSdrMgmtCtrlDev( &(mchSys->mgmt[iMgmt].sdr), raw + i*SDR_MAX_LENGTH );
-			iMgmt++;
-		}
-	}
+	/* Find associated entitites */
+	mchSdrGetAssocEnt( mchData );
 
 	if ( MCH_DBG( mchStat[inst] ) >= MCH_DBG_MED ) {
-		printf("%s mchSdrGetDataAll Sumary:\n", mchSess->name);
-		for ( i = 0; i < iFull; i++ ) {
+		printf("%s mchSdrGetDataAll Summary:\n", mchSess->name);
+		for ( i = 0; i < mchSys->sensCount; i++ ) {
 			sens = &mchSys->sens[i];
 			printf("SDR %i, %s entity ID 0x%02x, entity inst 0x%02x, sensor number %i, sens type 0x%02x, "
 				"owner 0x%02x, LUN %i, RexpBexp %i, M %i, MTol %i, B %i, BAcc %i\n", 
@@ -1108,26 +1664,54 @@ int      remainder = 0;
 				sens->sdr.number, sens->sdr.sensType, sens->sdr.owner, sens->sdr.lun, 
 				sens->sdr.RexpBexp, sens->sdr.M, sens->sdr.MTol, sens->sdr.B, sens->sdr.BAcc);
 		}
-		for ( i = 0; i < MAX_FRU; i++ ) {
+		for ( i = 0; i < mchSys->fruCount; i++ ) {
 			fru = &mchSys->fru[i];
 			if ( fru->sdr.recType )
-				printf("FRU %i, entity ID 0x%02x, entity inst 0x%02x, FRU id %i, %s\n", 
-				i, fru->sdr.entityId, fru->sdr.entityInst, fru->sdr.fruId, fru->sdr.str);
+				printf("FRU %i, recType 0x%02x, entity ID 0x%02x, entity inst 0x%02x,, addr 0x%02x, chan %i, FRU id %i, %s, entity count %i\n", 
+				i, fru->sdr.recType, fru->sdr.entityId, fru->sdr.entityInst, fru->sdr.addr, fru->sdr.chan, fru->sdr.fruId, fru->sdr.str, fru->entityCount);
+			for ( j = 0; j < fru->entityCount; j++ ) {
+				printf("     Associated entity addr 0x%02x chan %i entityId 0x%02x entityInst 0x%02x\n", 
+				fru->entity[j].addr, fru->entity[j].chan, fru->entity[j].entityId, fru->entity[j].entityInst); 
+			}
 		}
-		for ( i = 0; i < iMgmt; i++ ) {
+		for ( i = 0; i < mchSys->mgmtCount; i++ ) {
 			mgmt = &mchSys->mgmt[i];
-       			printf("Mgmt Ctrl %i, entity ID 0x%02x, entity inst 0x%02x, %s, cap 0x%02x\n", 
-				i, mgmt->sdr.entityId, mgmt->sdr.entityInst, mgmt->sdr.str, mgmt->sdr.cap);
+       			printf("Mgmt Ctrl %i, FRU entity ID 0x%02x, entity inst 0x%02x, %s, addr 0x%02x, chan %i, cap 0x%02x entity count %i\n", 
+				i, mgmt->sdr.entityId, mgmt->sdr.entityInst, mgmt->sdr.str, mgmt->sdr.addr, mgmt->sdr.chan, mgmt->sdr.cap, mgmt->entityCount);
+			for ( j = 0; j < mgmt->entityCount; j++ ) {
+				printf("     Associated entity addr 0x%02x chan %i entityId 0x%02x entityInst 0x%02x\n", 
+				mgmt->entity[j].addr, mgmt->entity[j].chan, mgmt->entity[j].entityId, mgmt->entity[j].entityInst); 
+			}
 		}
 
+		for ( i = 0; i < mchSys->devEntAssocCount; i++ ) {
+			devEntAssoc = &mchSys->devEntAssoc[i];
+       			printf("Dev Ent Assoc %i, owner addr 0x%02x container ent id 0x%02x inst 0x%02x addr 0x%02x chan %i, flags %i\n"
+				"     contained 1 addr 0x%02x chan %i entity id 0x%02x inst 0x%02x\n" 
+				"     contained 2 addr 0x%02x chan %i entity id 0x%02x inst 0x%02x\n" 
+				"     contained 3 addr 0x%02x chan %i entity id 0x%02x inst 0x%02x\n" 
+				"     contained 4 addr 0x%02x chan %i entity id 0x%02x inst 0x%02x\n", 
+				i, devEntAssoc->ownerAddr, devEntAssoc->sdr.cntnrId, devEntAssoc->sdr.cntnrInst, devEntAssoc->sdr.cntnrAddr, devEntAssoc->sdr.cntnrChan, devEntAssoc->sdr.flags, 
+				devEntAssoc->sdr.cntndAddr1, devEntAssoc->sdr.cntndChan1, devEntAssoc->sdr.cntndId1, devEntAssoc->sdr.cntndInst1,
+				devEntAssoc->sdr.cntndAddr2, devEntAssoc->sdr.cntndChan2, devEntAssoc->sdr.cntndId2, devEntAssoc->sdr.cntndInst2,
+				devEntAssoc->sdr.cntndAddr3, devEntAssoc->sdr.cntndChan3, devEntAssoc->sdr.cntndId3, devEntAssoc->sdr.cntndInst3,
+				devEntAssoc->sdr.cntndAddr4, devEntAssoc->sdr.cntndChan4, devEntAssoc->sdr.cntndId4, devEntAssoc->sdr.cntndInst4);
+		}
+		for ( i = 0; i < mchSys->entAssocCount; i++ ) {
+			entAssoc = &mchSys->entAssoc[i];
+       			printf("Ent Assoc %i, container ent id 0x%02x inst 0x%02x, flags %i\n"
+				"     contained entity 1 id 0x%02x inst 0x%02x\n" 
+				"     contained entity 2 id 0x%02x inst 0x%02x\n" 
+				"     contained entity 3 id 0x%02x inst 0x%02x\n" 
+				"     contained entity 4 id 0x%02x inst 0x%02x\n",
+				i, entAssoc->sdr.cntnrId, entAssoc->sdr.cntnrInst, entAssoc->sdr.flags, 
+				entAssoc->sdr.cntndId1, entAssoc->sdr.cntndInst1,
+				entAssoc->sdr.cntndId2, entAssoc->sdr.cntndInst2,
+				entAssoc->sdr.cntndId3, entAssoc->sdr.cntndInst3,
+				entAssoc->sdr.cntndId4, entAssoc->sdr.cntndInst4);
+		}
 	}
 
-	rval = 0;
-
-bail:
-
-	if ( raw )
-		free( raw );
 	return rval;
 }
 
@@ -1144,7 +1728,7 @@ bail:
  *  disconnected session.
  */
 
-void
+static void
 mchPing(void *arg)
 {
 MchDev  mch     = arg;
@@ -1192,7 +1776,7 @@ int     inst = mchSess->instance, i = 0,j  = 0;
 				i = 0;
 			}
 			/* Every 20 seconds (while mch online), scan sensor records */
-            if ( j > 20/PING_PERIOD ) {
+			if ( j > 20/PING_PERIOD ) {
 				if ( drvSensorScan[inst] ) 
 					scanIoRequest( drvSensorScan[inst] );
 				j = 0;
@@ -1223,7 +1807,7 @@ int    inst   = mchData->mchSess->instance;
 	if ( MCH_INIT_NOT_DONE( mchStat[inst] ) )
 		return mchCnfg( mchData );
 
-	else if ( MCH_INIT_DONE( mchStat[inst] ) ) {
+	else if ( MCH_INIT_DONE( mchStat[inst] ) ) { 
 		if ( mchSdrRepTsDiff( mchData ) )
 			return mchCnfg( mchData );
 	}
@@ -1232,7 +1816,7 @@ int    inst   = mchData->mchSess->instance;
 }
 
 /* Set all elements of 3D array to same integer value */
-void
+static void
 set3DArrayVals(int a, int b, int c, int arr[a][b][c], int val) {
 int i, j, k;
 
@@ -1244,6 +1828,17 @@ int i, j, k;
 		}
 	}
 }
+
+/* Set all elements of 1D array to same integer value */
+static void
+set1DArrayVals(int a, int arr[a], int val) {
+int i;
+
+	for ( i = 0; i < a; i++ ) {
+		arr[i] = val;
+	}
+}
+
 /* 
  * Modify MCH status mask. If record-related changes
  * were made, scan associated EPICS records
@@ -1257,13 +1852,19 @@ mchStatSet(int inst, uint32_t clear, uint32_t set) {
 	epicsMutexUnlock( mchStatMtx[inst] );
 
 	if ( clear == MCH_MASK_INIT) {
-		if ( drvMchInitScan )
+printf("scan init pv clear %i set %i\n", clear, set);
+		if ( drvMchInitScan ) {
+printf("before scaniorquest of drvMchInitScan\n");
 			scanIoRequest( drvMchInitScan );
+printf("after scaniorquest of drvMchInitScan\n");
+}
 	}
 
-	if ( clear == MCH_MASK_ONLN) {
-		if ( drvMchStatScan )
+	if ( (clear == MCH_MASK_ONLN) || (set == MCH_MASK_INIT_DONE) ) {
+		if ( drvMchStatScan ) {
+printf("drvMchStatScan\n");
 			scanIoRequest( drvMchStatScan );
+}
 	}
 }
 
@@ -1282,6 +1883,20 @@ IpmiSess ipmiSess = mchData->ipmiSess;
 		ipmiSess->features |= MCH_FEAT_SENDMSG_RPLY;		
 }	
 
+static void
+*mchSetIdentity(MchSess mchSess, char *vendor, uint8_t vers, int type, char *cbname)
+{
+void *cb;
+
+	printf("Identified %s to be %s. IPMI version %i.%i\n", mchSess->name, vendor, IPMI_VER_MSD( vers ), IPMI_VER_LSD( vers ));
+	mchSess->type = type;
+	if ( !(cb = registryFind( (void *)mchCbRegistryId, cbname )) ) {
+		printf("mchIdentify: ERROR for %s: failed to find callbacks %s\n", mchSess->name, cbname);
+		return 0;
+	}
+	return cb;
+}
+
 /* 
  * Use Manufacturer ID (from Get Device ID command)
  * to determine MCH type
@@ -1294,10 +1909,12 @@ int      i;
 uint8_t  response[MSG_MAX_LENGTH] = { 0 };
 uint8_t  tmp[4] = { 0 }, vers;
 uint32_t mf;
+void    *mchcb = 0;
+char    *vendor[25];
 
-	if ( mchMsgGetDeviceId( mchData, response, 0, 0 ) ) {
+	if ( mchMsgGetDeviceIdWrapper( mchData, response, IPMI_MSG_ADDR_BMC ) ) {
 		printf("mchIdentify: Error from Get Device ID command\n");
-mchMsgCloseSess( mchSess, mchData->ipmiSess, response );
+		mchMsgCloseSess( mchSess, mchData->ipmiSess, response );
 		return -1;
 	}
 
@@ -1318,13 +1935,13 @@ mchMsgCloseSess( mchSess, mchData->ipmiSess, response );
 			return -1;
 
 		case MCH_MANUF_ID_NAT:
-			mchSess->type = MCH_TYPE_NAT;
-			printf("Identified %s to be N.A.T. IPMI version %i.%i\n", mchSess->name, IPMI_VER_MSD( vers ), IPMI_VER_LSD( vers ));
+			if ( 0 == (mchcb = mchSetIdentity( mchSess, "N.A.T.", vers, MCH_TYPE_NAT, "drvMchMicrotcaNatCb")) )
+				return -1;
 			break;
 
 		case MCH_MANUF_ID_VT:
-			mchSess->type = MCH_TYPE_VT;
-			printf("Identified %s to be Vadatech. IPMI version %i.%i\n", mchSess->name, IPMI_VER_MSD( vers ), IPMI_VER_LSD( vers ));
+			if ( 0 == (mchcb = mchSetIdentity( mchSess, "Vadatech", vers, MCH_TYPE_VT, "drvMchMicrotcaVtCb")) )
+				return -1;
 			break;
 /*  Not yet supported     
 		case MCH_MANUF_ID_DELL:
@@ -1333,73 +1950,69 @@ mchMsgCloseSess( mchSess, mchData->ipmiSess, response );
 			break;
 */
 		case MCH_MANUF_ID_SUPERMICRO:
-			mchSess->type = MCH_TYPE_SUPERMICRO; // Was previously DELL; need to figure this out
-			printf("Identified %s to be Supermicro. IPMI version %i.%i\n", mchSess->name, IPMI_VER_MSD( vers ), IPMI_VER_LSD( vers ));
+			if ( 0 == (mchcb = mchSetIdentity( mchSess, "Supermicro", vers, MCH_TYPE_SUPERMICRO, "drvMchSupermicroCb")) )
+				return -1;
 			break;
 
+		case MCH_MANUF_ID_PENTAIR:
+			if ( 0 == (mchcb = mchSetIdentity( mchSess, "Pentair", vers, MCH_TYPE_PENTAIR, "drvMchAtcaCb")) )
+				return -1;
+			break;
+
+		case MCH_MANUF_ID_ARTESYN:
+			if ( 0 == (mchcb = mchSetIdentity( mchSess, "Artesyn", vers, MCH_TYPE_ARTESYN, "drvMchAtcaCb")) )
+				return -1;
+			break;
 	}
+
+	/* Callbacks and init for comm with knob controller */
+	mchData->mchSys->mchcb = (MchCbRec *)mchcb;
 
 	mchSetFeatures( mchData );
         return 0;
 }
 
 static void
-mchSensorFruGetInstance(int type, MchSys mchSys)
+mchSensorFruGetInstance(MchData mchData)
 {
+MchSys  mchSys= mchData->mchSys;
 int     s = mchSys->sensCount;
 uint8_t sensTypeInst[MAX_FRU_MGMT][MAX_SENSOR_TYPE] = { { 0 } };    /* Counts of sensor type per ID instance */
-int     j, id, mgmtId;
+int     j, index;
 Fru     fru  = 0;
 Mgmt    mgmt = 0;
 Sensor  sens;
-uint8_t mgmtEntId, mgmtEntInst;
 
 	/* Find FRU or management controller associated with this sensor, assign sensor an instance based on type */
 	for ( j = 0; j < s; j++ ) {
 
 		sens = &mchSys->sens[j];
 
-		if ( -1 == (id = sens->fruId) )
+		if ( -1 == (index = sens->fruIndex) )
 			continue;
 
-		/* Skip FRU 0 for MicroTCA because it is reserved logical entity with same entityId and entityInst as MCH 1 */
-		if ( (id == 0) && MCH_IS_MICROTCA( type ) )
+		/* Skip FRU 0 for MicroTCA because it is reserved logical entity with same 
+		 * entityId and entityInst as MCH 1. This should be in callbacks
+		 */
+		if ( (sens->fruId == 0) && MCH_IS_MICROTCA( mchData->mchSess->type ) )
 			continue;
 
-		if ( id < MAX_FRU ) {
+		if ( index < MAX_FRU ) {
 
-			fru = &mchSys->fru[id];
+			fru = &mchSys->fru[index];
 
 			/* If a real entity */
 			if ( fru->sdr.recType ) {
-				sens->instance = ++sensTypeInst[id][sens->sdr.sensType];
+
+				sens->instance = ++sensTypeInst[index][sens->sdr.sensType];
 				if ( sens->instance > MAX_SENS_INST ) {
-					printf("WARNING: FRU %i sensor type 0x%02x instance %i exceeds allowed instance %i\n", id, sens->sdr.sensType, sens->instance, MAX_SENS_INST);
+					printf("WARNING: FRU %i sensor type 0x%02x instance %i exceeds allowed instance %i\n",
+					    index, sens->sdr.sensType, sens->instance, MAX_SENS_INST);
 					continue;
 				}
+
 				if ( !sens->unavail )
-					mchSys->sensLkup[id][sens->sdr.sensType][sens->instance] = j;
-			}
-		}
-		else {
-			id = sens->fruId;
-			mgmtId = id - MAX_FRU;
-			mgmt        = &mchSys->mgmt[mgmtId];
-			mgmtEntId   = mgmt->sdr.entityId;
-			mgmtEntInst = mgmt->sdr.entityInst;
-
-			if ( mchSys->sens->mgmtIndex == mgmtId ) {
-
-				/* If a real entity */
-				if ( mgmt->sdr.recType ) {
-					sens->instance = ++sensTypeInst[id][sens->sdr.sensType];
-					if ( sens->instance > MAX_SENS_INST ) {
-						printf("WARNING: FRU %i sensor type 0x%02x instance %i exceeds allowed instance %i\n", id, sens->sdr.sensType, sens->instance, MAX_SENS_INST);
-						continue;
-					}
-					if ( !sens->unavail )
-						mchSys->sensLkup[id][sens->sdr.sensType][sens->instance] = j;
-				}
+					mchSys->sensLkup[index][sens->sdr.sensType][sens->instance] = j;
 			}
 		}
 	}
@@ -1409,29 +2022,52 @@ int i;
 printf("mchSensorFruGetInstance:\n");
 for ( i = 0; i < s; i++ ) {
 	sens = &mchSys->sens[i];
-	if ( sens->fruId != -1 ) {
-		fru  = &mchSys->fru[sens->fruId];
-		printf("FRU sensor %s %i, type 0x%02x, inst %i, FRU entId 0x%02x, entInst 0x%02x, sens entId 0x%02x  entInst 0x%02x recType %i fruId %i fruId %i unavail %i\n",
-			sens->sdr.str, sens->sdr.number, sens->sdr.sensType, sens->instance, fru->sdr.entityId, fru->sdr.entityInst, 
-			sens->sdr.entityId, sens->sdr.entityInst, sens->sdr.recType, sens->fruId, sens->fruId, sens->unavail);
+	if ( sens->fruIndex != -1 ) {
+		fru  = &mchSys->fru[sens->fruIndex];
+		printf("FRU sensor %s %i, type 0x%02x, inst %i, FRU addr 0x%02x, entId 0x%02x, entInst 0x%02x, "
+			"sens owner 0x%02x, entId 0x%02x  entInst 0x%02x recType %i fruId %i fruLkup %i fruIndex %i unavail %i\n",
+			sens->sdr.str, sens->sdr.number, sens->sdr.sensType, sens->instance, fru->sdr.addr, 
+			fru->sdr.entityId, fru->sdr.entityInst, sens->sdr.owner, sens->sdr.entityId, 
+			sens->sdr.entityInst, sens->sdr.recType, sens->fruId, mchGetFruLkup( mchData, sens->fruIndex ), 
+			sens->fruIndex, sens->unavail);
 	}
 	else if ( sens->mgmtIndex != -1 ) {
 		mgmt  = &mchSys->mgmt[sens->mgmtIndex];
-		printf("Mgmt sensor %s %i, type 0x%02x, inst %i, MGMT entId 0x%02x, entInst 0x%02x, sens entId 0x%02x  entInst 0x%02x recType %i unavail %i\n",
-			sens->sdr.str, sens->sdr.number, sens->sdr.sensType, sens->instance, mgmt->sdr.entityId, mgmt->sdr.entityInst, 
-			sens->sdr.entityId, sens->sdr.entityInst, sens->sdr.recType, sens->unavail);
+		printf("Mgmt sensor %s %i, type 0x%02x, inst %i, MGMT addr 0x%02x, entId 0x%02x, entInst 0x%02x, "
+			"sens owner 0x%02x, entId 0x%02x  entInst 0x%02x recType %i fruLkup %i unavail %i\n",
+			sens->sdr.str, sens->sdr.number, sens->sdr.sensType, sens->instance, mgmt->sdr.addr, 
+			mgmt->sdr.entityId, mgmt->sdr.entityInst, sens->sdr.owner, sens->sdr.entityId, 
+			sens->sdr.entityInst, sens->sdr.recType, mchGetFruLkup( mchData, sens->mgmtIndex ), sens->unavail);
 	}
 	else
-		printf("Sensor %s %i, type 0x%02x, inst %i, entId 0x%02x  entInst 0x%02x recType %i, no corresponding FRU or MGTM unavail %i\n",
-			sens->sdr.str, sens->sdr.number, sens->sdr.sensType, sens->instance, sens->sdr.entityId, sens->sdr.entityInst, sens->sdr.recType, sens->unavail);
+		printf("Sensor %s %i, type 0x%02x, inst %i, entId 0x%02x  entInst 0x%02x recType %i, "
+			"no corresponding FRU or MGTM unavail %i\n",
+			sens->sdr.str, sens->sdr.number, sens->sdr.sensType, sens->instance, sens->sdr.entityId, 
+			sens->sdr.entityInst, sens->sdr.recType, sens->unavail);
 }
 #endif
+
+}
+
+static void
+mchCnfgReset(MchData mchData) {
+MchSys mchSys = mchData->mchSys;
+
+	if ( !(mchSys->fru = ipmiReallocZeros( mchSys->fru , MAX_FRU*sizeof(FruRec) )) )
+		cantProceed("FATAL ERROR: No memory for FRU data for %s\n", mchData->mchSess->name);
+
+	if ( !(mchSys->mgmt = ipmiReallocZeros( mchSys->mgmt , MAX_MGMT*sizeof(MgmtRec) )) )
+		cantProceed("FATAL ERROR: No memory for Management Controller data for %s\n", mchData->mchSess->name);
+
+	/* move this to reset values routine, add fruid, fuindex, etc. */
+	set3DArrayVals( MAX_FRU_MGMT, MAX_SENSOR_TYPE, MAX_SENS_INST, mchSys->sensLkup, -1 );
+	set1DArrayVals( MAX_FRU_MGMT, mchSys->fruLkup, -1 );
 }
 
 /* Get info about MCH, shelf, FRUs, sensors
  * Caller must perform locking
  */
-int
+static int
 mchCnfg(MchData mchData) {
 MchSess mchSess = mchData->mchSess;
 MchSys  mchSys  = mchData->mchSys;
@@ -1440,12 +2076,13 @@ int i;
 
 	mchStatSet( inst, MCH_MASK_INIT, MCH_MASK_INIT_IN_PROGRESS );
 
-	set3DArrayVals( MAX_FRU_MGMT, MAX_SENSOR_TYPE, MAX_SENS_INST, mchSys->sensLkup, -1 );
+	mchCnfgReset( mchData );
 
 	mchSeqInit( mchData->ipmiSess );
 
 	/* Turn on debug messages during initial messages with device */
-	mchStatSet( inst, MCH_MASK_DBG, MCH_DBG_SET(MCH_DBG_LOW) );
+//	mchStatSet( inst, MCH_MASK_DBG, MCH_DBG_SET(MCH_DBG_LOW) );
+	mchStatSet( inst, MCH_MASK_DBG, MCH_DBG_SET(MCH_DBG_MED) );
 
 	/* Initiate communication session with MCH */
 	if ( mchCommStart( mchSess, mchData->ipmiSess ) ) {
@@ -1460,7 +2097,10 @@ int i;
 	}
 
 	/* Turn off debug messages after initial messages with device */
-	mchStatSet( inst, MCH_MASK_DBG, MCH_DBG_SET(MCH_DBG_OFF) );
+//	mchStatSet( inst, MCH_MASK_DBG, MCH_DBG_SET(MCH_DBG_OFF) );
+
+	/* Intialize sensor and device counts to 0 */
+	mchSys->sdrCount = mchSys->sensCount = mchSys->fruCount = mchSys->mgmtCount = 0;
 
        	/* Get SDR data */
        	if ( mchSdrGetDataAll( mchData ) ) {
@@ -1477,19 +2117,20 @@ int i;
 
 	/* Get Sensor/FRU association */
 	for ( i = 0; i < mchSys->sensCount; i++ )
-		mchSensorGetFru( mchSess->type, mchSys, i );
+		mchSensorGetFru( mchData, i );
 
-	mchSensorFruGetInstance( mchSess->type, mchSys );
+	mchSensorFruGetInstance( mchData );
 
 	mchStatSet( inst, MCH_MASK_INIT, MCH_MASK_INIT_DONE );
 
 	if ( drvMchFruScan )
 		scanIoRequest( drvMchFruScan );
 
+	mchStatSet( inst, MCH_MASK_DBG, MCH_DBG_SET(MCH_DBG_OFF) );
+
 	return 0;
 
 bail:
-
 	mchStatSet( inst, MCH_MASK_INIT, MCH_MASK_INIT_NOT_DONE );
 	return -1;
 }
@@ -1505,7 +2146,7 @@ bail:
  * Later release should derive info from previously
  * created script.
  */
-void
+static void
 mchInit(const char *name)
 {
 MchDev   mch     = 0; /* Device support data structure */
@@ -1528,12 +2169,6 @@ int      inst;
 
 	if ( ! (mchSys = calloc( 1, sizeof( *mchSys ))) )
 		cantProceed("FATAL ERROR: No memory for MchSys structure for %s\n", name);
-
-	if ( !(mchSys->fru = calloc( MAX_FRU , sizeof(FruRec) ) ) )
-		cantProceed("FATAL ERROR: No memory for FRU data for %s for %s\n", name);
-
-	if ( !(mchSys->mgmt = calloc( MAX_MGMT , sizeof(MgmtRec) ) ) )
-		cantProceed("FATAL ERROR: No memory for Management Controller data for %s for %s\n", name);
 
 	ipmiSess->wrf = (IpmiWriteReadHelper)mchMsgWriteReadHelper;
 
@@ -1574,14 +2209,16 @@ int      inst;
 		mchCnfg( mchData );
 		epicsMutexUnlock( mch->mutex );
 	}
-	else
+	else {
+		mchCnfgReset( mchData ); /* Initialize some data structs and values */
 		printf("No response from %s; cannot complete initialization\n",mch->name);
+	}
 }
 
 static long
 drvMchReport(int level)
 {
-	printf("MicroTCA MCH communication driver support\n");
+	printf("IPMI communication driver support\n");
 	return 0;
 }
 
@@ -1611,7 +2248,8 @@ static const iocshArg mchInitArg0        = { "port name",iocshArgString};
 static const iocshArg *mchInitArgs[1]    = { &mchInitArg0 };
 static const iocshFuncDef mchInitFuncDef = { "mchInit", 1, mchInitArgs };
 
-static void mchInitCallFunc(const iocshArgBuf *args)
+static void 
+mchInitCallFunc(const iocshArgBuf *args)
 {
 	mchInit(args[0].sval);
 }
