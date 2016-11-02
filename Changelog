@@ -1,3 +1,15 @@
+02Nov2016 (SH)
+Release: ipmiComm-R3-0-3-dev-br-R0-0-0
+
+First tag on dev branch includes changes to-date
+to support ATCA; moves vendor and architecture specific
+functionality to callbacks; contains known memory leak
+that needs to be addressed
+
+02Nov2016 (SH)
+Create development branch ipmiComm-R3-0-3-dev-br
+  for adding support for ATCA crates and Advantech
+
 28May2016 (SH)
 Release: ipmiComm-R3-0-2
 

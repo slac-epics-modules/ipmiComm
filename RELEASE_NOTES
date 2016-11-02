@@ -1,3 +1,13 @@
+ipmiComm-R3-0-3-dev-br-R0-0-0
+
+		First tag on dev branch includes changes to-date
+		to support ATCA; moves vendor and architecture specific
+		functionality to callbacks; contains known memory leak
+		that needs to be addressed
+
+BRANCH: ipmiComm-R3-0-3-dev-br
+  		For adding/testing support for ATCA crates and Advantech
+
 ipmiComm-R3-0-2:  28-May-2016 S. Hoobler
 		  Only scan sensors when 'present'. Change sensor scan from
 		  10 second scan to i/o event triggered by drvMch.c: mchPing thread
