@@ -381,16 +381,49 @@ epicsFloat64 value;
 	else if ( l == SENSOR_CONV_CUBE_NEG1 )
 		value = pow( value, -1/3 );
 	else
-		printf("sensorConverstion %s: unknown sensor conversion algorithm\n", name);
+		printf("sensorConversion %s: unknown sensor conversion algorithm\n", name);
 
 	return value;
 }
 
 static short
+fruLkup(MchSys mchSys, struct camacio link) {
+
+	return mchSys->fruLkup[link.b];
+}
+
+static short
 sensLkup(MchSys mchSys, struct camacio link) {
 
-	return mchSys->sensLkup[link.b][link.c][link.n];
+int fruindex = fruLkup( mchSys, link );
+
+	if ( -1 == fruindex )
+		return -1;
+
+	return mchSys->sensLkup[fruindex][link.c][link.n];
 }
+
+static int
+checkMchOnlnSessInitDone(MchSess mchSess) {
+
+	return (MCH_ONLN( mchStat[mchSess->instance] ) && mchSess->session && MCH_INIT_DONE( mchStat[mchSess->instance] ));
+}
+
+static int
+checkMchOnlnSess(MchSess mchSess) {
+
+	return (MCH_ONLN( mchStat[mchSess->instance] ) && mchSess->session);
+}
+
+static int
+checkMchInitDone(MchSess mchSess) {
+	return MCH_INIT_DONE( mchStat[mchSess->instance] );
+}
+
+static int
+checkMchOnln(MchSess mchSess) {
+	return MCH_ONLN( mchStat[mchSess->instance] );
+}	
 
 static void
 sensEgu(char *egu, unsigned units) {
@@ -550,7 +583,6 @@ MchDev   mch;
 MchData  mchData;
 int      inst;
 long     status  = SUCCESS;
-char     str[40];
 
 	if ( !recPvt )
 		return NO_CONVERT;
@@ -618,11 +650,9 @@ Sensor   sens;
 SdrFull  sdr;
 char     egu[16];
 uint8_t  data[MSG_MAX_LENGTH] = { 0 };
-uint8_t  raw = 0, sensor;
+uint8_t  raw = 0;
 short    index; /* Sensor index */
 int      s = 0, inst;
-size_t   responseSize;
-uint8_t  lun;
 
 	if ( !recPvt )
 		return NO_CONVERT;
@@ -633,7 +663,7 @@ uint8_t  lun;
 	mchSys  = mchData->mchSys;
 	inst    = mchSess->instance;
 
-	if ( MCH_ONLN( mchStat[inst] ) && mchSess->session ) {    
+	if ( checkMchOnlnSess( mchSess ) ) {    
 
 		epicsMutexLock( mch->mutex );
 
@@ -659,11 +689,7 @@ uint8_t  lun;
 
 		sens = &mchSys->sens[index];
 
-		responseSize = sens->readMsgLength;
-		sensor       = sens->sdr.number;
-		lun          = sens->sdr.lun & 0x3;
-
-		if ( mchGetSensorReadingStat( mchData, sens, data, sensor, lun, &responseSize) )
+		if ( mchGetSensorReadingStat( mchData, data, sens ) )
 			s = ERROR;
 		else
 			sens->val = raw = data[IPMI_RPLY_IMSG2_SENSOR_READING_OFFSET];
@@ -681,16 +707,15 @@ uint8_t  lun;
 				strcpy( pai->desc, sdr->str );
 
 			if ( sdr->recType == SDR_TYPE_FULL_SENSOR )
-				sensThresh( sdr, sens, &pai->lolo, &pai->llsv, &pai->low, &pai->lsv, &pai->high, &pai->hsv, &pai->hihi, &pai->hhsv, pai->name );
-
+				sensThresh( sdr, sens, &pai->lolo, &pai->llsv, &pai->low, &pai->lsv, 
+					    &pai->high, &pai->hsv, &pai->hihi, &pai->hhsv, pai->name );
 			sens->cnfg = 1;
 		}
 
 		if ( s ) {
 			if ( MCH_DBG( mchStat[inst] ) )
-				printf("%s writeread error sensor %02x index %i\n", pai->name, sensor, index);
-			recGblSetSevr( pai, READ_ALARM, INVALID_ALARM );
-			return ERROR;
+				printf("%s writeread error sensor owner 0x%02x number %02x index %i\n", pai->name, sdr->owner, sdr->number, index);
+			goto bail;
 		}
 
 		/* All of our conversions are for Full Sensor SDRs */
@@ -706,10 +731,9 @@ uint8_t  lun;
 		pai->udf = FALSE;
 		return NO_CONVERT;
 	}
-	else {
-		recGblSetSevr( pai, READ_ALARM, INVALID_ALARM );
-		return ERROR;
-	}
+bail:
+	recGblSetSevr( pai, READ_ALARM, INVALID_ALARM );
+	return ERROR;
 }
 
 static long 
@@ -760,7 +784,6 @@ MchData  mchData;
 MchSess  mchSess;
 MchSys   mchSys;
 char    *task;
-int      inst;
 
 	if ( !recPvt )
 		return SUCCESS;
@@ -769,11 +792,10 @@ int      inst;
 	mchData = mch->udata;
 	mchSess = mchData->mchSess;
 	mchSys  = mchData->mchSys;
-	inst    = mchSess->instance;
 
 	task    = recPvt->task;
 
-	if (  MCH_ONLN( mchStat[inst] ) ) {
+	if (  checkMchOnln( mchSess ) ) {
 
 		if ( !(strcmp( task, "sess" )) ) {
 
@@ -797,15 +819,13 @@ int      inst;
 		}
 
 		else if ( !(strcmp( task, "init" )) && mchSess->session )
-			mchStatSet( inst, MCH_MASK_INIT, (pbo->val) ? MCH_MASK_INIT_DONE : MCH_MASK_INIT_NOT_DONE );
+			mchStatSet( mchSess->instance, MCH_MASK_INIT, (pbo->val) ? MCH_MASK_INIT_DONE : MCH_MASK_INIT_NOT_DONE );
 
 		pbo->udf = FALSE;
 		return SUCCESS;
 	}
-	else {
-		recGblSetSevr( pbo, WRITE_ALARM, INVALID_ALARM );
-		return ERROR;
-	}
+	recGblSetSevr( pbo, WRITE_ALARM, INVALID_ALARM );
+	return ERROR;
 }
 
 static long
@@ -871,12 +891,9 @@ MchDev   mch;
 MchData  mchData;
 MchSess  mchSess;
 MchSys   mchSys;
-Fru      fru;
-Mgmt     mgmt;
 char    *task;
 long     status = SUCCESS;
-int      inst;
-short    id, index;
+ short    index;
 
 	if ( !recPvt )
 		return status;
@@ -885,14 +902,14 @@ short    id, index;
 	mchData = mch->udata;
 	mchSess = mchData->mchSess;
 	mchSys  = mchData->mchSys;
-	inst    = mchSess->instance;
 
 	task    = recPvt->task;
 
-       	if ( !(strcmp( task, "stat" )) ) 
-       		pbi->rval = MCH_ONLN( mchStat[inst] );
+       	if ( !(strcmp( task, "stat" )) )
 
-	else if ( MCH_INIT_DONE( mchStat[inst] ) ) {
+       		pbi->rval = checkMchOnln( mchSess );
+
+	else if ( checkMchInitDone( mchSess ) ) {
 
 		if ( !(strcmp( task, "spres")) ) {
 
@@ -901,16 +918,9 @@ short    id, index;
 		}
 
 		else if ( !(strcmp( task, "fpres")) ) {
-			id  = pbi->inp.value.camacio.b;   /* FRU or Management Controller id */
 
-			if ( id < 255 ) {
-				fru = &mchSys->fru[id];
-				pbi->rval = ( fru->sdr.recType ) ? 1 : 0;
-			}
-			else {
-				mgmt = &mchSys->mgmt[id];
-				pbi->rval = ( mgmt->sdr.recType ) ? 1 : 0;
-			}
+			index     = fruLkup( mchSys, pbi->inp.value.camacio );
+			pbi->rval = ( -1 == index ) ? 0 : 1;
 		}
 	}
 	return status;
@@ -952,7 +962,8 @@ DBLINK  *plink  = &pmbbi->inp;
         node = strtok( pmbbi->inp.value.camacio.parm, "+" );
         if ( (p = strtok( NULL, "+")) ) {
                 task = p;
-                if ( strcmp( task, "hs") && strcmp( task, "fan") && strcmp( task, "init" ) && strcmp( task, "pwr") && strcmp( task, "mch" ) ) {
+                if ( strcmp( task, "hs") && strcmp( task, "fan") && strcmp( task, "init" ) 
+		    && strcmp( task, "pwr") && strcmp( task, "mch" ) ) {
 			sprintf( str, "Unknown task parameter %s", task);
 			status = S_dev_badSignal;
 		}
@@ -982,13 +993,11 @@ MchSess  mchSess;
 MchSys   mchSys;
 char    *task;
 Fru      fru;
+Sensor   sens;
 uint8_t  value  = 0, sensor, bits;
-uint16_t addr   = 0; /* get addr */
-short    id     = pmbbi->inp.value.camacio.b;   /* FRU id */
-short    index; /* Sensor index */
+short    findex, sindex; /* FRU and Sensor index */
 long     status = SUCCESS;
 int      s = 0, inst;
-size_t   responseSize;
 
 	if ( !recPvt )
 		return status;
@@ -998,79 +1007,69 @@ size_t   responseSize;
 	mchSess = mchData->mchSess;
 	mchSys  = mchData->mchSys;
 	inst    = mchSess->instance;
-
 	task    = recPvt->task;
-	fru     = &mchSys->fru[id];
 
+	/* Read initialized status */
        	if ( !(strcmp( task, "init" )) )
        		pmbbi->rval = mchStat[inst] & MCH_MASK_INIT;
 
-	else if ( task && MCH_INIT_DONE( mchStat[inst] ) ) {
+	else if ( task && checkMchInitDone( mchSess ) ) {
 
-		if ( !(strcmp( task, "fan" )) )
+		if ( !(strcmp( task, "fan" )) ) {
+
+			if ( -1 == (findex = fruLkup( mchSys, pmbbi->inp.value.camacio )) )
+				return ERROR;
+			fru = &mchSys->fru[findex];
 
 			pmbbi->rval = ( fru->fanProp & (1<<7) ) ? 1 : 0;
+		}
 
-		else if ( !(strcmp( task, "pwr" )) && fru->sdr.recType )
+		else if ( !(strcmp( task, "pwr" )) ) {
+
+			if ( -1 == (findex = fruLkup( mchSys, pmbbi->inp.value.camacio )) )
+				return ERROR;
+			fru = &mchSys->fru[findex];
 
 			pmbbi->rval = fru->pwrDyn;
-    
+		}
+
 		else if ( !(strcmp( task, "mch" )) ) {
 
 			pmbbi->rval = mchSess->type;
-			strncpy( pmbbi->desc, mchDescString[mchSess->type], MCH_DESC_MAX_LENGTH );
 		}
 
-		else if ( !(strcmp( task, "hs")) && mchSess->session ) {
+		else if ( !(strcmp( task, "hs")) && checkMchOnlnSess( mchSess ) ) {
 
-			if ( MCH_ONLN( mchStat[inst] ) ) {
+			if ( -1 == (sindex = sensLkup( mchSys, pmbbi->inp.value.camacio )) ) {
+				return ERROR;
+			}
 
-				if ( -1 == (index = sensLkup( mchSys, pmbbi->inp.value.camacio )) )
-					return ERROR;
-
-				responseSize = mchSys->sens[index].readMsgLength;
-				sensor = mchSys->sens[index].sdr.number;
-
+			sens = &mchSys->sens[sindex];
 /* possibly add this later
 int readoffset;
-				if ( SENSOR_NUMERIC_FORMAT( mchSys->sens[index].sdr.units1) == SENSOR_NUMERIC_FORMAT_NONNUMERIC )
-					readoffset = IPMI_RPLY_DISCRETE_SENSOR_READING_OFFSET;
+			if ( SENSOR_NUMERIC_FORMAT( mchSys->sens[sindex].sdr.units1) == SENSOR_NUMERIC_FORMAT_NONNUMERIC )
+				readoffset = IPMI_RPLY_DISCRETE_SENSOR_READING_OFFSET;
 */
+			epicsMutexLock( mch->mutex );
 
+			if ( mchGetSensorReadingStat( mchData, data, sens ) )
+				s = ERROR;
+			else {
+				sens->val = value = data[IPMI_RPLY_IMSG2_DISCRETE_SENSOR_READING_OFFSET];
 
-				epicsMutexLock( mch->mutex );
-
-/* Change this to use mchGetSensorReadingStat */
-				if ( !(s = mchMsgReadSensor( mchData, data, sensor, addr, &responseSize )) ) {	
-
-					bits = data[IPMI_RPLY_IMSG2_SENSOR_ENABLE_BITS_OFFSET];// + offs];
-					if ( IPMI_SENSOR_READING_DISABLED(bits)  || IPMI_SENSOR_SCANNING_DISABLED(bits) ) {
-						if ( MCH_DBG( mchStat[inst] ) )
-						    printf("%s sensor reading/state unavailable or scanning disabled. Bits: %02x\n", pmbbi->name, bits);
-						s = ERROR;
-					}
-
-					else { 
-						/* Store raw sensor reading */
-						value = data[IPMI_RPLY_IMSG2_DISCRETE_SENSOR_READING_OFFSET];
-
-						mchSys->sens[index].val = value;
-
-						if ( MCH_DBG( mchStat[inst] ) >= MCH_DBG_MED )
-							printf("%s read_mbbi: value %02x, sensor %i, owner %i, lun %i, index %i, value %i\n",
-								pmbbi->name, value, sensor, mchSys->sens[index].sdr.owner, mchSys->sens[index].sdr.lun, index, value);
-					} 
-				}
-
-				epicsMutexUnlock( mch->mutex );
-
-				if ( s ) {
-					recGblSetSevr( pmbbi, READ_ALARM, INVALID_ALARM );
-					return ERROR;
-				}
-
-				pmbbi->rval = value;
+				if ( MCH_DBG( mchStat[inst] ) >= MCH_DBG_MED )
+					printf("%s read_mbbi: value %02x, sensor %i, owner %i, lun %i, index %i, value %i\n",
+						pmbbi->name, value, mchSys->sens[sindex].sdr.number, mchSys->sens[sindex].sdr.owner, mchSys->sens[sindex].sdr.lun, sindex, value);
 			}
+
+			epicsMutexUnlock( mch->mutex );
+
+			if ( s ) {
+				recGblSetSevr( pmbbi, READ_ALARM, INVALID_ALARM );
+				return ERROR;
+			}
+
+			pmbbi->rval = value;
 		}	
 	}
 
@@ -1130,7 +1129,8 @@ char    *task;
 Fru      fru;
 long     status = SUCCESS;
 int      cmd;
-int      id     = pmbbo->out.value.camacio.b;
+int      id;
+short    index; 
 int      inst;
 
 	if ( !recPvt )
@@ -1143,7 +1143,6 @@ int      inst;
 	inst    = mchSess->instance;
 
 	task    = recPvt->task;
-	fru     = &mchSys->fru[id];
 
 	if ( !(strcmp( task, "dbg" )) ) {
 
@@ -1152,7 +1151,7 @@ int      inst;
 		pmbbo->udf = FALSE;
 		return status;
 	}
-	else if (  MCH_ONLN(mchStat[inst] ) && mchSess->session ) {
+	else if ( checkMchOnlnSess( mchSess ) ) {
 
 		if ( !(strcmp( task, "chas" )) ) {
 
@@ -1163,7 +1162,12 @@ int      inst;
 			status = mchMsgChassisControl( mchData, data, pmbbo->val );
 			epicsMutexUnlock( mch->mutex );
 		}
-		else if ( !(strcmp( task, "fru" )) && fru->sdr.recType ) {
+		else if ( !(strcmp( task, "fru" )) ) {
+
+			if ( -1 == (index = fruLkup( mchSys, pmbbo->out.value.camacio )) )
+				return ERROR;
+
+			fru = &mchSys->fru[index];
 
 			if ( pmbbo->val > 1 ) { /* reset not supported yet */
 				recGblSetSevr( pmbbo, STATE_ALARM, MAJOR_ALARM );
@@ -1173,7 +1177,10 @@ int      inst;
 			cmd = ( pmbbo->val == 2 ) ? 0 : pmbbo->val; 
 
 			epicsMutexLock( mch->mutex );
-			status = mchMsgSetFruActHelper( mchData, data, id, cmd );
+			if ( mchData->mchSys->mchcb->set_fru_act )        
+				status = mchData->mchSys->mchcb->set_fru_act( mchData, data, index, cmd );
+			else
+				status = -1;
 			epicsMutexUnlock( mch->mutex );
 		}
 
@@ -1255,14 +1262,15 @@ int      inst;
 	mchSess = mchData->mchSess;
 	inst    = mchSess->instance;
 
-	if ( MCH_ONLN( mchStat[inst] ) && mchSess->session ) {    
+	if ( checkMchOnlnSess( mchSess ) ) {
 
 		epicsMutexLock( mch->mutex );
 
-			if ( mchMsgGetChassisStatus( mchData, data ) ) {
+		if ( mchData->mchSys->mchcb->get_chassis_status ) {
+
+			if ( mchData->mchSys->mchcb->get_chassis_status( mchData, data ) ) {
 				epicsMutexUnlock( mch->mutex );
-				recGblSetSevr( plongin, READ_ALARM, INVALID_ALARM );
-				return ERROR;
+				goto bail;
 			}
 			else {
 				plongin->val = IPMI_GET_CHAS_POWER_STATE( data[IPMI_RPLY_IMSG2_GET_CHAS_POWER_STATE_OFFSET] ) | 
@@ -1271,7 +1279,7 @@ int      inst;
 					/* Or 'last event' and 'misc' bits into power state word */
 
 				if ( MCH_DBG( mchStat[inst] ) >= MCH_DBG_MED )
-					printf("read_longin: val %i, power state %i last event %i misc state %i\n", plongin->val, 
+					printf("%s read_longin: val %i, power state %i last event %i misc state %i\n", plongin->name, plongin->val, 
 					IPMI_GET_CHAS_POWER_STATE( data[IPMI_RPLY_IMSG2_GET_CHAS_POWER_STATE_OFFSET] ), 
 					IPMI_GET_CHAS_LAST_EVENT( data[IPMI_RPLY_IMSG2_GET_CHAS_LAST_EVENT_OFFSET] ), 
 					IPMI_GET_CHAS_MISC_STATE( data[IPMI_RPLY_IMSG2_GET_CHAS_MISC_STATE_OFFSET] ));
@@ -1280,11 +1288,14 @@ int      inst;
 				plongin->udf = FALSE;
 				return SUCCESS;
 			}
+		}
+		else
+			goto bail;
 	}
-	else {
-		recGblSetSevr( plongin, READ_ALARM, INVALID_ALARM );
-		return ERROR;
-	}
+
+bail:
+	recGblSetSevr( plongin, READ_ALARM, INVALID_ALARM );
+	return ERROR;
 }
 
 /* 
@@ -1355,6 +1366,7 @@ MchData  mchData;
 MchSess  mchSess;
 MchSys   mchSys;
 char    *task;
+short    index;
 int      id     = pai->inp.value.camacio.b;
 int      parm   = pai->inp.value.camacio.c;
 long     status = NO_CONVERT;
@@ -1369,81 +1381,87 @@ uint8_t  prop, level, draw, mult;
 	mchData = mch->udata;
 	mchSess = mchData->mchSess;
 	mchSys  = mchData->mchSys;
-	inst    = mchSess->instance;
 
-	task    = recPvt->task;
-	fru     = &mchSys->fru[id];
+	if ( -1 == (index = fruLkup( mchSys, pai->inp.value.camacio )) )
+		return ERROR;
 
-	if ( MCH_INIT_DONE( mchStat[inst] ) && MCH_ONLN( mchStat[inst] ) && mchSess->session && fru->sdr.recType ) {
+	inst = mchSess->instance;
+	task = recPvt->task;
+	fru  = &mchSys->fru[index];
+
+	if ( checkMchOnlnSessInitDone( mchSess ) ) {
 
 		if ( !(strcmp( task, "fan")) ) {
 
-				epicsMutexLock( mch->mutex );
+			epicsMutexLock( mch->mutex );
 
-				if ( !(s = mchMsgGetFanLevelHelper( mchData, data, id, fru->fanProp, &level )) ) 
+			if ( mchSys->mchcb->get_fan_level ) {
+				if ( !(s = mchSys->mchcb->get_fan_level( mchData, data, index, &level )) )
 					pai->rval = level;
-				epicsMutexUnlock( mch->mutex );
+			}
+			else
+				s = -1;
+			epicsMutexUnlock( mch->mutex );
 		}
+		else if ( !(strcmp( task, "pwr")) ) {
 
-		/* Check for systems and FRU IDs that support this query */
-		else if ( !(strcmp( task, "pwr")) && MCH_IS_VT( mchSess->type ) && FRU_PWR_MSG_CMPTBL( id ) ) {
+			/* Check for systems and FRU IDs that support this query; 
+			 * kludgey implementation, needs re-work
+			 */
+			if ( !((mchSys->mchcb->get_power_level) && (FRU_PWR_MSG_CMPTBL( id ))) )
+				goto bail;
 
-				epicsMutexLock( mch->mutex );
+			epicsMutexLock( mch->mutex );
 
-				if ( parm < 4 ) {
+			if ( parm < 4 ) {
 
-					if ( !(s = mchMsgGetPowerLevelVt( mchData, data, id, parm )) ) {
+				if ( !(s = mchSys->mchcb->get_power_level( mchData, data, index, parm )) ) {
 
-						prop  = data[PICMG_RPLY_IMSG2_GET_POWER_LEVEL_PROP_OFFSET];
+					prop  = data[PICMG_RPLY_IMSG2_GET_POWER_LEVEL_PROP_OFFSET];
 
-						if ( (level = FRU_PWR_LEVEL( prop )) ) {
-							draw  = data[PICMG_RPLY_IMSG2_GET_POWER_LEVEL_DRAW_OFFSET + (level - 1)];
-							mult  = data[PICMG_RPLY_IMSG2_GET_POWER_LEVEL_MULT_OFFSET];
-							pai->rval = draw * mult * 0.1; /* Convert from 0.1 Watts to Watts */
-						}
+					if ( (level = FRU_PWR_LEVEL( prop )) ) {
+						draw  = data[PICMG_RPLY_IMSG2_GET_POWER_LEVEL_DRAW_OFFSET + (level - 1)];
+						mult  = data[PICMG_RPLY_IMSG2_GET_POWER_LEVEL_MULT_OFFSET];
+						pai->rval = draw * mult * 0.1; /* Convert from 0.1 Watts to Watts */
+					}
 
-						/* If these don't change, consider i/o scanning these after initialization */
-						switch ( parm ) {
+					/* If these don't change, consider i/o scanning these after initialization */
+					switch ( parm ) {
 
-							default: 
-								break;
+						default: 
+							break;
 
-							case FRU_PWR_STEADY_STATE:
-								fru->pwrDyn = FRU_PWR_DYNAMIC( prop ) ? 1 : 0;
-								break;
+						case FRU_PWR_STEADY_STATE:
+							fru->pwrDyn = FRU_PWR_DYNAMIC( prop ) ? 1 : 0;
+							break;
 
-							case FRU_PWR_EARLY:
-								fru->pwrDly = data[PICMG_RPLY_IMSG2_GET_POWER_LEVEL_DELAY_OFFSET];
-								break;
-						}
-				       	}
-				}
-
-				else if ( parm == 4 )
-						pai->rval = fru->pwrDly * 0.1; /* Convert from 0.1 seconds to seconds */
-
-
-				epicsMutexUnlock( mch->mutex );
+						case FRU_PWR_EARLY:
+							fru->pwrDly = data[PICMG_RPLY_IMSG2_GET_POWER_LEVEL_DELAY_OFFSET];
+							break;
+					}
+			       	}
 			}
 
-		       	if ( s ) {
-		       		recGblSetSevr( pai, READ_ALARM, INVALID_ALARM );
-		       		return ERROR;
-		       	}
+			else if ( parm == 4 )
+					pai->rval = fru->pwrDly * 0.1; /* Convert from 0.1 seconds to seconds */
 
-		       	pai->val  = pai->rval;
+			epicsMutexUnlock( mch->mutex );
+		}
+
+		if ( s )
+			goto bail;
+
+		pai->val  = pai->rval;
 
 		if ( MCH_DBG( mchStat[inst] ) >= MCH_DBG_MED )
-			printf("read_fru_ai: %s FRU id is %i, value is %.0f\n", pai->name, id, pai->val);
+			printf("read_fru_ai: %s FRU id is %i, index is %i, value is %.0f\n", pai->name, id, index, pai->val);
 
 		pai->udf = FALSE;
-
 		return status;
 	}
-	else {
-		recGblSetSevr( pai, READ_ALARM, INVALID_ALARM );
-		return ERROR;
-	}
+bail:
+	recGblSetSevr( pai, READ_ALARM, INVALID_ALARM );
+	return ERROR;
 }
 
 static long
@@ -1483,7 +1501,8 @@ char    str[40];
 	node = strtok( pstringin->inp.value.camacio.parm, "+" );
 	if ( (p = strtok( NULL, "+" )) ) {
 		task = p;
-		if ( strcmp( task, "bmf" ) && strcmp( task, "bp" ) && strcmp( task, "pmf" ) && strcmp( task, "pp") && strcmp( task, "bpn" ) && strcmp( task, "ppn") && strcmp( task, "bsn" ) && strcmp( task, "psn" )) {
+		if ( strcmp( task, "bmf" ) && strcmp( task, "bp" ) && strcmp( task, "pmf" ) && strcmp( task, "pp") 
+		    && strcmp( task, "bpn" ) && strcmp( task, "ppn") && strcmp( task, "bsn" ) && strcmp( task, "psn" )) {
 			sprintf( str, "Unknown task parameter %s", task);
 			status = S_dev_badSignal;
 		}
@@ -1495,7 +1514,6 @@ char    str[40];
 		pstringin->dpvt = recPvt;
 
 bail:
-
 	if ( status ) {
 	       recGblRecordError( status, (void *)pstringin , (const char *)str );
 	       pstringin->pact=TRUE;
@@ -1520,7 +1538,8 @@ MchData  mchData;
 MchSess  mchSess;
 MchSys   mchSys;
 char    *task;
-short    id = pstringin->inp.value.camacio.b;     /* FRU ID */
+short    index;
+int      id = pstringin->inp.value.camacio.b; /* FRU ID; correct type? */
 int      i, inst;
 long     status = SUCCESS;//NO_CONVERT;
 Fru      fru;
@@ -1536,9 +1555,15 @@ uint8_t  l = 0, *d = 0; /* FRU data length and raw */
 	inst    = mchSess->instance;
 
 	task    = recPvt->task;
-	fru     = &mchSys->fru[id];
 
-	if ( MCH_INIT_DONE( mchStat[inst] ) && fru->sdr.recType ) {
+	if ( -1 == (index = fruLkup( mchSys, pstringin->inp.value.camacio )) )
+		goto bail;
+
+	fru = &mchSys->fru[index];
+
+	/* index check may be sufficient; may no longer need to check recType */
+
+	if ( checkMchInitDone( mchSess ) ) {
 
 		if ( !(strcmp( task, "bmf" )) ) {
 			d = fru->board.manuf.data;
@@ -1582,14 +1607,14 @@ uint8_t  l = 0, *d = 0; /* FRU data length and raw */
 		}
 
 		if ( MCH_DBG( mchStat[inst] ) >= MCH_DBG_MED )
-			printf("%s read_fru_stringin: task is %s, FRU is %i\n", pstringin->name, task, pstringin->inp.value.camacio.b);
+			printf("%s read_fru_stringin: task is %s, FRU id %i index %i\n", pstringin->name, task, id, index);
 		pstringin->udf = FALSE;
 		return status;
 	}
-	else {
+
+bail:
 		recGblSetSevr( pstringin, READ_ALARM, INVALID_ALARM );
 		return ERROR;
-	}
 }
 
 static long
@@ -1602,7 +1627,7 @@ char   *task    = 0; /* Optional additional parameter appended to parm */
 char   *p;
 long    status = 0;
 char    str[40];
-int      id      = plongout->out.value.camacio.b; /* FRU ID */
+short   index;
 MchData  mchData;
 MchSess  mchSess;
 MchSys   mchSys;
@@ -1623,14 +1648,20 @@ MchSys   mchSys;
 	if ( init_record_find( mch, recPvt, node, task, &status, str ) )
 		goto bail;
 	else {
+
+		mch     = recPvt->mch;
+		mchData = mch->udata;
+		mchSess = mchData->mchSess;
+		mchSys  = mchData->mchSys;
+
+		if ( -1 == (index = fruLkup( mchSys, plongout->out.value.camacio )) )
+			goto bail;
+
 		plongout->dpvt = recPvt;
+
 		if ( 0 == strcmp( task, "fan" ) ) {
-			mch     = recPvt->mch;
-			mchData = mch->udata;
-			mchSess = mchData->mchSess;
-			mchSys  = mchData->mchSys;
-       			plongout->drvl = plongout->lopr = mchSys->fru[id].fanMin;
-       			plongout->drvh = plongout->hopr = mchSys->fru[id].fanMax;
+       			plongout->drvl = plongout->lopr = mchSys->fru[index].fanMin;
+       			plongout->drvh = plongout->hopr = mchSys->fru[index].fanMax;
 		}
 	}
 
@@ -1654,6 +1685,7 @@ MchSess  mchSess;
 MchSys   mchSys;
 char    *task;
 int      id      = plongout->out.value.camacio.b; /* FRU ID */
+short    index;  /* FRU index in data structure */
 long     status  = 0;
 Fru      fru;
 uint8_t  data[MSG_MAX_LENGTH] = { 0 };
@@ -1669,37 +1701,44 @@ int      s = 0, inst;
 	inst    = mchSess->instance;
 
 	task    = recPvt->task;
-	fru     = &mchSys->fru[id];
+
+	if ( -1 == (index = fruLkup( mchSys, plongout->out.value.camacio )) )
+		goto bail;
+
+	fru = &mchSys->fru[index];
 
 	if ( MCH_DBG( mchStat[inst] ) >= MCH_DBG_MED )
-		printf("%s write_fru_longout: FRU id is %i, value is %.0f\n",plongout->name, id, (double)plongout->val);
+		printf("%s write_fru_longout: FRU id is %i, index is %i, value is %.0f\n",plongout->name, id, index, (double)plongout->val);
 
-	if ( MCH_ONLN( mchStat[inst] ) && mchSess->session && MCH_INIT_DONE( mchStat[inst] ) && fru->sdr.recType ) {
+	if ( checkMchOnlnSessInitDone( mchSess ) ) {
 		if ( !(strcmp( task, "fan" )) ) {
 
-       			/* Need to change this so that these limits are also set after a config update */
-       			plongout->drvl = plongout->lopr = mchSys->fru[id].fanMin;
-       			plongout->drvh = plongout->hopr = mchSys->fru[id].fanMax;
+       			/* Need to change this so that these limits are also set after a config update
+			 * instead of setting them on every write
+			 */
+       			plongout->drvl = plongout->lopr = mchSys->fru[index].fanMin;
+       			plongout->drvh = plongout->hopr = mchSys->fru[index].fanMax;
 
 			epicsMutexLock( mch->mutex );
 
-			s = mchMsgSetFanLevelHelper( mchData, data, id, plongout->val );
+/* Need to test this for all archs */
+			if ( mchData->mchSys->mchcb->set_fan_level )
+				s = mchData->mchSys->mchcb->set_fan_level( mchData, data, index, plongout->val );
+			else
+				s = -1;
 
 			epicsMutexUnlock( mch->mutex );
 
-			if ( s ) {
-				recGblSetSevr( plongout, WRITE_ALARM, INVALID_ALARM );
-				return ERROR;
-			}
+			if ( s )
+				goto bail;
 		}
 
 		plongout->udf = FALSE;
 		return status;
 	}
-	else {
+bail:
        	       	recGblSetSevr( plongout, WRITE_ALARM, INVALID_ALARM );
 		return ERROR;		
-	}
 }
 
 /*

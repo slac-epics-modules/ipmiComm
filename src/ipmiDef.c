@@ -143,7 +143,7 @@ uint8_t GET_SDR_MSG[]  =  { IPMI_MSG_ADDR_SW,            /* Requester's address 
 uint8_t GET_DEV_SDR_INFO_MSG[] = { IPMI_MSG_ADDR_SW,      /* Requester's address */            
                             0,                             /* Message sequence number */         
                             IPMI_MSG_CMD_GET_DEV_SDR_INFO, /* Command code */         
-			    0,                             /* Request data, 1 get SDR count, 0 get sensor count */
+			    IPMI_GET_DEV_SDR_INFO_SDR_COUNT,/* Request data, get SDR count or sensor count for specified LUN */
                             0 };                           /* For checksum */
 
 /* Close Session */

@@ -5,6 +5,8 @@
 
 TODO:
 
+UPDATE ALL MSG ROUTINES TO USE FRU INDEX INSTEAD OF ID
+
 Test MicroTCA remote on/off commands with new privilege level of operator
 
 Test everything with Vadatech MCH
@@ -146,6 +148,81 @@ typedef struct SdrMgmtRec_ {
 	uint8_t      strLength;     /* Device ID string type/length Section 43.15*/
 	char         str[17];       /* Device ID string, 16 bytes maximum */
 } SdrMgmtRec, *SdrMgmt;
+
+/* 
+ * Data structure for Entity Association Record, IPMI v2.0 Table 43-4
+ */
+typedef struct SdrEntAssocRec_ {
+	uint8_t      id[2];         /* Record ID */
+	uint8_t      ver;           /* SDR version */
+	uint8_t      recType;       /* Record type, 0x08 for Entity Association Record */
+        uint8_t      length;        /* Number of remaining record bytes */
+	uint8_t      cntnrId;       /* Entity ID for container entity */
+	uint8_t      cntnrInst;     /* Entity instance for container entity */
+	uint8_t      flags;         /* [7] 0=contained entities specified as list, 1=specified as range;
+				     * [6] 0=no linked Entity Assoc records, 1=linked Entity Assoc records exist;
+				     * [5] 0=container and contained entities can be assumed absent if presence sensor for container 
+				     *       cannot be acessed, 1=presence sensor should always be available
+				     * [4:0] reserved
+				     */
+	uint8_t      cntndId1;      /* If list Entity Id for contained entity 1, if range Entity Id of entity for contained entity range 1 */
+	uint8_t      cntndInst1;    /* If list Entity Inst for contained entity 1, if range Entity Inst for *first* entity in contained entity range 1 */
+/* contained entity id/inst fields 2-4 are 0 if unspecified */
+	uint8_t      cntndId2;      /* If list Entity Id for contained entity 2, if range Entity Id of entity for contained entity range 1 (must match cnndEntId1) */
+	uint8_t      cntndInst2;    /* If list Entity Inst for contained entity 2, if range Entity Inst for *last* entity in contained entity range 1 */
+	uint8_t      cntndId3;      /* If list Entity Id for contained entity 3, if range Entity Id of entity for contained entity range 2 */
+	uint8_t      cntndInst3;    /* If list Entity Inst for contained entity 13 if range Entity Inst for *first* entity in contained entity range 2 */
+	uint8_t      cntndId4;      /* If list Entity Id for contained entity 4, if range Entity Id of entity for contained entity range 2 */
+	uint8_t      cntndInst4;    /* If list Entity Inst for contained entity 4, if range Entity Inst for *last* entity in contained entity range 2 */
+} SdrEntAssocRec, *SdrEntAssoc;
+
+/* 
+ * Data structure for Device-relative Entity Association Record, IPMI v2.0 Table 43-4
+ */
+typedef struct SdrDevEntAssocRec_ {
+	uint8_t      id[2];         /* Record ID */
+	uint8_t      ver;           /* SDR version */
+	uint8_t      recType;       /* Record type, 0x08 for Entity Association Record */
+        uint8_t      length;        /* Number of remaining record bytes */
+	uint8_t      cntnrId;       /* Entity ID for container entity */
+	uint8_t      cntnrInst;     /* Entity instance for container entity */
+	uint8_t      cntnrAddr;     /* Device address for container entity, [7:1] slave address of mgmt cntrlr against which device-relative instance is defined, [0] reserved */
+	uint8_t      cntnrChan;     /* [7:4] Channel number of channel that holds the mgmt cntrlr, 0 if Entity Inst is device-relative, [3:0] reserved */
+	uint8_t      flags;         /* [7] 0=contained entities specified as list, 1=specified as range;
+				     * [6] 0=no linked Entity Assoc records, 1=linked Entity Assoc records exist;
+				     * [5] 0=container and contained entities can be assumed absent if presence sensor for container 
+				     *       cannot be acessed, 1=presence sensor should always be available
+				     * [4:0] reserved
+				     */
+	uint8_t      cntndAddr1;    /* [7:1] Slave address of mgmt cntrlr against which device-relative Entity Inst for contained entity 1 is defined, [0] reserved */
+	uint8_t      cntndChan1;    /* [7:4] Channel number of channel that holds mgmt cntrlr against which device-relative Entity Inst for contained entity 1 is defined,
+				     * 0 if instance values are device-relative; [3:0] reserved 
+				     */
+	uint8_t      cntndId1;      /* If list Entity Id for contained entity 1, if range Entity Id of entity for contained entity range 1 */
+	uint8_t      cntndInst1;    /* If list Entity Inst for contained entity 1, if range Entity Inst for *first* entity in contained entity range 1 */
+/* contained entity id/inst fields 2-4 are 0 if unspecified */
+	uint8_t      cntndAddr2;    /* [7:1] Slave address of mgmt cntrlr against which device-relative Entity Inst for contained entity 1 is defined, [0] reserved */
+	uint8_t      cntndChan2;    /* [7:4] Channel number of channel that holds mgmt cntrlr against which device-relative Entity Inst for contained entity 1 is defined,
+				     * 0 if instance values are device-relative; [3:0] reserved 
+				     */
+	uint8_t      cntndId2;      /* If list Entity Id for contained entity 2, if range Entity Id of entity for contained entity range 2 (must match containedEntityId1) */
+	uint8_t      cntndInst2;    /* If list Entity Inst for contained entity 2, if range Entity Inst for *last* entity in contained entity range 2 */
+
+	uint8_t      cntndAddr3;    /* [7:1] Slave address of mgmt cntrlr against which device-relative Entity Inst for contained entity 3 is defined, [0] reserved */
+	uint8_t      cntndChan3;    /* [7:4] Channel number of channel that holds mgmt cntrlr against which device-relative Entity Inst for contained entity 3 is defined,
+				     * 0 if instance values are device-relative; [3:0] reserved 
+				     */
+	uint8_t      cntndId3;      /* If list Entity Id for contained entity 3, if range Entity Id of entity for contained entity range 2 */
+	uint8_t      cntndInst3;    /* If list Entity Inst for contained entity 13 if range Entity Inst for *first* entity in contained entity range 2 */
+
+	uint8_t      cntndAddr4;    /* [7:1] Slave address of mgmt cntrlr against which device-relative Entity Inst for contained entity 4 is defined, [0] reserved */
+	uint8_t      cntndChan4;    /* [7:4] Channel number of channel that holds mgmt cntrlr against which device-relative Entity Inst for contained entity 4 is defined,
+				     * 0 if instance values are device-relative; [3:0] reserved 
+				     */
+	uint8_t      cntndId4;      /* If list Entity Id for contained entity 4, if range Entity Id of entity for contained entity range 2 */
+	uint8_t      cntndInst4;    /* If list Entity Inst for contained entity 4, if range Entity Inst for *last* entity in contained entity range 2 */
+
+} SdrDevEntAssocRec, *SdrDevEntAssoc;
 	
 
 /* Data structure for Sensor Data Record Repository and Dynamic Sensor Device */
@@ -304,6 +381,7 @@ extern size_t IPMI_MSG1_LENGTH;
 #define IPMI_MSG_CMD_GET_SDR                 0x23
 #define IPMI_MSG_CMD_GET_DEV_SDR_INFO        0x20
 #define IPMI_MSG_CMD_GET_DEV_SDR             0x21
+#define IPMI_MSG_CMD_RESERVE_DEV_SDRREP      0x22
 #define IPMI_MSG_CMD_COLD_RESET              0x02
 #define IPMI_MSG_CMD_SET_FRU_POLICY          0x0A
 #define IPMI_MSG_CMD_GET_FRU_POLICY          0x0B
@@ -396,13 +474,29 @@ extern size_t IPMI_MSG1_LENGTH;
 #define IPMI_GET_CHAS_MISC_STATE(x)  (x & ~0xF0)
 
 /* Get Device ID message */
-#define IPMI_RPLY_IMSG2_GET_DEVICE_ID_MANUF_ID_OFFSET  7    /* Returned from Get Device ID Command */
+#define IPMI_RPLY_IMSG2_GET_DEVICE_ID_ID_OFFSET        1     /* Device ID, 0 = unspecified */
+#define IPMI_RPLY_IMSG2_GET_DEVICE_ID_DEVICE_VERS_OFFSET  2  /* Device revision, [7] 1=provides device SDR;[6:4] reserved; [3:0] device revision, binary encoded */
+#define IPMI_RPLY_IMSG2_GET_DEVICE_ID_FW_VERS1_OFFSET  3     /* FW revision 1, [7] device avail (see ipmi spec for details), [6:0] major fw revision, binary encoded */
+#define IPMI_RPLY_IMSG2_GET_DEVICE_ID_FW_VERS2_OFFSET  4     /* FW revision 2, minor firmware revision, BCD encoded */
+#define IPMI_RPLY_IMSG2_GET_DEVICE_ID_IPMI_VERS_OFFSET 5     /* IPMI version, BCD encoded, 0x00 reserved, [7:4] LS digit, [3:0] MS digit */
+#define IPMI_RPLY_IMSG2_GET_DEVICE_ID_SUPPORT_OFFSET   6     /* Additional support, see device capabilities in Management Controller record below*/
+#define IPMI_RPLY_IMSG2_GET_DEVICE_ID_MANUF_ID_OFFSET  7     /* Returned from Get Device ID Command */
 #define IPMI_RPLY_IPMI_VERS_OFFSET                     8     /* Returned from Get Device ID Command */
 #define IPMI_RPLY_IMSG2_GET_DEVICE_ID_IPMI_VERS_OFFSET 5     /* Returned from Get Device ID Command */
 #define IPMI_RPLY_MANUF_ID_LENGTH   3    
 #define IPMI_VER_LSD(x) (x & 0xF0)>>4   /* Extract IPMI version, least significant digit, eg 0x51 = version 1.5 */
 #define IPMI_VER_MSD(x)  x & 0x0F       /* Extract IPMI version, most significant digit */
 #define IPMI_MANUF_ID(x) x & 0x0FFFFF   /* Extract manufacturer ID */
+#define IPMI_DEVICE_PROVIDES_DEVICE_SDR(x)   ((x&1<<7)>>7)
+//#define IPMI_DEVICE_PROVIDES_FRU_INV_INFO(x) ((x&1<<3)>>3)
+
+/* SDR commands */
+#define IPMI_SDRREP_PARM_GET_SDR                  0
+#define IPMI_SDRREP_PARM_GET_DEV_SDR              1
+
+/* Get Device SDR Info message */
+#define IPMI_GET_DEV_SDR_INFO_LUN_SENS_COUNT      0
+#define IPMI_GET_DEV_SDR_INFO_SDR_COUNT           1
 
 /* Get SDR Repository Info message */
 #define IPMI_RPLY_IMSG2_SDRREP_VER_OFFSET              1     /* SDR Repository Info */    
@@ -503,7 +597,7 @@ extern size_t IPMI_MSG1_LENGTH;
 /* Sensor Data Record (SDR) types*/
 #define SDR_TYPE_FULL_SENSOR      0x01
 #define SDR_TYPE_COMPACT_SENSOR   0x02
-#define SDR_TYPE_EVENT_ONLY       0x03dr
+#define SDR_TYPE_EVENT_ONLY       0x03
 #define SDR_TYPE_ENTITY_ASSOC     0x08
 #define SDR_TYPE_DEV_ENTITY_ASSOC 0x09
 #define SDR_TYPE_GENERIC_DEV      0x10
@@ -574,6 +668,7 @@ extern size_t IPMI_MSG1_LENGTH;
 #define SENSOR_NORM_MAX_GIVEN(x)   (x & (1<<1))
 #define SENSOR_NORM_MIN_GIVEN(x)   (x & (1<<2))
 #define SENSOR_NUMERIC_FORMAT(x)   ((x & 0xC0) >> 6)
+#define SDR_ENTITY_LOGICAL(x)      ((x & (1<<7)) >> 7) /* 1 if entity is logical entity; 0 if is physical entity */
 
 #define SENSOR_UNITS_UNSPEC        0
 #define SENSOR_UNITS_DEGC          1
@@ -626,17 +721,70 @@ extern size_t IPMI_MSG1_LENGTH;
 #define SDR_MGMT_ENTITY_INST_OFFSET  13
 #define SDR_MGMT_STR_LENGTH_OFFSET 14     
 #define SDR_MGMT_STR_OFFSET        15     
+/*...Device Capabilities */
+#define IPMI_DEVICE_SLAVE_ADDR(x) ((x&0xFE)>>1) /* 7-bit I2C slave address of device on channel */
+#define IPMI_CHAN_NUMBER(x)       (x&0xF)       /* Chan number mgmt controller is on; 0 for BMC */
+#define IPMI_DEV_CAP_CHASSIS(x)   ((x&1<<7)>>7) /* Device functions as chassis device, per ICMB spec) */
+#define IPMI_DEV_CAP_BRIDGE(x)    ((x&1<<6)>>6) /* Responds to Bridge NetFn commands */		      
+#define IPMI_DEV_CAP_IPMB_EVG(x)  ((x&1<<5)>>5)	/* Generates event messages on IPMB */                
+#define IPMI_DEV_CAP_IPMB_EVR(x)  ((x&1<<4)>>4) /* Accepts event messages on IPMB */
+#define IPMI_DEV_CAP_FRU_INV(x)   ((x&1<<3)>>3) /* Accepts FRU commands to FRU Device #0 at LUN 00b */
+#define IPMI_DEV_CAP_SEL(x)       ((x&1<<2)>>2) /* Provides interface to SEL */
+#define IPMI_DEV_CAP_SDRREP(x)    ((x&1<<1)>>1) /* For BMC, indicates provides interface to 1b = SDR Rep; else accepts Device SDR commands */
+#define IPMI_DEV_CAP_SENSOR(x)    (x&1)         /* Accepts sensor commands (see Table 37-11 IPMB/I2C Device Type Codes) */
      
-#define SENSOR_OWNER_ID(x)        x & 0xFE
-#define SENSOR_OWNER_ID_TYPE(x)   x & 0x1
-#define SENSOR_OWNER_CHAN(x)      x & 0xF0
-#define SENSOR_OWNER_LUN(x)       x & 0x3
+#define SENSOR_OWNER_ID(x)        (x & 0xFE)
+#define SENSOR_OWNER_ID_TYPE(x)   (x & 0x1)
+#define SENSOR_OWNER_CHAN(x)      (x & 0xF0)
+#define SENSOR_OWNER_LUN(x)       (x & 0x3)
 
-#define DEV_SENSOR_DYNAMIC(x)     x & 0x80
-#define DEV_SENSOR_LUN0(x)        x & 0x1
-#define DEV_SENSOR_LUN1(x)        x & 0x2
-#define DEV_SENSOR_LUN2(x)        x & 0x4
-#define DEV_SENSOR_LUN3(x)        x & 0x8
+#define DEV_SENSOR_DYNAMIC(x)     (x & 0x80)
+#define DEV_SENSOR_LUN0(x)        (x & 0x1)
+#define DEV_SENSOR_LUN1(x)        (x & 0x2)
+#define DEV_SENSOR_LUN2(x)        (x & 0x4)
+#define DEV_SENSOR_LUN3(x)        (x & 0x8)
+
+/* SDR Entity Association and Device-relative Entity Association common contents */
+#define SDR_CNTNR_ENTITY_ID_OFFSET        5   /* SDR Body */
+#define SDR_CNTNR_ENTITY_INST_OFFSET      6 
+
+/* SDR Entity Assocation contents */
+#define SDR_ENTITY_ASSOC_FLAGS_OFFSET     7
+#define SDR_CNTND_ENTITY_ID1_OFFSET       8
+#define SDR_CNTND_ENTITY_INST1_OFFSET     9
+#define SDR_CNTND_ENTITY_ID2_OFFSET       10
+#define SDR_CNTND_ENTITY_INST2_OFFSET     11
+#define SDR_CNTND_ENTITY_ID3_OFFSET       12
+#define SDR_CNTND_ENTITY_INST3_OFFSET     13
+#define SDR_CNTND_ENTITY_ID4_OFFSET       14
+#define SDR_CNTND_ENTITY_INST4_OFFSET     15
+
+/* SDR Device-relative Entity Assocation contents */
+#define SDR_DEV_CNTNR_ADDR_OFFSET             7
+#define SDR_DEV_CNTNR_CHAN_OFFSET             8
+#define SDR_DEV_ENTITY_ASSOC_FLAGS_OFFSET     9
+#define SDR_DEV_CNTND_ADDR1_OFFSET            10
+#define SDR_DEV_CNTND_CHAN1_OFFSET            11
+#define SDR_DEV_CNTND_ENTITY_ID1_OFFSET       12
+#define SDR_DEV_CNTND_ENTITY_INST1_OFFSET     13
+#define SDR_DEV_CNTND_ADDR2_OFFSET            14
+#define SDR_DEV_CNTND_CHAN2_OFFSET            15
+#define SDR_DEV_CNTND_ENTITY_ID2_OFFSET       16
+#define SDR_DEV_CNTND_ENTITY_INST2_OFFSET     17
+#define SDR_DEV_CNTND_ADDR3_OFFSET            18
+#define SDR_DEV_CNTND_CHAN3_OFFSET            19
+#define SDR_DEV_CNTND_ENTITY_ID3_OFFSET       20
+#define SDR_DEV_CNTND_ENTITY_INST3_OFFSET     21
+#define SDR_DEV_CNTND_ADDR4_OFFSET            22
+#define SDR_DEV_CNTND_CHAN4_OFFSET            23
+#define SDR_DEV_CNTND_ENTITY_ID4_OFFSET       24
+#define SDR_DEV_CNTND_ENTITY_INST4_OFFSET     25
+
+/* Information stored in entity assocation records */
+#define ENTITY_ASSOC_FLAGS_RANGE(x)    ((x&(1<<7))>>7) /* If 1 contained entities provided as range; if 0 provided as list */
+#define ENTITY_ASSOC_FLAGS_LINK(x)     ((x&(1<<6))>>6) /* If 1 linked assocation records exist */
+#define ENTITY_ASSOC_FLAGS_PRESSENS(x) ((x&(1<<5))>>5) /* If 1 presence sensor should always be accessible; 
+							  if 0 absense of sensor indicates container/contained entitites are absent */
 
 /* Sensor types */
 #define MAX_SENSOR_TYPE            0xFF
@@ -657,6 +805,18 @@ extern size_t IPMI_MSG1_LENGTH;
 #define SENSOR_TYPE_SYS_FW         0x0F
 #define SENSOR_TYPE_FRU_STATE      0x2C
 /* more... */
+
+/* Entity instance ranges:
+ * system-relative: the combination of entity ID and instance
+ *                  must be unique within the system
+ * device-relative: that combination must be unique relative
+ *                  to the management controller providing access
+ *                  to the entity 
+ */
+#define ENTITY_INST_SYS_REL_MIN       0x00
+#define ENTITY_INST_SYS_REL_MAX       0x5F
+#define ENTITY_INST_DEV_REL_MIN       0x60
+#define ENTITY_INST_DEV_REL_MAX       0x7F
 
 /* Entity IDs */
 #define ENTITY_ID_UNSPEC               0x00
@@ -713,16 +873,24 @@ extern size_t IPMI_MSG1_LENGTH;
 #define ENTITY_ID_SATA_SAS_BUS         0x33
 #define ENTITY_ID_PROCESSOR_FRONT_BUS  0x34
 
-
 /* FRU data storage, specified in IPMI Platform Management FRU 
  * Information Storage Definition V1.0, Document Revision 1.1
  */
+
+/* Number of bytes stored in 6 bits, so 2^6 = 64 max bytes */
+#define MAX_FRU_FIELD_RAW_LENGTH 64
+/* Based on how FRU field data is stored, actual length may be up to 2 x raw length */
+#define MAX_FRU_FIELD_LENGTH (MAX_FRU_FIELD_RAW_LENGTH*2)
+
+#define FRU_FIELD_LENGTH_TYPE_RAW       0
+#define FRU_FIELD_LENGTH_TYPE_CONVERTED 1
+
 typedef struct FruFieldRec_ {
 	uint8_t     type;         /* Type of data */
 	uint8_t     rlength;      /* Length of raw data (bytes) */
-	uint8_t    *rdata;        /* Raw data */
+	uint8_t     rdata[MAX_FRU_FIELD_RAW_LENGTH]; /* Raw data */
 	uint8_t     length;       /* Length of data after converted to ASCII (bytes) */
-	uint8_t    *data;         /* Data */
+	uint8_t     data[MAX_FRU_FIELD_LENGTH]; /* Data */
 } FruFieldRec, *FruField;
 
 /* Chassis area doesn't have a language field

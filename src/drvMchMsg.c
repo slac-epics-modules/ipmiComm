@@ -71,7 +71,10 @@ size_t   responseLen;
 	*responseSize = responseLen; /* Pass actual response length back to caller */
 
 	if ( outSess ) {
-		if ( (code = response[codeOffs]/*IPMI_RPLY_COMPLETION_CODE_OFFSET + auth_offset]*/) && MCH_DBG( mchStat[inst] ) )
+		if ( status )
+			return status;
+
+		if ( (code = response[codeOffs]) && MCH_DBG( mchStat[inst] ) )
 			ipmiCompletionCode( mchSess->name, code, cmd, netfn );
 	       	return code;
 	}
@@ -121,14 +124,17 @@ size_t   responseLen;
 		if ( MCH_DBG( mchStat[inst] ) >= MCH_DBG_MED )
 	       		printf("%s sequence number %i, previous %i\n", mchSess->name, seqInt, seqRplyInt);
 	       	incr4Uint8Array( ipmiSess->seqRply, 1 );
-		mchSess->err++;
-		return -1;
+		/* Dumb workaround for Advantech non-increasing numbers */
+		if ( !(mchSess->type == MCH_TYPE_ADVANTECH) ) {
+			mchSess->err++;
+			return -1;
+		}
        	}
        	else {
 		for ( i = 0; i < IPMI_RPLY_SEQ_LENGTH ; i++)
 			ipmiSess->seqRply[i] = seq[i];
 
-		if ( (code = response[/*IPMI_RPLY_COMPLETION_CODE_OFFSET*/ codeOffs]/*codeOffs + auth_offset]*/) ) {
+		if ( (code = response[codeOffs] ) ) {
 			if ( MCH_DBG( mchStat[inst] ) )
 				ipmiCompletionCode( mchSess->name, code, cmd, netfn );
 			//mchSess->err++; // only increment error count for some errors ? --not parameter out of range, for example
@@ -140,8 +146,12 @@ size_t   responseLen;
 	return 0;
 }
 
-/* Only relevant for messages in a session. Do not call for messages preceding a session. Do this so we can use authReq to determine auth type. */
-static void
+/* Only relevant for messages in a session. Do not call for messages preceding a session. Do this so we can use authReq to determine auth type. 
+ * Some devices do both bridged/non-bridged messages, so cannot use ipmiSess->features alone to determine this. For now,
+ * also check *bridged, which should be set to non-zero value for a bridged message. Also this is only for once-bridged messages.
+ * Twice-bridged messages handled separately
+ */
+void
 mchSetSizeOffs(IpmiSess ipmiSess, size_t payloadSize, size_t *roffs, size_t *responseSize, int *bridged, uint8_t *rsAddr, uint8_t *rqAddr)
 {
 int authOffs, offs;
@@ -155,12 +165,16 @@ int authOffs, offs;
 		*rsAddr = IPMI_MSG_ADDR_CM;
 		*rqAddr = IPMI_MSG_ADDR_BMC;
 	}
+	else if ( *bridged ) {
+		offs = IPMI_RPLY_BRIDGED_2REPLY_OFFSET;
+		*responseSize += IPMI_RPLY_HEADER_LENGTH + offs;
+		*rqAddr = IPMI_MSG_ADDR_BMC;
+	}
 	else {
 		offs = 0;
 		*responseSize += IPMI_RPLY_HEADER_LENGTH;
 		*bridged = 0;
-		*rsAddr  = 0;
-		*rqAddr  = 0;
+		*rqAddr  = IPMI_MSG_ADDR_SW;
 	}
 
 
@@ -181,12 +195,12 @@ int authOffs, offs;
 int
 mchMsgCheckSizes(size_t destSize, int offset, size_t srcSize)
 {
-	if ( 0 >= srcSize ) {
-	  printf("mchMsgCheckSizes: message size %i less than zero\n", (int)srcSize);
+	if ( 0 >= (int)srcSize ) {
+		printf("mchMsgCheckSizes: message size %i less than zero\n", (int)srcSize);
 		return -1;
 	}
-	else if ( (offset + srcSize) > destSize ) {
-	  printf("mchMsgCheckSizes: copy size %i larger than destination %i \n", offset+(int)srcSize, (int)destSize);
+	else if ( (offset + (int)srcSize) > (int)destSize ) {
+		printf("mchMsgCheckSizes: copy size %i larger than destination %i \n", offset+(int)srcSize, (int)destSize);
 		return -1;
 	}
 	
@@ -280,8 +294,8 @@ mchMsgActSess(MchSess mchSess, IpmiSess ipmiSess, uint8_t *data)
 {
 uint8_t  response[MSG_MAX_LENGTH] = { 0 }; 
 size_t   roffs, responseSize = 0, payloadSize = IPMI_RPLY_IMSG2_ACTIVATE_SESSION_LENGTH; 
-int      rval, bridged;
-uint8_t  rsAddr, rqAddr;
+int      rval, bridged = 0;
+uint8_t  rsAddr = IPMI_MSG_ADDR_BMC, rqAddr;
 
 	mchSetSizeOffs( ipmiSess, payloadSize, &roffs, &responseSize, &bridged, &rsAddr, &rqAddr );
 
@@ -309,8 +323,8 @@ mchMsgSetPriv(MchSess mchSess, IpmiSess ipmiSess, uint8_t *data, uint8_t level)
 {
 uint8_t  response[MSG_MAX_LENGTH] = { 0 }; 
 size_t   roffs, responseSize = 0, payloadSize = IPMI_RPLY_IMSG2_SET_PRIV_LEVEL_LENGTH; 
-int      rval, bridged;
-uint8_t  rsAddr, rqAddr;
+int      rval, bridged = 0;
+uint8_t  rsAddr = IPMI_MSG_ADDR_BMC, rqAddr;
 
 	mchSetSizeOffs( ipmiSess, payloadSize, &roffs, &responseSize, &bridged, &rsAddr, &rqAddr );
 
@@ -333,13 +347,13 @@ bail:
  *            0 on success
  *            non-zero for error
  */
-int
-mchMsgGetDeviceId(MchData mchData, uint8_t *data, int tmp, uint8_t tmp1 ) //int bridged, uint8_t rsAddr) // change this to either never be bridged or to implement device checking and offsets; handle rqAddr too
+static int
+mchMsgGetDeviceId(MchData mchData, uint8_t *data, int bridged, uint8_t rsAddr) // change this to either never be bridged or to implement device checking and offsets; handle rqAddr too
 {
 uint8_t  response[MSG_MAX_LENGTH] = { 0 }; 
 size_t   roffs, responseSize = 0, payloadSize = IPMI_RPLY_IMSG2_GET_DEVICE_ID_LENGTH; 
-int      rval, bridged;
-uint8_t  rsAddr, rqAddr;
+int      rval;
+uint8_t  rqAddr;
 
 	mchSetSizeOffs( mchData->ipmiSess, payloadSize, &roffs, &responseSize, &bridged, &rsAddr, &rqAddr);
 
@@ -354,6 +368,43 @@ uint8_t  rsAddr, rqAddr;
 
 bail:
 	return rval;
+}
+
+int 
+mchMsgGetDeviceIdWrapper(MchData mchData, uint8_t *data, uint8_t rsAddr) {
+int bridged = 0;
+
+	if ( rsAddr != IPMI_MSG_ADDR_BMC )
+		bridged = 1;
+	return mchMsgGetDeviceId( mchData, data, bridged, rsAddr );
+}
+
+ /* Broadcast Get Device ID -- this is called before we know device type -- need to update this
+  *
+  *   RETURNS: status from mchMsgWriteReadHelper
+  *            0 on success
+  *            non-zero for error
+  */
+ int
+ mchMsgBroadcastGetDeviceId(MchData mchData, uint8_t *data, int tmp, uint8_t tmp1 ) //int bridged, uint8_t rsAddr) // change this $
+ {
+ uint8_t  response[MSG_MAX_LENGTH] = { 0 };
+ size_t   roffs, responseSize = 0, payloadSize = IPMI_RPLY_IMSG2_GET_DEVICE_ID_LENGTH;
+ int      rval, bridged = 0;
+ uint8_t  rsAddr = IPMI_MSG_ADDR_BMC, rqAddr;
+
+       mchSetSizeOffs( mchData->ipmiSess, payloadSize, &roffs, &responseSize, &bridged, &rsAddr, &rqAddr);
+ 
+       if ( (rval = ipmiMsgBroadcastGetDeviceId( mchData->mchSess, mchData->ipmiSess, response, bridged, rsAddr, rqAddr, &responseSize, roffs )) )
+               goto bail;
+  
+       if ( (rval = mchMsgCheckSizes( sizeof( response ), roffs, payloadSize )) ) {
+               printf("mchMsgBroadcastGetDeviceId size error\n");
+               goto bail;
+       }
+       memcpy( data, response + roffs, payloadSize );
+bail:
+      return rval;
 }
 
 /* Close Session - test for NAT and determine reply offset*/
@@ -376,8 +427,8 @@ mchMsgChassisControl(MchData mchData, uint8_t *data, uint8_t parm)
 {
 uint8_t  response[MSG_MAX_LENGTH] = { 0 }; 
 size_t   roffs, responseSize = 0, payloadSize = IPMI_RPLY_IMSG2_CHAS_CTRL_LENGTH; 
-int      rval, bridged;
-uint8_t  rsAddr, rqAddr;
+int      rval, bridged = 0;
+uint8_t  rsAddr = IPMI_MSG_ADDR_BMC, rqAddr;
 
 	mchSetSizeOffs( mchData->ipmiSess, payloadSize, &roffs, &responseSize, &bridged, &rsAddr, &rqAddr );
 
@@ -394,7 +445,7 @@ bail:
 	return rval;
 }
 
-/* Get Chassis Status
+/* Get Chassis Status, supported by Supermicro and ATCA systems
  *
  *   RETURNS: status from ipmiMsgGetChassisStatus
  *            0 on success
@@ -405,14 +456,8 @@ mchMsgGetChassisStatus(MchData mchData, uint8_t *data)
 {
 uint8_t  response[MSG_MAX_LENGTH] = { 0 }; 
 size_t   roffs, responseSize = 0, payloadSize = IPMI_RPLY_IMSG2_GET_CHAS_STATUS_LENGTH; 
-int      rval, bridged;
-uint8_t  rsAddr, rqAddr;
-
-/* Not supported by all devices (of course); workaround for now: */
-
-	if ( 0 == MCH_IS_SUPERMICRO( mchData->mchSess->type ) )
-		return -1;
-
+int      rval, bridged = 0;
+uint8_t  rsAddr = IPMI_MSG_ADDR_BMC, rqAddr;
 
 	mchSetSizeOffs( mchData->ipmiSess, payloadSize, &roffs, &responseSize, &bridged, &rsAddr, &rqAddr );
 
@@ -429,19 +474,19 @@ bail:
 	return rval;
 }
 
-/* Get FRU Inventory Info 
+/* Get FRU Inventory Info, optionally bridged message. If not bridged, caller, should set bridged arg to 0.
  *
  *   RETURNS: status from ipmiMsgGetFruInfo
  *            0 on success
  *            non-zero for error
  */
-int
-mchMsgGetFruInvInfo(MchData mchData, uint8_t *data, uint8_t id)
+static int
+mchMsgGetFruInvInfo(MchData mchData, uint8_t *data, uint8_t id, int bridged, uint8_t rsAddr)
 {
 uint8_t  response[MSG_MAX_LENGTH] = { 0 }; 
 size_t   roffs, responseSize = 0, payloadSize = IPMI_RPLY_IMSG2_GET_FRU_INV_INFO_LENGTH; 
-int      rval, bridged;
-uint8_t  rsAddr, rqAddr;
+int      rval;
+uint8_t  rqAddr;
 
 	mchSetSizeOffs( mchData->ipmiSess, payloadSize, &roffs, &responseSize, &bridged, &rsAddr, &rqAddr );
 
@@ -459,19 +504,30 @@ bail:
 	return rval;
 }
 
+int
+mchMsgGetFruInvInfoWrapper(MchData mchData, uint8_t *data, Fru fru)
+{
+int bridged = 0;
+uint8_t rsAddr = fru->sdr.addr;
+
+	if ( rsAddr != IPMI_MSG_ADDR_BMC )
+		bridged = 1;
+	return mchMsgGetFruInvInfo( mchData, data, fru->sdr.fruId, bridged, rsAddr );
+}
+
 /* Read FRU data 
  *
  *   RETURNS: status from mchMsgWriteReadHelper
  *            0 on success
  *            non-zero for error
  */
-int
-mchMsgReadFru(MchData mchData, uint8_t *data, uint8_t id, uint8_t *readOffset, uint8_t readSize)
+static int
+mchMsgReadFru(MchData mchData, uint8_t *data, uint8_t id, uint8_t *readOffset, uint8_t readSize, int bridged, uint8_t rsAddr)
 {
 uint8_t  response[MSG_MAX_LENGTH] = { 0 }; 
 size_t   roffs, responseSize = 0, payloadSize = IPMI_RPLY_IMSG2_READ_FRU_DATA_BASE_LENGTH + readSize; 
-int      rval, bridged;
-uint8_t  rsAddr, rqAddr;
+int      rval;
+uint8_t  rqAddr;
 
 	mchSetSizeOffs( mchData->ipmiSess, payloadSize, &roffs, &responseSize, &bridged, &rsAddr, &rqAddr );
 
@@ -489,6 +545,16 @@ bail:
 	return rval;
 }
 
+int
+mchMsgReadFruWrapper(MchData mchData, uint8_t *data, Fru fru, uint8_t *readOffset, uint8_t readSize)
+{
+int bridged = 0;
+uint8_t rsAddr = fru->sdr.addr;
+
+	if ( rsAddr != IPMI_MSG_ADDR_BMC )
+		bridged = 1;
+	return mchMsgReadFru( mchData, data, fru->sdr.fruId, readOffset, readSize, bridged, rsAddr );
+}
 
 /* Get SDR (Sensor Data Record) Repository Info 
  *
@@ -496,21 +562,23 @@ bail:
  *            0 on success
  *            non-zero for error
  */
-int
-mchMsgGetSdrRepInfo(MchData mchData, uint8_t *data)
+static int
+mchMsgGetSdrRepInfo(MchData mchData, uint8_t *data, uint8_t parm, int bridged, uint8_t rsAddr)
 {
 uint8_t  response[MSG_MAX_LENGTH] = { 0 }; 
-size_t   roffs, responseSize = 0, payloadSize = IPMI_RPLY_IMSG2_GET_SDRREP_INFO_LENGTH; 
-int      rval, bridged;
-uint8_t  rsAddr, rqAddr;
+size_t   roffs, responseSize = 0; 
+size_t   payloadSize = (parm==IPMI_SDRREP_PARM_GET_DEV_SDR) ? IPMI_RPLY_IMSG2_GET_DEV_SDR_INFO_LENGTH : IPMI_RPLY_IMSG2_GET_SDRREP_INFO_LENGTH; 
+int      rval;
+uint8_t  rqAddr;
 
 	mchSetSizeOffs( mchData->ipmiSess, payloadSize, &roffs, &responseSize, &bridged, &rsAddr, &rqAddr );
 
-	if ( (rval = ipmiMsgGetSdrRepInfo( mchData->mchSess, mchData->ipmiSess, response, bridged, rsAddr, rqAddr, &responseSize, roffs )) )
+/* Set channel ? */
+	if ( (rval = ipmiMsgGetSdrRepInfo( mchData->mchSess, mchData->ipmiSess, response, bridged, rsAddr, rqAddr, &responseSize, roffs, parm )) )
 		goto bail;
 
 	if ( (rval = mchMsgCheckSizes( sizeof( response ), roffs, payloadSize )) ) {
-	  printf("mchMsgGetSdrRepInfo size error roffs %i payloadSize %i responseSize %i\n", (int)roffs, (int)payloadSize, (int)responseSize);
+		printf("mchMsgGetSdrRepInfo size error roffs %i payloadSize %i responseSize %i\n", (int)roffs, (int)payloadSize, (int)responseSize);
 		goto bail;
 	}
 
@@ -520,72 +588,15 @@ bail:
 	return rval;
 }
 
-/* Reserve SDR (Sensor Data Record) Repository
- *
- *   RETURNS: status from mchMsgWriteReadHelper
- *            0 on success
- *            non-zero for error
- */
 int
-mchMsgReserveSdrRep(MchData mchData, uint8_t *data)
+mchMsgGetSdrRepInfoWrapper(MchData mchData, uint8_t *data, uint8_t parm, uint8_t rsAddr)
 {
-uint8_t  response[MSG_MAX_LENGTH] = { 0 }; 
-size_t   roffs, responseSize = 0, payloadSize = IPMI_RPLY_IMSG2_RESERVE_SDRREP_LENGTH; 
-int      rval, bridged;
-uint8_t  rsAddr, rqAddr;
+int bridged = 0;
 
-	mchSetSizeOffs( mchData->ipmiSess, payloadSize, &roffs, &responseSize, &bridged, &rsAddr, &rqAddr );
+	if ( rsAddr != IPMI_MSG_ADDR_BMC )
+		bridged = 1;
 
-	if ( (rval = ipmiMsgReserveSdrRep( mchData->mchSess, mchData->ipmiSess, response, bridged, rsAddr, rqAddr, &responseSize, roffs )) )
-		goto bail;
-
-	if ( (rval = mchMsgCheckSizes( sizeof( response ), roffs, payloadSize )) ) {
-		printf("mchMsgReserveSdrRep size error\n");
-		goto bail;
-	}
-
-	memcpy( data, response + roffs, payloadSize );
-
-bail:
-	return rval;
-}
-
-/* 
- * Get SDR (Sensor Data Record)
- * 
- * Offset and reservation ID are 0 unless doing partial read that begins at an 
- * offset into the SDR other than 0.
- *
- * Used for both Get SDR (parm = 0) and Get Device SDR (parm = 1). 
- * Only differences in the message are the network function and command code.
- *
- *   RETURNS: status from mchMsgWriteReadHelper
- *            0 on success
- *            non-zero for error
- */
-int
-mchMsgGetSdr(MchData mchData, uint8_t *data, uint8_t *id, uint8_t *res, uint8_t offset, uint8_t readSize, uint8_t parm, uint8_t recordSize)
-{
-uint8_t  response[MSG_MAX_LENGTH] = { 0 }; 
-uint8_t  sdrDataSize = ( readSize == 0xFF ) ? SDR_MAX_LENGTH : readSize;
-size_t   roffs, responseSize = 0, payloadSize = IPMI_RPLY_IMSG2_GET_SDR_BASE_LENGTH + sdrDataSize; 
-int      rval, bridged;
-uint8_t  rsAddr, rqAddr;
-    
-	mchSetSizeOffs( mchData->ipmiSess, payloadSize, &roffs, &responseSize, &bridged, &rsAddr, &rqAddr );
-
-	if ( (rval = ipmiMsgGetSdr( mchData->mchSess, mchData->ipmiSess, response, bridged, rsAddr, rqAddr, id, res, offset, readSize, parm, recordSize, &responseSize, roffs )) )
-		goto bail;
-
-	if ( (rval = mchMsgCheckSizes( sizeof( response ), roffs, payloadSize )) ) {
-		printf("mchMsgGetSdr size error\n");
-		goto bail;
-	}
- 
-	memcpy( data, response + roffs, payloadSize );
-
-bail:
-	return rval;
+	return mchMsgGetSdrRepInfo( mchData, data, parm, bridged, rsAddr );
 }
 
 /* Get Device Sensor Data Record (SDR) Info 
@@ -593,14 +604,14 @@ bail:
  *   RETURNS: status from mchMsgWriteReadHelper
  *            0 on success
  *            non-zero for error
- */
+ *
 int
-mchMsgGetDevSdrInfo(MchData mchData, uint8_t *data, uint8_t parm)
+mchMsgGetDevSdrInfo(MchData mchData, uint8_t *data, int bridged, uint8_t rsAddr, uint8_t parm)
 {
 uint8_t  response[MSG_MAX_LENGTH] = { 0 }; 
 size_t   roffs, responseSize = 0, payloadSize = IPMI_RPLY_IMSG2_GET_DEV_SDR_INFO_LENGTH; 
-int      rval, bridged;
-uint8_t  rsAddr, rqAddr;
+int      rval;
+uint8_t  rqAddr;
 
 	mchSetSizeOffs( mchData->ipmiSess, payloadSize, &roffs, &responseSize, &bridged, &rsAddr, &rqAddr );
 
@@ -617,6 +628,95 @@ uint8_t  rsAddr, rqAddr;
 bail:
 	return rval;
 }
+*/
+
+/* Reserve SDR (Sensor Data Record) Repository
+ *
+ *   RETURNS: status from mchMsgWriteReadHelper
+ *            0 on success
+ *            non-zero for error
+ */
+static int
+mchMsgReserveSdrRep(MchData mchData, uint8_t *data, uint8_t parm, int bridged, uint8_t rsAddr)
+{
+uint8_t  response[MSG_MAX_LENGTH] = { 0 }; 
+size_t   roffs, responseSize = 0, payloadSize = IPMI_RPLY_IMSG2_RESERVE_SDRREP_LENGTH; 
+int      rval;
+uint8_t  rqAddr;
+
+	mchSetSizeOffs( mchData->ipmiSess, payloadSize, &roffs, &responseSize, &bridged, &rsAddr, &rqAddr );
+
+	if ( (rval = ipmiMsgReserveSdrRep( mchData->mchSess, mchData->ipmiSess, response, bridged, rsAddr, rqAddr, &responseSize, roffs, parm )) )
+		goto bail;
+
+	if ( (rval = mchMsgCheckSizes( sizeof( response ), roffs, payloadSize )) ) {
+		printf("mchMsgReserveSdrRep size error\n");
+		goto bail;
+	}
+
+	memcpy( data, response + roffs, payloadSize );
+
+bail:
+	return rval;
+}
+
+int
+mchMsgReserveSdrRepWrapper(MchData mchData, uint8_t *data, uint8_t parm, uint8_t rsAddr)
+{
+int bridged = 0;
+
+	if ( rsAddr != IPMI_MSG_ADDR_BMC )
+		bridged = 1;
+	return mchMsgReserveSdrRep( mchData, data, parm, bridged, rsAddr );
+}
+
+/* 
+ * Get SDR (Sensor Data Record)
+ * 
+ * Offset and reservation ID are 0 unless doing partial read that begins at an 
+ * offset into the SDR other than 0.
+ *
+ * Used for both Get SDR (parm = 0) and Get Device SDR (parm = 1). 
+ * Only differences in the message are the network function and command code.
+ *
+ *   RETURNS: status from mchMsgWriteReadHelper
+ *            0 on success
+ *            non-zero for error
+ */
+static int
+mchMsgGetSdr(MchData mchData, uint8_t *data, uint8_t *id, uint8_t *res, uint8_t offset, uint8_t readSize, uint8_t parm, int bridged, uint8_t rsAddr)
+{
+uint8_t  response[MSG_MAX_LENGTH] = { 0 }; 
+uint8_t  sdrDataSize = ( readSize == 0xFF ) ? SDR_MAX_LENGTH : readSize;
+size_t   roffs, responseSize = 0, payloadSize = IPMI_RPLY_IMSG2_GET_SDR_BASE_LENGTH + sdrDataSize; 
+int      rval;
+uint8_t  rqAddr;
+    
+	mchSetSizeOffs( mchData->ipmiSess, payloadSize, &roffs, &responseSize, &bridged, &rsAddr, &rqAddr );
+
+	if ( (rval = ipmiMsgGetSdr( mchData->mchSess, mchData->ipmiSess, response, bridged, rsAddr, rqAddr, id, res, offset, readSize, &responseSize, roffs, parm )) )
+		goto bail;
+
+	if ( (rval = mchMsgCheckSizes( sizeof( response ), roffs, payloadSize )) ) {
+		printf("mchMsgGetSdr size error\n");
+		goto bail;
+	}
+ 
+	memcpy( data, response + roffs, payloadSize );
+
+bail:
+	return rval;
+}
+
+int
+mchMsgGetSdrWrapper(MchData mchData, uint8_t *data,  uint8_t *id, uint8_t *res, uint8_t offset, uint8_t readSize, uint8_t parm, uint8_t rsAddr)
+{
+int bridged = 0;
+
+	if ( rsAddr != IPMI_MSG_ADDR_BMC )
+		bridged = 1;
+	return mchMsgGetSdr( mchData, data, id, res, offset, readSize, parm, bridged, rsAddr );
+}
 
 /* Get Sensor Reading. Caller specifies expected message response length. 
  *
@@ -625,12 +725,12 @@ bail:
  *            non-zero for error
  */
 int
-mchMsgReadSensor(MchData mchData, uint8_t *data, uint8_t sens, uint8_t lun, size_t *sensReadMsgSize)
+mchMsgReadSensor(MchData mchData, uint8_t *data, uint8_t sens, uint8_t lun, size_t *sensReadMsgSize, int bridged, uint8_t rsAddr)
 {
 uint8_t  response[MSG_MAX_LENGTH] = { 0 }; 
 size_t   roffs, responseSize = 0, payloadSize = *sensReadMsgSize; 
-int      rval, bridged;
-uint8_t  rsAddr, rqAddr;
+int      rval;
+uint8_t  rqAddr;
 
 	mchSetSizeOffs( mchData->ipmiSess, payloadSize, &roffs, &responseSize, &bridged, &rsAddr, &rqAddr );
 
@@ -643,6 +743,8 @@ uint8_t  rsAddr, rqAddr;
 		goto bail;
 	}
 
+//printf("mchMsgReadSensor: responseSize %i roffs %i response+roffs %i payloadSize %i\n", (int)responseSize, (int)roffs, (int)(response + roffs), (int)payloadSize);
+
 	memcpy( data, response + roffs, payloadSize );
 
 bail:
@@ -650,12 +752,23 @@ bail:
 }
 
 int
-mchMsgGetSensorThresholds(MchData mchData, uint8_t *data, uint8_t sens, uint8_t lun)
+mchMsgReadSensorWrapper(MchData mchData, uint8_t *data, Sensor sens, size_t *sensReadMsgSize)
+{
+int bridged = 0;
+uint8_t rsAddr = sens->sdr.owner;
+
+	if ( rsAddr != IPMI_MSG_ADDR_BMC )
+		bridged = 1;
+	return mchMsgReadSensor( mchData, data, sens->sdr.number, (sens->sdr.lun & 0x3), sensReadMsgSize, bridged, rsAddr );
+}
+
+static int
+mchMsgGetSensorThresholds(MchData mchData, uint8_t *data, uint8_t sens, uint8_t lun, int bridged, uint8_t rsAddr)
 {
 uint8_t  response[MSG_MAX_LENGTH] = { 0 }; 
 size_t   roffs, responseSize = 0, payloadSize = IPMI_RPLY_IMSG2_GET_SENSOR_THRESH_LENGTH; 
-int      rval, bridged;
-uint8_t  rsAddr, rqAddr;
+int      rval;
+uint8_t  rqAddr;
 
 	mchSetSizeOffs( mchData->ipmiSess, payloadSize, &roffs, &responseSize, &bridged, &rsAddr, &rqAddr);
 
@@ -673,722 +786,14 @@ bail:
 	return rval;
 }
 
-/* Set FRU Activation using Vadatech MCH - not used at this time
- *
- *   RETURNS: status from mchMsgWriteReadHelper
- *            0 on success
- *            non-zero for error
- */
 int
-mchMsgSetFruActVt(MchData mchData, uint8_t *data, uint8_t fru, uint8_t parm)
-{
-uint8_t  message[MSG_MAX_LENGTH] = { 0 };
-size_t   imsg2Size   = sizeof( SEND_MSG_MSG );
-size_t   b1msg1Size   = sizeof( IPMI_MSG1 );
-size_t   b1msg2Size   = sizeof( SET_FRU_ACT_MSG );
-uint8_t  imsg2[imsg2Size];
-uint8_t  b1msg1[b1msg1Size];
-uint8_t  b1msg2[b1msg2Size];
-size_t   messageSize;
-size_t   responseSize = IPMI_RPLY_SET_FRU_POLICY_LENGTH_VT;
-uint8_t  cmd   = IPMI_MSG_CMD_SET_FRU_ACT;
-uint8_t  netfn = IPMI_MSG_NETFN_PICMG;
+mchMsgGetSensorThresholdsWrapper(MchData mchData, uint8_t *data, Sensor sens){
 
-	memcpy( imsg2, SEND_MSG_MSG   , imsg2Size );
-	memcpy( b1msg1, IPMI_MSG1      , b1msg1Size );
-	memcpy( b1msg2, SET_FRU_ACT_MSG, b1msg2Size );
+int bridged = 0;
+uint8_t rsAddr = sens->sdr.owner;
 
-	imsg2[IPMI_MSG2_CHAN_OFFSET] = IPMI_MSG_CHAN_IPMB0 + IPMI_MSG_TRACKING;
-
-	b1msg1[IPMI_MSG1_RSADDR_OFFSET]   = IPMI_MSG_ADDR_CM;
-	b1msg1[IPMI_MSG1_NETFNLUN_OFFSET] = netfn << 2;
-
-	b1msg2[IPMI_MSG2_SET_FRU_ACT_FRU_OFFSET] = fru;
-	b1msg2[IPMI_MSG2_SET_FRU_ACT_CMD_OFFSET] = parm;
-
-	messageSize = ipmiMsgBuild( mchData->ipmiSess, message, cmd, IPMI_MSG_NETFN_APP_REQUEST, imsg2, imsg2Size, b1msg1, b1msg2, b1msg2Size, 0, 0, 0 );
-
-	return mchMsgWriteReadHelper( mchData->mchSess, mchData->ipmiSess, message, messageSize, data, &responseSize, cmd, netfn, 0/*need to set codeoffs*/, 0 );
+	if ( rsAddr != IPMI_MSG_ADDR_BMC )
+		bridged = 1;
+	return mchMsgGetSensorThresholds( mchData, data, sens->sdr.number, (sens->sdr.lun & 0x3), bridged, rsAddr );
 }
 
-/* Set FRU Activation - For NAT MCH, used to deactivate/activate FRU
- *
- *
- *   RETURNS: status from mchMsgWriteReadHelper
- *            0 on success
- *            non-zero for error
- */
-int
-mchMsgSetFruActNat(MchData mchData, uint8_t *data, uint8_t fru, uint8_t parm)
-{
-uint8_t  message[MSG_MAX_LENGTH] = { 0 };
-size_t   imsg2Size    = sizeof( SET_FRU_ACT_MSG );
-uint8_t  imsg2[imsg2Size];
-size_t   messageSize;
-size_t   responseSize = 0;/*IPMI_RPLY_SET_FRU_ACT_LENGTH_NAT; - determine length */
-uint8_t  cmd   = IPMI_MSG_CMD_SET_FRU_ACT;
-uint8_t  netfn = IPMI_MSG_NETFN_PICMG;
-int      offs = 0; /* determine needed offset */
-
-	memcpy( imsg2, SET_FRU_ACT_MSG, imsg2Size );
-
-	imsg2[IPMI_MSG2_RQADDR_OFFSET] = IPMI_MSG_ADDR_SW;
-	imsg2[IPMI_MSG2_SET_FRU_ACT_FRU_OFFSET] = fru;
-	imsg2[IPMI_MSG2_SET_FRU_ACT_CMD_OFFSET] = parm;
-
-       	messageSize = ipmiMsgBuild( mchData->ipmiSess, message, cmd, netfn, imsg2, imsg2Size, 0, 0, 0, 0, 0, 0 );
-
-	return mchMsgWriteReadHelper( mchData->mchSess, mchData->ipmiSess, message, messageSize, data, &responseSize, cmd, netfn, offs/*need to set codeoffs*/, 0 );
-}
-
-/* Set FRU Activation Policy - For Vadatech MCH, used to deactivate/activate FRU
- *
- * (See ATCA spec 3.2.4.2.2)
- *
- * Activate version causes FRU to transition from "Inactive" to "Activation Request"
- * Deactivate version causes FRU to transition from "Active" to "Deactivation Request"
- * 
- *   RETURNS: status from mchMsgWriteReadHelper
- *            0 on success
- *            non-zero for error
- */
-int 
-mchMsgSetFruActPolicyVt(MchData mchData, uint8_t *data, uint8_t fru, uint8_t mask, uint8_t bits)
-{
-uint8_t  message[MSG_MAX_LENGTH] = { 0 };
-size_t   imsg2Size   = sizeof( SEND_MSG_MSG );
-size_t   b1msg1Size   = sizeof( IPMI_MSG1 );
-size_t   b1msg2Size   = sizeof( SET_FRU_POLICY_MSG );
-uint8_t  imsg2[imsg2Size];
-uint8_t  b1msg1[b1msg1Size];
-uint8_t  b1msg2[b1msg2Size];
-size_t   messageSize;
-size_t   responseSize = IPMI_RPLY_SET_FRU_POLICY_LENGTH_VT;
-uint8_t  cmd   = IPMI_MSG_CMD_SET_FRU_POLICY;
-uint8_t  netfn = IPMI_MSG_NETFN_PICMG;
-
-	memcpy( imsg2, SEND_MSG_MSG   , imsg2Size );
-	memcpy( b1msg1, IPMI_MSG1      , b1msg1Size );
-	memcpy( b1msg2, SET_FRU_POLICY_MSG, b1msg2Size );
-
-	imsg2[IPMI_MSG2_CHAN_OFFSET] = IPMI_MSG_CHAN_IPMB0 + IPMI_MSG_TRACKING;
-
-	b1msg1[IPMI_MSG1_RSADDR_OFFSET]   = IPMI_MSG_ADDR_CM;
-	b1msg1[IPMI_MSG1_NETFNLUN_OFFSET] = netfn << 2;
-
-	b1msg2[IPMI_MSG2_SET_FRU_ACT_FRU_OFFSET] = fru;
-	b1msg2[IPMI_MSG2_SET_FRU_POLICY_MASK_OFFSET] = mask;
-	b1msg2[IPMI_MSG2_SET_FRU_POLICY_BITS_OFFSET] = bits;
-
-	messageSize = ipmiMsgBuild( mchData->ipmiSess, message, cmd, IPMI_MSG_NETFN_APP_REQUEST, imsg2, imsg2Size, b1msg1, b1msg2, b1msg2Size, 0, 0, 0 );
-
-	return mchMsgWriteReadHelper( mchData->mchSess, mchData->ipmiSess, message, messageSize, data, &responseSize, cmd, netfn, 0/*need to set codeoffs*/, 0 );
-}
-
-/* Set FRU Activation Policy using NAT MCH - not yet tested; may be single message like SetFruActNat
- *
- *   RETURNS: status from mchMsgWriteReadHelper
- *            0 on success
- *            non-zero for error
- */
-int
-mchMsgSetFruActPolicyNat(MchData mchData, uint8_t *data, uint8_t fru, uint8_t mask, uint8_t bits)
-{
-uint8_t  message[MSG_MAX_LENGTH] = { 0 };
-size_t   imsg2Size    = sizeof( SEND_MSG_MSG );
-size_t   b1msg1Size   = sizeof( IPMI_MSG1 );
-size_t   b1msg2Size   = sizeof( SEND_MSG_MSG );
-size_t   b2msg1Size   = sizeof( IPMI_MSG1 );
-size_t   b2msg2Size   = sizeof( SET_FRU_POLICY_MSG );
-uint8_t  imsg2[imsg2Size];
-uint8_t  b1msg1[b1msg1Size];
-uint8_t  b1msg2[b1msg2Size];
-uint8_t  b2msg1[b2msg1Size];
-uint8_t  b2msg2[b2msg2Size];
-size_t   messageSize;
-size_t   responseSize = IPMI_RPLY_SET_FRU_POLICY_LENGTH_NAT;
-uint8_t  cmd          = IPMI_MSG_CMD_SET_FRU_POLICY;
-uint8_t  netfn        = IPMI_MSG_NETFN_PICMG;
-int      offs         = IPMI_RPLY_2ND_BRIDGED_OFFSET_NAT;
-
-	memcpy( imsg2,  SEND_MSG_MSG , imsg2Size  );
-	memcpy( b1msg1, IPMI_MSG1    , b1msg1Size );
-
-	imsg2[IPMI_MSG2_CHAN_OFFSET]    = IPMI_MSG_CHAN_IPMB0 + IPMI_MSG_TRACKING;
-	b1msg1[IPMI_MSG1_RSADDR_OFFSET] = IPMI_MSG_ADDR_CM;
-
-	memcpy( b1msg2, SEND_MSG_MSG      , b1msg2Size );
-	memcpy( b2msg1, IPMI_MSG1         , b2msg1Size );
-	memcpy( b2msg2, SET_FRU_POLICY_MSG, b2msg2Size );
-
-	b1msg2[IPMI_MSG2_RQADDR_OFFSET]   = IPMI_MSG_ADDR_BMC;
-	b2msg1[IPMI_MSG1_NETFNLUN_OFFSET] = netfn << 2;
-	b1msg2[IPMI_MSG2_CHAN_OFFSET]     = IPMI_MSG_CHAN_IPMBL + IPMI_MSG_TRACKING;
-	b2msg1[IPMI_MSG1_RSADDR_OFFSET]   = FRU_I2C_ADDR[fru];
-	b2msg2[IPMI_MSG2_SET_FRU_ACT_FRU_OFFSET] = 0; /* 0 for front; 0x80 for rear */
-	b2msg2[IPMI_MSG2_SET_FRU_POLICY_MASK_OFFSET] = mask;
-	b2msg2[IPMI_MSG2_SET_FRU_POLICY_BITS_OFFSET] = bits;
-
-       	messageSize = ipmiMsgBuild( mchData->ipmiSess, message, cmd, IPMI_MSG_NETFN_APP_REQUEST, imsg2, imsg2Size, b1msg1, b1msg2, b1msg2Size, b2msg1, b2msg2, b2msg2Size );
-
-	return mchMsgWriteReadHelper( mchData->mchSess, mchData->ipmiSess, message, messageSize, data, &responseSize, cmd, netfn, offs/*need to set codeoffs*/, 0 );
-}
-
-/* 
- * Based on parm (0 for Deactivate, 1 for Activate),
- * set appropriate mask and bits and call:
- *  ipmiMsgSetFruActPolicyVt for Vadatech MCH or 
- *  ipmiMsgSetFruActNat      for NAT MCH
- *
- * RETURNS:
- *         -1 if illegal parm value 
- *         or retrun value of ipmiMsgSetFruActPolicy (0 on success)
- */
-int
-mchMsgSetFruActHelper(MchData mchData, uint8_t *data, uint8_t fru, int parm) 
-{
-uint8_t mask;
-uint8_t bits;
-
-	mchMsgGetFruActPolicyHelper( mchData, data, fru );
-
-	if ( parm == 0 ) {
-		mask = 1 << 1; /* make this #define */
-		bits = 0;
-	}
-	else if ( parm == 1 ){
-		mask = 1;
-		bits = 0;
-	} 
-	else
-		return -1;
-
-	if ( MCH_IS_NAT( mchData->mchSess->type ) )
-		return mchMsgSetFruActNat( mchData, data, fru, parm );
-	else
-		return mchMsgSetFruActPolicyVt( mchData, data, fru, mask, bits );
-}
-
-/* Get FRU Activation Policy using Vadatech MCH; message contains 1 bridged message -> needs updating 3/23/16
- *
- *   RETURNS: status from mchMsgWriteReadHelper
- *            0 on success
- *            non-zero for error
- */
-int
-mchMsgGetFruActPolicyVt(MchData mchData, uint8_t *data, uint8_t fru)
-{
-uint8_t  message[MSG_MAX_LENGTH] = { 0 };
-size_t   imsg2Size   = sizeof( SEND_MSG_MSG );
-size_t   b1msg1Size   = sizeof( IPMI_MSG1 );
-size_t   b1msg2Size   = sizeof( GET_FAN_PROP_MSG );
-uint8_t  imsg2[imsg2Size];
-uint8_t  b1msg1[b1msg1Size];
-uint8_t  b1msg2[b1msg2Size];
-size_t   messageSize;
-size_t   responseSize = IPMI_RPLY_GET_FRU_POLICY_LENGTH_VT;
-//size_t   responseSize = IPMI_RPLY_GET_FRU_POLICY_LENGTH_VT;
-uint8_t  cmd   = IPMI_MSG_CMD_GET_FRU_POLICY;
-uint8_t  netfn = IPMI_MSG_NETFN_PICMG;
-
-	memcpy( imsg2,  SEND_MSG_MSG, imsg2Size );
-	memcpy( b1msg1, IPMI_MSG1   , b1msg1Size );
-	memcpy( b1msg2, GET_FRU_POLICY_MSG, b1msg2Size );
-
-	imsg2[IPMI_MSG2_CHAN_OFFSET] = IPMI_MSG_CHAN_IPMB0 + IPMI_MSG_TRACKING;
-
-	b1msg1[IPMI_MSG1_RSADDR_OFFSET]   = IPMI_MSG_ADDR_CM;
-	b1msg1[IPMI_MSG1_NETFNLUN_OFFSET] = netfn << 2;
-
-	b1msg2[IPMI_MSG2_SET_FRU_ACT_FRU_OFFSET] = fru;
-
-	messageSize = ipmiMsgBuild( mchData->ipmiSess, message, cmd, IPMI_MSG_NETFN_APP_REQUEST, imsg2, imsg2Size, b1msg1, b1msg2, b1msg2Size, 0, 0, 0 );
-
-	return mchMsgWriteReadHelper( mchData->mchSess, mchData->ipmiSess, message, messageSize, data, &responseSize, cmd, netfn, 0/*need to set codeoffs*/, 0 );
-}
-
-
-/* Get FRU Activation Policy using NAT MCH - not yet tested; may be single message like SetFruActNat
- *
- *   RETURNS: status from mchMsgWriteReadHelper
- *            0 on success
- *            non-zero for error
- */
-int
-mchMsgGetFruActPolicyNat(MchData mchData, uint8_t *data, uint8_t fru)
-{
-uint8_t  message[MSG_MAX_LENGTH] = { 0 };
-size_t   imsg2Size    = sizeof( SEND_MSG_MSG );
-size_t   b1msg1Size   = sizeof( IPMI_MSG1 );
-size_t   b1msg2Size   = sizeof( SEND_MSG_MSG );
-size_t   b2msg1Size   = sizeof( IPMI_MSG1 );
-size_t   b2msg2Size   = sizeof( GET_FRU_POLICY_MSG );
-uint8_t  imsg2[imsg2Size];
-uint8_t  b1msg1[b1msg1Size];
-uint8_t  b1msg2[b1msg2Size];
-uint8_t  b2msg1[b2msg1Size];
-uint8_t  b2msg2[b2msg2Size];
-size_t   messageSize;
-size_t   roffs;
-size_t   payloadSize  = IPMI_RPLY_GET_FRU_POLICY_LENGTH;
-size_t   responseSize = 2*IPMI_MSG1_LENGTH + 2*IPMI_RPLY_IMSG2_SEND_MSG_LENGTH;
-uint8_t  cmd          = IPMI_MSG_CMD_GET_FRU_POLICY;
-uint8_t  netfn        = IPMI_MSG_NETFN_PICMG;
-int      bridged;
-uint8_t  rsAddr, rqAddr;
-
-	mchSetSizeOffs( mchData->ipmiSess, payloadSize, &roffs, &responseSize, &bridged, &rsAddr, &rqAddr );
-
-	memcpy( imsg2,  SEND_MSG_MSG , imsg2Size  );
-	memcpy( b1msg1, IPMI_MSG1    , b1msg1Size );
-
-	imsg2[IPMI_MSG2_CHAN_OFFSET]    = IPMI_MSG_CHAN_IPMB0 + IPMI_MSG_TRACKING;
-	b1msg1[IPMI_MSG1_RSADDR_OFFSET] = IPMI_MSG_ADDR_CM;
-
-	memcpy( b1msg2, SEND_MSG_MSG     , b1msg2Size );
-	memcpy( b2msg1, IPMI_MSG1        , b2msg1Size );
-	memcpy( b2msg2, GET_FRU_POLICY_MSG , b2msg2Size );
-
-	b1msg2[IPMI_MSG2_RQADDR_OFFSET]   = IPMI_MSG_ADDR_BMC;
-	b2msg1[IPMI_MSG1_NETFNLUN_OFFSET] = netfn << 2;
-	b1msg2[IPMI_MSG2_CHAN_OFFSET]     = IPMI_MSG_CHAN_IPMBL + IPMI_MSG_TRACKING;
-	b2msg1[IPMI_MSG1_RSADDR_OFFSET]   = FRU_I2C_ADDR[fru];
-	b2msg2[IPMI_MSG2_SET_FRU_ACT_FRU_OFFSET] = 0;
-
-       	messageSize = ipmiMsgBuild( mchData->ipmiSess, message, cmd, IPMI_MSG_NETFN_APP_REQUEST, imsg2, imsg2Size, b1msg1, b1msg2, b1msg2Size, b2msg1, b2msg2, b2msg2Size );
-
-	return mchMsgWriteReadHelper( mchData->mchSess, mchData->ipmiSess, message, messageSize, data, &responseSize, cmd, netfn, roffs, 0);
-}
-
-int
-mchMsgGetFruActPolicyHelper(MchData mchData, uint8_t *data, uint8_t fru)
-{
-	if ( !( MCH_IS_NAT( mchData->mchSess->type )) )
-		return mchMsgGetFruActPolicyVt( mchData, data, fru );
-	else
-		return mchMsgGetFruActPolicyNat( mchData, data, fru );
-
-}
-
-/* Get Fan Speed Properties using Vadatech MCH; message contains 1 bridged message -> needs updating 3/23/16
- *
- *   RETURNS: status from mchMsgWriteReadHelper
- *            0 on success
- *            non-zero for error
- */
-int
-mchMsgGetFanPropVt(MchData mchData, uint8_t *data, uint8_t fru)
-{
-uint8_t  message[MSG_MAX_LENGTH] = { 0 };
-uint8_t  imsg2Size = sizeof( GET_FAN_PROP_MSG );
-uint8_t  imsg2[imsg2Size];
-size_t   messageSize;
-
-uint8_t  response[MSG_MAX_LENGTH] = { 0 }; 
-size_t   roffs, responseSize, payloadSize = IPMI_RPLY_GET_FAN_PROP_LENGTH; 
-int      rval, offs=0, bridged;
-uint8_t  rsAddr, rqAddr;
-uint8_t  cmd   = IPMI_MSG_CMD_GET_FAN_PROP;
-uint8_t  netfn = IPMI_MSG_NETFN_PICMG;
-
-	mchSetSizeOffs( mchData->ipmiSess, payloadSize, &roffs, &responseSize, &bridged, &rsAddr, &rqAddr);
-
-	memcpy( imsg2, GET_FAN_PROP_MSG, imsg2Size );
-
-	imsg2[IPMI_MSG2_SET_FRU_ACT_FRU_OFFSET] = fru;
-
-	if ( bridged ) // may need to distinguish between once and twice-bridged messages
-		ipmiBuildSendMsg( mchData->ipmiSess, message, &messageSize, cmd, netfn, rsAddr, rqAddr, imsg2, imsg2Size, 0 );
-	else
-		messageSize = ipmiMsgBuild( mchData->ipmiSess, message, cmd, netfn, imsg2, imsg2Size, 0, 0, 0, 0, 0, 0 );
-
-	if ( (rval = mchMsgWriteReadHelper( mchData->mchSess, mchData->ipmiSess, message, messageSize, response, &responseSize, cmd, netfn, offs/*need to set codeoffs*/, 0 )) )
-		goto bail;
-
-	if ( (rval = mchMsgCheckSizes( sizeof( response ), roffs, payloadSize )) ) {
-		printf("mchMsgGetFanPropVt size error\n");
-		goto bail;
-	}
-
-	memcpy( data, response + roffs, payloadSize );
-
-bail:
-	return rval;
-}
-
-/* Get Fan Speed Properties using NAT MCH; message contains 2 bridged messages
- *
- *   RETURNS: status from mchMsgWriteReadHelper
- *            0 on success
- *            non-zero for error
- */
-int
-mchMsgGetFanPropNat(MchData mchData, uint8_t *data, uint8_t fru)
-{
-uint8_t  message[MSG_MAX_LENGTH]  = { 0 };
-uint8_t  response[MSG_MAX_LENGTH] = { 0 };
-size_t   imsg2Size    = sizeof( SEND_MSG_MSG );
-size_t   b1msg1Size   = sizeof( IPMI_MSG1 );
-size_t   b1msg2Size   = sizeof( SEND_MSG_MSG );
-size_t   b2msg1Size   = sizeof( IPMI_MSG1 );
-size_t   b2msg2Size   = sizeof( GET_FAN_PROP_MSG );
-uint8_t  imsg2[imsg2Size];
-uint8_t  b1msg1[b1msg1Size];
-uint8_t  b1msg2[b1msg2Size];
-uint8_t  b2msg1[b2msg1Size];
-uint8_t  b2msg2[b2msg2Size];
-size_t   messageSize;
-size_t   roffs;
-size_t   payloadSize  = IPMI_RPLY_GET_FAN_PROP_LENGTH;
-size_t   responseSize = 2*IPMI_MSG1_LENGTH + 2*IPMI_RPLY_IMSG2_SEND_MSG_LENGTH;
-uint8_t  cmd          = IPMI_MSG_CMD_GET_FAN_PROP;
-uint8_t  netfn        = IPMI_MSG_NETFN_PICMG;
-int      rval, bridged;
-uint8_t  rsAddr, rqAddr;
-
-	mchSetSizeOffs( mchData->ipmiSess, payloadSize, &roffs, &responseSize, &bridged, &rsAddr, &rqAddr );
-
-	memcpy( imsg2,  SEND_MSG_MSG , imsg2Size  );
-	memcpy( b1msg1, IPMI_MSG1    , b1msg1Size );
-
-	imsg2[IPMI_MSG2_CHAN_OFFSET]    = IPMI_MSG_CHAN_IPMB0 + IPMI_MSG_TRACKING;
-	b1msg1[IPMI_MSG1_RSADDR_OFFSET] = IPMI_MSG_ADDR_CM;
-
-	memcpy( b1msg2, SEND_MSG_MSG      , b1msg2Size );
-	memcpy( b2msg1, IPMI_MSG1         , b2msg1Size );
-	memcpy( b2msg2, GET_FAN_PROP_MSG , b2msg2Size );
-
-	b1msg2[IPMI_MSG2_RQADDR_OFFSET]   = IPMI_MSG_ADDR_BMC;
-	b2msg1[IPMI_MSG1_NETFNLUN_OFFSET] = netfn << 2;
-	b1msg2[IPMI_MSG2_CHAN_OFFSET]     = IPMI_MSG_CHAN_IPMBL + IPMI_MSG_TRACKING;
-	b2msg1[IPMI_MSG1_RSADDR_OFFSET]   = FRU_I2C_ADDR[fru];
-	b2msg2[IPMI_MSG2_SET_FRU_ACT_FRU_OFFSET] = 0;
-
-       	messageSize = ipmiMsgBuild( mchData->ipmiSess, message, cmd, IPMI_MSG_NETFN_APP_REQUEST, imsg2, imsg2Size, b1msg1, b1msg2, b1msg2Size, b2msg1, b2msg2, b2msg2Size );
-
-	if ( (rval = mchMsgWriteReadHelper( mchData->mchSess, mchData->ipmiSess, message, messageSize, response, &responseSize, cmd, netfn, roffs, 0 )) )
-		goto bail;
-
-	if ( (rval = mchMsgCheckSizes( sizeof( response ), roffs, payloadSize )) ) {
-		printf("mchMsgGetFanPropNat size error\n");
-		goto bail;
-	}
-
-	memcpy( data, response + roffs, payloadSize );
-    
-bail:
-	return rval;
-}
-
-int
-mchMsgGetFanPropHelper(MchData mchData, uint8_t *data, uint8_t fru)
-{
-	if ( MCH_IS_NAT( mchData->mchSess->type ) )
-		return mchMsgGetFanPropNat( mchData, data, fru );
-	else
-		return mchMsgGetFanPropVt( mchData, data, fru );
-
-}
-
-/* -> needs updating 3/23/16 */
-int
-mchMsgGetFanLevelVt(MchData mchData, uint8_t *data, uint8_t fru)
-{
-uint8_t  message[MSG_MAX_LENGTH] = { 0 };
-uint8_t  imsg2Size = sizeof( GET_FAN_LEVEL_MSG );
-uint8_t  imsg2[imsg2Size];
-size_t   messageSize;
-
-uint8_t  response[MSG_MAX_LENGTH] = { 0 }; 
-size_t   roffs, responseSize, payloadSize = IPMI_RPLY_GET_FAN_LEVEL_LENGTH; 
-int      rval, offs=0, bridged;
-uint8_t  rsAddr, rqAddr;
-uint8_t  cmd   = IPMI_MSG_CMD_GET_FAN_LEVEL;
-uint8_t  netfn = IPMI_MSG_NETFN_PICMG;
-
-	mchSetSizeOffs( mchData->ipmiSess, payloadSize, &roffs, &responseSize, &bridged, &rsAddr, &rqAddr);
-
-	memcpy( imsg2, GET_FAN_LEVEL_MSG, imsg2Size );
-
-	imsg2[IPMI_MSG2_SET_FRU_ACT_FRU_OFFSET]      = fru;
-
-	if ( bridged ) // may need to distinguish between once and twice-bridged messages
-		ipmiBuildSendMsg( mchData->ipmiSess, message, &messageSize, cmd, netfn, rsAddr, rqAddr, imsg2, imsg2Size, 0 );
-	else
-		messageSize = ipmiMsgBuild( mchData->ipmiSess, message, cmd, netfn, imsg2, imsg2Size, 0, 0, 0, 0, 0, 0 );
-
-	if ( (rval = mchMsgWriteReadHelper( mchData->mchSess, mchData->ipmiSess, message, messageSize, response, &responseSize, cmd, netfn, offs/*need to set codeoffs*/, 0 )) )
-		goto bail;
-
-	if ( (rval = mchMsgCheckSizes( sizeof( response ), roffs, payloadSize )) ) {
-		printf("mchMsgGetFanLevelVt size error\n");
-		goto bail;
-	}
-
-	memcpy( data, response + roffs, payloadSize );
-
-bail:
-	return rval;
-}
-
-/* Get Fan Level using NAT MCH; message contains 2 bridged messages 
- *
- *   RETURNS: status from mchMsgWriteReadHelper
- *            0 on success
- *            non-zero for error
- */
-int
-mchMsgGetFanLevelNat(MchData mchData, uint8_t *data, uint8_t fru)
-{
-uint8_t  message[MSG_MAX_LENGTH]  = { 0 };
-uint8_t  response[MSG_MAX_LENGTH] = { 0 };
-size_t   imsg2Size    = sizeof( SEND_MSG_MSG );
-size_t   b1msg1Size   = sizeof( IPMI_MSG1 );
-size_t   b1msg2Size   = sizeof( SEND_MSG_MSG );
-size_t   b2msg1Size   = sizeof( IPMI_MSG1 );
-size_t   b2msg2Size   = sizeof( GET_FAN_LEVEL_MSG );
-uint8_t  imsg2[imsg2Size];
-uint8_t  b1msg1[b1msg1Size];
-uint8_t  b1msg2[b1msg2Size];
-uint8_t  b2msg1[b2msg1Size];
-uint8_t  b2msg2[b2msg2Size];
-size_t   messageSize;
-size_t   roffs;
-size_t   payloadSize  = IPMI_RPLY_GET_FAN_LEVEL_LENGTH;
-size_t   responseSize = 2*IPMI_MSG1_LENGTH + 2*IPMI_RPLY_IMSG2_SEND_MSG_LENGTH;
-uint8_t  cmd          = IPMI_MSG_CMD_GET_FAN_LEVEL;
-uint8_t  netfn        = IPMI_MSG_NETFN_PICMG;
-int      rval, bridged;
-uint8_t  rsAddr, rqAddr;
-
-	mchSetSizeOffs( mchData->ipmiSess, payloadSize, &roffs, &responseSize, &bridged, &rsAddr, &rqAddr );
-
-	memcpy( imsg2,  SEND_MSG_MSG , imsg2Size  );
-	memcpy( b1msg1, IPMI_MSG1    , b1msg1Size );
-
-	imsg2[IPMI_MSG2_CHAN_OFFSET]    = IPMI_MSG_CHAN_IPMB0 + IPMI_MSG_TRACKING;
-	b1msg1[IPMI_MSG1_RSADDR_OFFSET] = IPMI_MSG_ADDR_CM;
-
-	memcpy( b1msg2, SEND_MSG_MSG      , b1msg2Size );
-	memcpy( b2msg1, IPMI_MSG1         , b2msg1Size );
-	memcpy( b2msg2, GET_FAN_LEVEL_MSG , b2msg2Size );
-
-	b1msg2[IPMI_MSG2_RQADDR_OFFSET]   = IPMI_MSG_ADDR_BMC;
-	b2msg1[IPMI_MSG1_NETFNLUN_OFFSET] = netfn << 2;
-	b1msg2[IPMI_MSG2_CHAN_OFFSET]     = IPMI_MSG_CHAN_IPMBL + IPMI_MSG_TRACKING;
-	b2msg1[IPMI_MSG1_RSADDR_OFFSET]   = FRU_I2C_ADDR[fru];
-	b2msg2[IPMI_MSG2_SET_FRU_ACT_FRU_OFFSET] = 0;
-
-       	messageSize = ipmiMsgBuild( mchData->ipmiSess, message, cmd, IPMI_MSG_NETFN_APP_REQUEST, imsg2, imsg2Size, b1msg1, b1msg2, b1msg2Size, b2msg1, b2msg2, b2msg2Size );
-
-	if ( (rval = mchMsgWriteReadHelper( mchData->mchSess, mchData->ipmiSess, message, messageSize, response, &responseSize, cmd, netfn, roffs, 0 )) )
-		goto bail;
-
-	if ( (rval = mchMsgCheckSizes( sizeof( response ), roffs, payloadSize )) ) {
-		printf("mchMsgGetFanLevelNat size error\n");
-		goto bail;
-	}
-
-	memcpy( data, response + roffs, payloadSize );
-
-bail:    
-	return rval;
-}
-
-/* Details of this algorithm specified in PICMG 3.0 Rev 3.0 ATCA Base Spec, Table 3-87 */
-int
-mchMsgGetFanLevelHelper(MchData mchData, uint8_t *data, uint8_t fruId, uint8_t fanProp, uint8_t *level)
-{
-int rval;
-uint8_t llevel, olevel, lenabled;
-
-	if ( MCH_IS_NAT( mchData->mchSess->type ) )
-		rval = mchMsgGetFanLevelNat( mchData, data, fruId );
-	else
-		rval = mchMsgGetFanLevelVt(  mchData, data, fruId );
-
-	if ( rval )
-		return rval;
-
-	olevel = data[PICMG_RPLY_IMSG2_GET_FAN_OVERRIDE_LEVEL_OFFSET];
-
-	if ( PICMG_FAN_LOCAL_CONTROL_SUPPORTED(fanProp) ) {
-
-		llevel   = data[PICMG_RPLY_IMSG2_GET_FAN_LOCAL_LEVEL_OFFSET];
-		lenabled = data[ PICMG_RPLY_IMSG2_GET_FAN_LOCAL_ENABLED_OFFSET];
-
-		if ( olevel == 0xFF )
-			*level = llevel;
-
-		else if ( lenabled )
-			*level = (llevel > olevel) ? llevel : olevel;
-
-		else if ( (0xFE==llevel) || (0xFE==olevel) )
-			*level = -1; /* Shut down state; arbitrarily choose -1 for this state for now */
-
-		else
-			*level = olevel;
-	}
-	else
-		*level = olevel;
-
-	return rval;
-}
-
-/* Set Fan Level using Vadatech MCH; message contains 1 bridged message  -> needs updating 3/23/16
- *
- *   RETURNS: status from mchMsgWriteReadHelper
- *            0 on success
- *            non-zero for error
- */
-int
-mchMsgSetFanLevelVt(MchData mchData, uint8_t *data, uint8_t fru, uint8_t level)
-{
-uint8_t  message[MSG_MAX_LENGTH] = { 0 };
-uint8_t  imsg2Size = sizeof( SET_FAN_LEVEL_MSG );
-uint8_t  imsg2[imsg2Size];
-size_t   messageSize;
-
-uint8_t  response[MSG_MAX_LENGTH] = { 0 }; 
-size_t   roffs, responseSize, payloadSize = IPMI_RPLY_SET_FAN_LEVEL_LENGTH; 
-int      rval, offs=0, bridged;
-uint8_t  rsAddr, rqAddr;
-uint8_t  cmd   = IPMI_MSG_CMD_SET_FAN_LEVEL;
-uint8_t  netfn = IPMI_MSG_NETFN_PICMG;
-
-	mchSetSizeOffs( mchData->ipmiSess, payloadSize, &roffs, &responseSize, &bridged, &rsAddr, &rqAddr);
-
-	memcpy( imsg2, SET_FAN_LEVEL_MSG, imsg2Size );
-
-	imsg2[IPMI_MSG2_SET_FRU_ACT_FRU_OFFSET] = fru;
-	imsg2[IPMI_MSG2_SET_FAN_LEVEL_OFFSET]   = level;
-
-	if ( bridged ) // may need to distinguish between once and twice-bridged messages
-		ipmiBuildSendMsg( mchData->ipmiSess, message, &messageSize, cmd, netfn, rsAddr, rqAddr, imsg2, imsg2Size, 0 );
-	else
-		messageSize = ipmiMsgBuild( mchData->ipmiSess, message, cmd, netfn, imsg2, imsg2Size, 0, 0, 0, 0, 0, 0 );
-
-	if ( (rval = mchMsgWriteReadHelper( mchData->mchSess, mchData->ipmiSess, message, messageSize, response, &responseSize, cmd, netfn, offs/*need to set codeoffs*/, 0 )) )
-		goto bail;
-
-	if ( (rval = mchMsgCheckSizes( sizeof( response ), roffs, payloadSize )) ) {
-		printf("mchMsgSetFanLevelVt size error\n");
-		goto bail;
-	}
-	memcpy( data, response + roffs, payloadSize );
-
-bail:
-	return rval;
-}
-
-/* Set Fan Level using NAT MCH; message contains 2 bridged messages
- *
- *   RETURNS: status from mchMsgWriteReadHelper
- *            0 on success
- *            non-zero for error
- */
-int
-mchMsgSetFanLevelNat(MchData mchData, uint8_t *data, uint8_t fru, uint8_t level)
-{
-uint8_t  message[MSG_MAX_LENGTH]  = { 0 };
-uint8_t  response[MSG_MAX_LENGTH] = { 0 };
-size_t   imsg2Size    = sizeof( SEND_MSG_MSG );
-size_t   b1msg1Size   = sizeof( IPMI_MSG1 );
-size_t   b1msg2Size   = sizeof( SEND_MSG_MSG );
-size_t   b2msg1Size   = sizeof( IPMI_MSG1 );
-size_t   b2msg2Size   = sizeof( GET_FAN_LEVEL_MSG );
-uint8_t  imsg2[imsg2Size];
-uint8_t  b1msg1[b1msg1Size];
-uint8_t  b1msg2[b1msg2Size];
-uint8_t  b2msg1[b2msg1Size];
-uint8_t  b2msg2[b2msg2Size];
-size_t   messageSize;
-size_t   offs         = IPMI_RPLY_2ND_BRIDGED_OFFSET_NAT;
-size_t   roffs        = IPMI_RPLY_HEADER_LENGTH + 3 + offs;
-size_t   payloadSize  = IPMI_RPLY_SET_FAN_LEVEL_LENGTH;
-size_t   responseSize = roffs + payloadSize + FOOTER_LENGTH;
-uint8_t  cmd          = IPMI_MSG_CMD_SET_FAN_LEVEL;
-uint8_t  netfn        = IPMI_MSG_NETFN_PICMG;
-int      rval;
-
-	memcpy( imsg2,  SEND_MSG_MSG , imsg2Size  );
-	memcpy( b1msg1, IPMI_MSG1    , b1msg1Size );
-
-	imsg2[IPMI_MSG2_CHAN_OFFSET]    = IPMI_MSG_CHAN_IPMB0 + IPMI_MSG_TRACKING;
-	b1msg1[IPMI_MSG1_RSADDR_OFFSET] = IPMI_MSG_ADDR_CM;
-
-	memcpy( b1msg2, SEND_MSG_MSG      , b1msg2Size );
-	memcpy( b2msg1, IPMI_MSG1         , b2msg1Size );
-	memcpy( b2msg2, SET_FAN_LEVEL_MSG , b2msg2Size );
-
-	b1msg2[IPMI_MSG2_RQADDR_OFFSET]   = IPMI_MSG_ADDR_BMC;
-	b2msg1[IPMI_MSG1_NETFNLUN_OFFSET] = netfn << 2;
-	b1msg2[IPMI_MSG2_CHAN_OFFSET]     = IPMI_MSG_CHAN_IPMBL + IPMI_MSG_TRACKING;
-	b2msg1[IPMI_MSG1_RSADDR_OFFSET]   = FRU_I2C_ADDR[fru];
-	b2msg2[IPMI_MSG2_SET_FRU_ACT_FRU_OFFSET] = 0;
-	b2msg2[IPMI_MSG2_SET_FAN_LEVEL_OFFSET] = level;
-
-       	messageSize = ipmiMsgBuild( mchData->ipmiSess, message, cmd, IPMI_MSG_NETFN_APP_REQUEST, imsg2, imsg2Size, b1msg1, b1msg2, b1msg2Size, b2msg1, b2msg2, b2msg2Size );
-
-	if ( (rval = mchMsgWriteReadHelper( mchData->mchSess, mchData->ipmiSess, message, messageSize, response, &responseSize, cmd, netfn, offs/*need to set codeoffs*/, 0 )) )
-		goto bail;
-
-	if ( (rval = mchMsgCheckSizes( sizeof( response ), roffs, payloadSize )) ) {
-		printf("mchMsgSetFanLevelNat size error\n");
-		goto bail;
-	}
-	memcpy( data, response + roffs, payloadSize );
-    
-bail:
-	return rval;
-}
-
-int
-mchMsgSetFanLevelHelper(MchData mchData, uint8_t *data, uint8_t fru, uint8_t level)
-{
-	if ( MCH_IS_NAT( mchData->mchSess->type ) )
-		return mchMsgSetFanLevelNat( mchData, data, fru, level );
-	else
-		return mchMsgSetFanLevelVt( mchData, data, fru, level );
-}
-
-/*  -> needs updating 3/23/16 */
-int
-mchMsgGetPowerLevelVt(MchData mchData, uint8_t *data, uint8_t fru, uint8_t parm)
-{
-uint8_t  message[MSG_MAX_LENGTH] = { 0 };
-uint8_t  imsg2Size = sizeof( GET_POWER_LEVEL_MSG );
-uint8_t  imsg2[imsg2Size];
-size_t   messageSize;
-
-uint8_t  response[MSG_MAX_LENGTH] = { 0 }; 
-size_t   roffs, responseSize, payloadSize = IPMI_RPLY_GET_POWER_LEVEL_LENGTH; 
-int      rval, offs=0, bridged;
-uint8_t  rsAddr, rqAddr;
-uint8_t  cmd   = IPMI_MSG_CMD_GET_POWER_LEVEL;
-uint8_t  netfn = IPMI_MSG_NETFN_PICMG;
-
-	mchSetSizeOffs( mchData->ipmiSess, payloadSize, &roffs, &responseSize, &bridged, &rsAddr, &rqAddr);
-
-	memcpy( imsg2, GET_POWER_LEVEL_MSG, imsg2Size );
-
-	imsg2[IPMI_MSG2_SET_FRU_ACT_FRU_OFFSET]      = fru;
-	imsg2[PICMG_RPLY_IMSG2_GET_POWER_LEVEL_TYPE_OFFSET] = parm;
-
-	if ( bridged ) // may need to distinguish between once and twice-bridged messages
-		ipmiBuildSendMsg( mchData->ipmiSess, message, &messageSize, cmd, netfn, rsAddr, rqAddr, imsg2, imsg2Size, 0 );
-	else
-		messageSize = ipmiMsgBuild( mchData->ipmiSess, message, cmd, netfn, imsg2, imsg2Size, 0, 0, 0, 0, 0, 0 );
-
-	if ( (rval = mchMsgWriteReadHelper( mchData->mchSess, mchData->ipmiSess, message, messageSize, response, &responseSize, cmd, netfn, offs/*need to set codeoffs*/, 0 )) )
-		goto bail;
-
-	if ( (rval = mchMsgCheckSizes( sizeof( response ), roffs, payloadSize )) ) {
-		printf("mchMsgGetPowerLevelVt size error\n");
-		goto bail;
-	}
-	memcpy( data, response + roffs, payloadSize );
-
-bail:
-	return rval;
-}
