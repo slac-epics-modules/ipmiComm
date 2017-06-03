@@ -15,3 +15,7 @@ CROSS_COMPILER_TARGET_ARCHS =
 # You must rebuild in the iocBoot directory for this to
 # take effect.
 #IOCS_APPL_TOP = <path to application top as seen by IOC>
+
+# Generate a static build
+SHARED_LIBRARIES=NO
+STATIC_BUILD=YES
