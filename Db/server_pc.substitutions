@@ -1,8 +1,8 @@
 #==============================================================================
 #
-# Abs:  Populate super micro server PVs
+# Abs:  Populate Supermicro and Advantech server PVs
 #
-# Name:  server_supermicro.substitutions
+# Name:  server_pc.substitutions
 #
 # Macros in:
 #	dev     Shelf name, for example CRAT:LI28:RF01

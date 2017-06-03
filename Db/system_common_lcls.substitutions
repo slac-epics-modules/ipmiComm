@@ -1,0 +1,25 @@
+#==============================================================================
+#
+# Abs:  Populate system-level LCLS-specific PVs
+#
+# Name:  system_common_lcls.substitutions
+#
+# Macros in:
+#	dev     Shelf name, for example CRAT:LI28:RF01
+# 	other macros define LCLS 'type' values for each of our supported devices
+#
+#==============================================================================
+#
+
+file system_common_facility.template
+{
+   pattern { dev	, unknown	, vadatech 	, nat	, supermicro	, pentair	, artesyn	, advantech	}
+           { $(dev)	, 25		, 26		, 27	, 28		, 30		, 30		, 28		}
+}	   		  	
+	   		  	
+	   		  	
+	   		  	
+	   		  	
+	   		  	
+	   		  	
+	   		  	

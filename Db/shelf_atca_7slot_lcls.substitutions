@@ -1,0 +1,36 @@
+#==============================================================================
+#
+# Abs:  Populate LCLS ATCA shelf PVs
+#
+# Name:  shelf_atca_7slot_lcls.substitutions
+#
+# Macros in:
+#	crat    Shelf name, for example CRAT:LI28:RF01
+#       node    Name of shelf used in asynIPPortConfigure in st.cmd, for example crat-li28-rf01
+#	id      String identifier, for example 'CU' for cooling unit
+#       unit    Instance of this type of module, for example 2 for the second MCH in a shelf
+#	loca	Building, rack, elevation
+#
+#
+# Macros out:
+#
+#       dev     Shelf Name, for example CRAT:LI28:RF01
+#       link    Name of shelf used in asynIPPortConfigure in st.cmd, for example crat-li28-rf01
+#	location Building, rack, elevation
+#
+#
+#==============================================================================
+#
+
+file shelf_atca_7slot.db
+{
+   pattern { dev	, link		, location	}
+	   { $(dev)	, $(link)	, $(location)	}	
+}
+
+file system_common_lcls.db
+{
+   pattern { dev	, link		, location	}
+	   { $(dev)	, $(link)	, $(location)	}	
+}
+

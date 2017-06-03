@@ -1,6 +1,5 @@
 record(mbbi, "$(dev):TYPE_RAW") {
-# DESC filled in by device support
- field(DESC, "")
+ field(DESC, "Device type")
  field(DTYP, "MCHsensor")
  field(SCAN, "I/O Intr")
  field(INP, "#B0 C0 N0 @$(link)+mch")
@@ -16,29 +15,16 @@ record(mbbi, "$(dev):TYPE_RAW") {
  field(THST, "Supermicro")
  field(THVL, "3")
  field(THSV, "NO_ALARM")
+ field(FRST, "Pentair")
+ field(FRVL, "4")
+ field(FRSV, "NO_ALARM")
+ field(FVVL, "5")
+ field(FVST, "Artesyn")
+ field(FVSV, "NO_ALARM")
+ field(FVVL, "6")
+ field(FVST, "Advantech")
+ field(FVSV, "NO_ALARM")
  field(PINI, "YES")
- field(FLNK, "$(dev):TYPE_CALC")
-}
-
-# Convert to TYPE numbers used at SLAC
-# and push DESC field to high-level TYPE PV
-record(calc, "$(dev):TYPE_CALC") {
-  field(CALC, "A+25")
-  field(INPA, "$(dev):TYPE_RAW")
-  field(FLNK, "$(dev):TYPE_DESC")
-}
-
-record(stringout, "$(dev):TYPE_DESC") {
-  field(OMSL, "closed_loop")
-  field(DOL,  "$(dev):TYPE_RAW.DESC")
-  field(OUT,  "$(dev):TYPE.DESC")
-  field(FLNK, "$(dev):TYPE")
-}
-
-record(ai, "$(dev):TYPE") {
-# DESC filled in by TYPE_DESC PV
-  field(DESC, "")
-  field(INP, "$(dev):TYPE_CALC")
 }
 
 record(stringin, "$(dev):LOC") {
@@ -118,9 +104,10 @@ record(bo, "$(dev):CONNECT") {
  field(ZSV,  "MAJOR")
  field(ONAM, "Connect")
  field(OSV,  "NO_ALARM")
+ field(VAL, "1")
  field(RVAL, "1")
  field(PINI, "YES") 
- info(autosaveFields,"VAL")
+ info(autosaveFields,"VAL RVAL")
 }
 
 # Add power on, power off, hard-reset, and msg
@@ -176,6 +163,23 @@ record(seq, "$(dev):HARDRESETSEQ") {
   field(LNK3, "$(dev):POWERMSG PP")
 }                                   
 
+record(bo, "$(dev):SOFTSHUTDOWN") {     
+  field(DESC, "Soft shutdown system")            
+  field(FLNK, "$(dev):SOFTSHUTDOWNSEQ")
+  field(PINI, "NO")             
+}                                               
+
+record(seq, "$(dev):SOFTSHUTDOWNSEQ") {
+  field(SELM, "All")               
+  field(DOL1, "1")                 
+  field(LNK1, "$(dev):POWERMSG PP")
+  field(DOL2, "5")                 
+  field(LNK2, "$(dev):POWERCTL PP")
+  field(DLY3, "5")                
+  field(DOL3, "0")                
+  field(LNK3, "$(dev):POWERMSG PP")
+}                                   
+
 record(mbbo, "$(dev):POWERMSG") {
   field(ZRVL, "0")               
   field(ONVL, "1")               
@@ -195,7 +199,7 @@ record(mbbo, "$(dev):POWERMSG") {
 # Sends 'Chassis Power' IPMI command
 # Vadatech MCH results are unreliable
 # NAT MCH does not implement this command
-# Dell Server does seem to work
+# Dell Server and ATCA crates do seem to implement this
 record(mbbo, "$(dev):POWERCTL") {
  field(DTYP, "MCHsensor")
  field(OMSL, "supervisory")
@@ -206,6 +210,10 @@ record(mbbo, "$(dev):POWERCTL") {
  field(ONST, "Power on")
  field(THVL, "3")
  field(THST, "Hard reset")
+# Soft shutdown required by PICMG 3.0
+# Tested in ATCA, but not MicroTCA
+ field(FVVL, "5")
+ field(FVST, "Soft shutdown")
  field(VAL, "1")
 }
 
