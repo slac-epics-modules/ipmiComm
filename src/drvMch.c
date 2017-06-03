@@ -352,7 +352,9 @@ int i;
 			return -1;
 
 		case FRU_DATA_TYPE_BINARY:
-			printf("\nFRU field data type binary or unspecified. Add support!\n");
+#ifdef DEBUG
+	printf("\nFRU field data type binary or unspecified. Add support!\n");
+#endif
 			field->length = 2*field->rlength;
 			if ( mchFruFieldCheckLength(field->length , FRU_FIELD_LENGTH_TYPE_CONVERTED ) )
 				return -1;
@@ -1675,8 +1677,6 @@ uint8_t  chan = 0;
 			if ( mchSdrGetData( mchData, IPMI_SDRREP_PARM_GET_DEV_SDR, addr, chan, &mgmt->sdrRep ) ) {
 				printf("mchSdrGetDataAll: Error in reading mgmt %i SDR\n", i);
 			}
-			else
-				printf("mchSdrGetDataAll: Successfully read mgmt %i SDR\n", i);
 		}
 
 		/* If provides FRU info, create a FRU instance for it in our data structure */
