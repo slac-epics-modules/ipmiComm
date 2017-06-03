@@ -1,3 +1,26 @@
+02Jun2017 (SH)
+Release: ipmiComm-R4-0-0
+
+* N.B: * 
+* Not tested with Vadatech MicroTCA MCH *
+* Workaround in place for Advantech non-increasing sequence numbers *
+
+Many many changes. 
+
+- Add support for ATCA systems, which includes support for 
+  associated entitities
+- Add support for Advantech server (combine with Supermicro in 'ServerPc')
+- Move architecture and vendor specific functionality to callbacks
+- Change memory allocations to be static and at init with these exceptions:
+--- mchSys->sens array. Sizes can vary wildly based on architecture, so
+    alloc/realloc at init, then free before subsequent configuration re-reads.
+--- Temporary blocks of memory that are immediately freed
+--- FRU and MGMT 'associated entities' arrays; these are also alloc-ed at init,
+    then freed on subsequent configuration re-reads
+- Add facility-specific database with accompanying subroutine. Used to
+  translate ipmiComm device types to LCLS IOCManager values
+- configure/CONFIG - change to static build for testing 
+
 28May2016 (SH)
 Release: ipmiComm-R3-0-2
 
