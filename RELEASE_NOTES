@@ -1,3 +1,13 @@
+ipmiComm-R4-0-0:  02-Jun-2017 S. Hoobler
+		  N.B: 
+		       * Not tested with Vadatech MicroTCA MCH *
+		       * Workaround in place for Advantech non-increasing sequence numbers *
+		  Many changes:
+		  Add support for ATCA and Advantech.
+		  Move architecture/vendor-specific functionality to callbacks.
+		  Changes to memory allocation.
+		  Create facility (LCLS) specific database files to be consistent with IOCManager.
+
 ipmiComm-R3-0-3:  11-Oct-2016 S. Hoobler
 		  Revert to asyn-R4-21_1-0 to be consistent with IOCManager
 
