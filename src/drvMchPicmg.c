@@ -14,6 +14,14 @@
 #include <ipmiMsg.h>
 #include <picmgDef.h>
 
+/* Arbitrary limit on numbers of FRUs
+ * and management controllers. Implemented to
+ * limit memory usage. Can be increased if
+ * necessary
+ */
+static int MAX_MGMT_ATCA = 10;
+static int MAX_FRU_ATCA  = 25;
+
 /* Get Address Info - this is version that attempts to get physical location 
  *                    information for a specific device using IPMB-0 address
  *
@@ -181,6 +189,13 @@ int dbg = MCH_DBG( mchStat[mchData->mchSess->instance] );
 			}
 		}
 	}
+}
+
+static void
+assign_sys_sizes_atca(MchData mchData)
+{
+	mchData->mchSys->fruCountMax  = MAX_FRU_ATCA;
+	mchData->mchSys->mgmtCountMax = MAX_MGMT_ATCA;
 }
 
 /* 
@@ -1284,7 +1299,7 @@ MchCbRec drvMchMicrotcaNatCb = {
 };
 
 MchCbRec drvMchAtcaCb = {
-    assign_sys_sizes: 0,   
+    assign_sys_sizes: assign_sys_sizes_atca,   
     assign_site_info: assign_site_info_atca,
     assign_fru_lkup:  assign_fru_lkup_atca,
     fru_data_suppl:   fru_data_suppl_picmg,
