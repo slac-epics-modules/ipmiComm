@@ -19,11 +19,13 @@ BASE_MODULE_VERSION=
 # IOC apps or other Support apps
 # =============================================================
 ASYN_MODULE_VERSION=asyn-R4-25-spear1
+IOCADMIN_MODULE_VERSION=iocStats-R3-1-12-spear1
 
 # ============================================================
 # Support module locations
 # ============================================================
 ASYN=$(EPICS_MODULES_TOP)/asyn/$(ASYN_MODULE_VERSION)
+IOCADMIN=$(EPICS_MODULES_TOP)/iocStats/$(IOCADMIN_MODULE_VERSION)
 
 # =================================================================
 # Define EPICS_BASE
