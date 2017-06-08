@@ -7,7 +7,7 @@
 #	dev      Shelf name, for example CRAT:LI28:RF01
 #	prefix   String in PV name that identifies the FRU sensor is associated with (if there is one)
 #		 PV name syntax: $(dev):$(prefix)$(attr)$(sensinst)
-#		 For microTCA systems, prefix is "<frutype><instance>_", for example AMC1_ for the first AMC
+#		 For atca systems, prefix is "<frutype><instance>_", for example FB1_ for the first FB
 #		 or CU2_ for the second cooling unit
 #		 For supermicro, the sensors are not associated with a FRU, so prefix is an empty string
 #	aliasprefix Temporary string to keep PV names backward-compatible via alias

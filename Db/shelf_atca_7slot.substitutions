@@ -44,18 +44,18 @@ file fru_basic.db
 file fru_atca_amc.db
 {
    pattern { dev	, id	, unit	, fruid	}
-           { $(dev)	, AMC	, 1  	, 5	}
-           { $(dev)	, AMC	, 2  	, 6	}
-           { $(dev)	, AMC	, 3  	, 7	}
-           { $(dev)	, AMC	, 4  	, 8	}
-           { $(dev)	, AMC	, 5  	, 9	}
-           { $(dev)	, AMC	, 6  	, 10	}
-           { $(dev)	, AMC	, 7  	, 11	}
-#           { $(dev)	, AMC	, 8  	, 12	}
-#           { $(dev)	, AMC	, 9  	, 13	}
-#           { $(dev)	, AMC	, 10  	, 14	}
-#           { $(dev)	, AMC	, 11  	, 15	}
-#           { $(dev)	, AMC	, 12  	, 16	}
+           { $(dev)	, FB	, 1  	, 5	}
+           { $(dev)	, FB	, 2  	, 6	}
+           { $(dev)	, FB	, 3  	, 7	}
+           { $(dev)	, FB	, 4  	, 8	}
+           { $(dev)	, FB	, 5  	, 9	}
+           { $(dev)	, FB	, 6  	, 10	}
+           { $(dev)	, FB	, 7  	, 11	}
+#           { $(dev)	, FB	, 8  	, 12	}
+#           { $(dev)	, FB	, 9  	, 13	}
+#           { $(dev)	, FB	, 10  	, 14	}
+#           { $(dev)	, FB	, 11  	, 15	}
+#           { $(dev)	, FB	, 12  	, 16	}
 }
 
 file fru_atca_rtm.db
