@@ -38,7 +38,7 @@ record(stringout, "$(dev):TYPE_DESC") {
   field(OMSL, "closed_loop")
   field(DOL,  "$(dev):TYPE_RAW")
   field(OUT,  "$(dev):TYPE.DESC")
-  field(FLNK, "$(dev):TYPE_SUB")
+  field(FLNK, "$(dev):TYPE")
 }
 
 # DESC filled in by TYPE_DESC PV
