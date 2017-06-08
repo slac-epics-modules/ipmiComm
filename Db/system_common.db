@@ -21,9 +21,9 @@ record(mbbi, "$(dev):TYPE_RAW") {
  field(FVVL, "5")
  field(FVST, "Artesyn")
  field(FVSV, "NO_ALARM")
- field(FVVL, "6")
- field(FVST, "Advantech")
- field(FVSV, "NO_ALARM")
+ field(SXVL, "6")
+ field(SXST, "Advantech")
+ field(SXSV, "NO_ALARM")
  field(PINI, "YES")
 }
 
