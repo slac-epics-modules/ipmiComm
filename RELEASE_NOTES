@@ -1,3 +1,10 @@
+ipmiComm-R4-0-1:  14-Jun-2017 S. Hoobler
+		  (See Changelog for details)
+		  Fix 'green' sensor records when system offline
+		  Add ability to override sensor scan period for special cases/problematic systems
+		  Fix ATCA db file names
+		  Add iocAdmin to configure/RELEASE_SPEAR
+
 ipmiComm-R4-0-0:  02-Jun-2017 S. Hoobler
 		  N.B: 
 		       * Not tested with Vadatech MicroTCA MCH *
