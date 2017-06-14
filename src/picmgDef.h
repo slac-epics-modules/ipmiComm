@@ -217,7 +217,7 @@ extern uint8_t FRU_I2C_ADDR[102];
 #define PICMG_ENTITY_ID_FRONT_BOARD          0xA0
 #define PICMG_ENTITY_ID_RTM                  0xC0
 #define PICMG_ENTITY_ID_AMC                  0xC1
-#define PICMG_ENTITY_ID_SHM                  0xF0 /* Shelf management controller *
+#define PICMG_ENTITY_ID_SHM                  0xF0 Shelf management controller 
 #define PICMG_ENTITY_ID_FILTRATION_UNIT      0xF1
 #define PICMG_ENTITY_ID_SHELF_FRU_INFO       0xF2
 #define PICMG_ENTITY_ID_ALARM_PANEL          0xF3

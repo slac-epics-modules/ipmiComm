@@ -1966,7 +1966,6 @@ uint8_t  response[MSG_MAX_LENGTH] = { 0 };
 uint8_t  tmp[4] = { 0 }, vers;
 uint32_t mf;
 void    *mchcb = 0;
-char    *vendor[25];
 
 	if ( mchMsgGetDeviceIdWrapper( mchData, response, IPMI_MSG_ADDR_BMC ) ) {
 		printf("mchIdentify: Error from Get Device ID command\n");

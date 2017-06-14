@@ -228,7 +228,7 @@ static void
 assign_fru_lkup_atca(MchData mchData) 
 {
 MchSys  mchSys  = mchData->mchSys;
-uint8_t i, id;
+uint8_t i;
 Fru fru;
 int cuCnt = 0, shfCnt = 0, pmCnt = 0, shmCnt = 0;
 int dbg = MCH_DBG( mchStat[mchData->mchSess->instance] );

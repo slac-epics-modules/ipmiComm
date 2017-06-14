@@ -899,7 +899,7 @@ MchSess  mchSess;
 MchSys   mchSys;
 char    *task;
 long     status = SUCCESS;
- short    index;
+short    index;
 
 	if ( !recPvt )
 		return status;
@@ -1000,7 +1000,7 @@ MchSys   mchSys;
 char    *task;
 Fru      fru;
 Sensor   sens;
-uint8_t  value  = 0, sensor, bits;
+uint8_t  value  = 0;
 short    findex, sindex; /* FRU and Sensor index */
 long     status = SUCCESS;
 int      s = 0, inst;
@@ -1135,7 +1135,6 @@ char    *task;
 Fru      fru;
 long     status = SUCCESS;
 int      cmd;
-int      id;
 short    index; 
 int      inst;
 

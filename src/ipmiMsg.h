@@ -95,6 +95,8 @@ int ipmiMsgBuild(IpmiSess sess, uint8_t *message, uint8_t cmd, uint8_t imsg1netf
 
 int ipmiMsgWriteRead(const char *name, uint8_t *message, size_t messageSize, uint8_t *response, size_t *responseSize, double timeout, size_t *responseLen);
 
+int ipmiMsgBroadcastGetDeviceId(void *device, IpmiSess sess, uint8_t *data, int bridged, uint8_t rsAddr, uint8_t rqAddr, size_t *responseSize, int offs);
+
 int ipmiMsgGetDeviceId(void *device, IpmiSess sess, uint8_t *data, int bridged, uint8_t rsAddr, uint8_t rqAddr, size_t *responseSize, int offs);
 
 int ipmiMsgGetChanAuth(void *device, IpmiSess sess, uint8_t *data, size_t *responseSize, size_t roffs);
