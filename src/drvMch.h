@@ -14,7 +14,10 @@
 extern const void *mchCbRegistryId;
 
 extern uint32_t mchStat[MAX_MCH];
-/*temporary:*/
+
+/* Sensor scan period [seconds] */
+extern volatile uint8_t mchSensorScanPeriod;
+
 extern epicsMutexId mchStatMtx[MAX_MCH];
 
 /* Used for sensor scanning; one list per MCH */

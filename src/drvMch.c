@@ -24,8 +24,15 @@
 #include <picmgDef.h>
 
 #undef DEBUG 
+#define DEBUG
 
 #define PING_PERIOD  5
+
+/* Sensor scan period [seconds] 
+ * Set to 10 seconds by default.
+ * Can be over-ridden by EPICS PV
+ */
+volatile uint8_t mchSensorScanPeriod = 10;
 
 /* For use by mchCnfg routine */
 #define MCH_CNFG_INIT 1
@@ -1780,7 +1787,7 @@ uint8_t message[MSG_MAX_LENGTH]  = { 0 };
 uint8_t response[MSG_MAX_LENGTH] = { 0 };
 size_t  responseSize, responseLen; /* expected, actual */
 int     cos; /* change of state */
-int     inst = mchSess->instance, i = 0,j  = 0;
+int     inst = mchSess->instance, i = 0, j = 0;
 
 	memcpy( message, RMCP_HEADER, sizeof( RMCP_HEADER ) );
 
@@ -1803,6 +1810,14 @@ int     inst = mchSess->instance, i = 0,j  = 0;
 					printf("%s mchPing now offline\n", mchSess->name);
 				mchStatSet( inst, MCH_MASK_ONLN, 0 );
 				cos = 1;
+
+				/* After MCH goes offline, perform one scan of sensor
+				 * records so that they get updated SEVR. After this,
+				 * only scan records if MCH is online.
+				 */
+				if ( drvSensorScan[inst] ) 
+					scanIoRequest( drvSensorScan[inst] );
+
 			}
 		}
 		else {
@@ -1817,8 +1832,8 @@ int     inst = mchSess->instance, i = 0,j  = 0;
 				mchStatSet( inst, MCH_MASK_CNFG_CHK, MCH_MASK_CNFG_CHK );
 				i = 0;
 			}
-			/* Every 10 seconds (while mch online), scan sensor records */
-			if ( j > 10/PING_PERIOD ) {
+			/* Periocially (while mch online), scan sensor records */
+			if ( j >= mchSensorScanPeriod/PING_PERIOD ) {
 				if ( drvSensorScan[inst] ) 
 					scanIoRequest( drvSensorScan[inst] );
 				j = 0;

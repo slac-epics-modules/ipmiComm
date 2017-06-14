@@ -224,3 +224,28 @@ record(bo, "$(dev):RESET") {
  field(OUT, "#B0 C0 N0 @$(link)+reset")
 }
 
+# Control sensor scan period [seconds]
+# Default is 10 seconds
+# Added this because PAL systems had 
+# trouble at that rate
+# Must match SENSOR_SCAN_PERIODS array 
+# definition in devMch.c
+record(mbbo, "$(dev):SENSOR_SCAN_PERIOD") {
+ field(DTYP, "MCHsensor")
+ field(OMSL, "supervisory")
+ field(ZRVL, "0")
+ field(ZRST, "5 seconds")
+ field(ONVL, "1")
+ field(ONST, "10 seconds")
+ field(TWVL, "2")
+ field(TWST, "20 seconds")
+ field(THVL, "3")
+ field(THST, "30 seconds")
+ field(FRVL, "4")
+ field(FRST, "60 seconds")
+ field(OUT,  "#B0 C0 N0 @$(link)+scan")
+ field(VAL,  "1")
+ field(RVAL, "1")
+ field(PINI, "YES")
+ info(autosaveFields,"VAL RVAL")
+}

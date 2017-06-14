@@ -101,7 +101,8 @@
 
              * "chas": chassis control on/off/reset
              * "fru":  FRU on/off
-             * "dbg":   control debug messages for one MCH
+             * "dbg":  control debug messages for one MCH
+             * "scan": sensor scan period control, one per system
 
          Long Integer Input Device Support:
          -------------------------------------------------------
@@ -190,6 +191,11 @@
 #include <devMch.h>
 
 extern uint32_t mchStat[MAX_MCH];
+
+/* Sensor scan period options (in seconds). Must match 
+ * SENSOR_SCAN_PERIOD record definition in system_common.db 
+ */
+uint8_t SENSOR_SCAN_PERIODS[5] = { 5, 10, 20, 30, 60 }; 
 
 #define MAX_STRING_LENGTH 39
 #define MAX_EGU_LENGTH 16
@@ -1097,7 +1103,7 @@ char     str[40];
         node = strtok( pmbbo->out.value.camacio.parm, "+" );
         if ( (p = strtok( NULL, "+")) ) {
                 task = p;
-                if ( strcmp( task, "chas" ) && strcmp( task, "fru") && strcmp( task, "dbg") ) { 
+                if ( strcmp( task, "chas" ) && strcmp( task, "fru") && strcmp( task, "dbg") && strcmp( task, "scan" ) ) { 
 			sprintf( str, "Unknown task parameter %s", task);
 			status = S_dev_badSignal;
 		}
@@ -1145,9 +1151,14 @@ int      inst;
 	task    = recPvt->task;
 
 	if ( !(strcmp( task, "dbg" )) ) {
-
        		mchStatSet( inst, MCH_MASK_DBG, MCH_DBG_SET(pmbbo->val) );
        		printf("%s Setting debug message verbosity to %i\n", mchSess->name, pmbbo->val);
+		pmbbo->udf = FALSE;
+		return status;
+	}
+	else if ( !(strcmp( task, "scan" )) ) {
+		mchSensorScanPeriod = SENSOR_SCAN_PERIODS[pmbbo->val];
+       		printf("%s Setting sensor scan period to %i seconds\n", mchSess->name, SENSOR_SCAN_PERIODS[pmbbo->val] );
 		pmbbo->udf = FALSE;
 		return status;
 	}
