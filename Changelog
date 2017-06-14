@@ -9,6 +9,7 @@ Release: ipmiComm-R4-0-1
 - ipmiComm/Db/Makefile and shelf_atca_7slot.substitutions: rename fru_atca_amc.db
   to fru_atca_fb.db which makes sense for ATCA architecture (should have been done
   in ipmiComm-R4-0-0 with related changes, but it was missed).
+- configure/RELEASE_SPEAR: include Kristi's addition of SPEAR-specific iocAdmin module
 
 02Jun2017 (SH)
 Release: ipmiComm-R4-0-0
