@@ -41,7 +41,7 @@ file fru_basic.db
            { $(dev)	, SHM	, 2  	, 253	}
 }
 
-file fru_atca_amc.db
+file fru_atca_fb.db
 {
    pattern { dev	, id	, unit	, fruid	}
            { $(dev)	, FB	, 1  	, 5	}

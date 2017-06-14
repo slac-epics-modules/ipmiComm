@@ -27,7 +27,7 @@ DB += fru_basic.db
 DB += fru_extended.db
 DB += fru_pm.db
 DB += fru_cu.db
-DB += fru_atca_amc.db
+DB += fru_atca_fb.db
 DB += fru_atca_rtm.db
 DB += system_common_lcls.db
 
