@@ -42,8 +42,7 @@ int      i, status, inst = mchSess->instance;
 uint8_t  ipmiSeq = 0, code;
 int      ipmiSeqOffs;
 uint8_t  seq[4];
-uint32_t seqInt;
-uint32_t seqRplyInt;
+uint32_t seqInt, seqRplyInt, seqDiff;
 size_t   responseLen;
 
 	ipmiSeqOffs = ( IPMI_MSG_AUTH_TYPE_NONE == message[RMCP_MSG_HEADER_LENGTH+IPMI_WRAPPER_AUTH_TYPE_OFFSET] ) ?
@@ -112,18 +111,30 @@ size_t   responseLen;
 	       
 	seqInt     = arrayToUint32( seq );
 	seqRplyInt = arrayToUint32( ipmiSess->seqRply );
+	seqDiff    = seqInt - seqRplyInt;
+
+	if ( MCH_DBG( mchStat[inst] ) >= MCH_DBG_HIGH )
+       		printf("%s new sequence number %i, stored %i\n", mchSess->name, seqInt, seqRplyInt);
 
 	/* Check session sequence number. If it is not increasing or more than 
-	 * 7 counts higher than last time, increment our stored seq number and set error. 
-	 * Else store sequence number.
+	 * 7 counts higher than last time, discard message and set error.
+	 * If it is more than 7 counts higher, store new sequence number.
+	 *
+	 * If neither above errors are encountered, sotre new sequence number
 	 *
 	 * If seq number error or completion code non-zero, increment error count and return error.
          * Else reset error count to 0 and return success.
 	 */
-	if ( (seqInt <= seqRplyInt) || (seqInt - seqRplyInt > 7) ) {
+	if ( (seqInt <= seqRplyInt) || (seqDiff > 7) ) {
 		if ( MCH_DBG( mchStat[inst] ) >= MCH_DBG_MED )
 	       		printf("%s sequence number %i, previous %i\n", mchSess->name, seqInt, seqRplyInt);
-	       	incr4Uint8Array( ipmiSess->seqRply, 1 );
+		if ( (seqDiff > 7) ) {
+			for ( i = 0; i < IPMI_RPLY_SEQ_LENGTH; i++ )
+				ipmiSess->seqRply[i] = seq[i];
+		}
+		else
+			incr4Uint8Array( ipmiSess->seqRply, 1 );
+
 		/* Dumb workaround for Advantech non-increasing numbers */
 		if ( !(mchSess->type == MCH_TYPE_ADVANTECH) ) {
 			mchSess->err++;
@@ -131,7 +142,7 @@ size_t   responseLen;
 		}
        	}
        	else {
-		for ( i = 0; i < IPMI_RPLY_SEQ_LENGTH ; i++)
+		for ( i = 0; i < IPMI_RPLY_SEQ_LENGTH; i++ )
 			ipmiSess->seqRply[i] = seq[i];
 
 		if ( (code = response[codeOffs] ) ) {
