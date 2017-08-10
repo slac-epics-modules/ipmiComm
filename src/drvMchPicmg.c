@@ -376,8 +376,8 @@ int i, j;
 	for ( i = 0; i < mchSys->fruCount; i++ ) {
 	
 		fru = &mchSys->fru[i];
-		if ( (sens->sdr.owner == mchSys->fru[i].sdr.addr) && (sens->sdr.entityId == mchSys->fru[i].sdr.entityId ) &&
-			(sens->sdr.entityInst == mchSys->fru[i].sdr.entityInst ) ) {
+		if ( (sens->sdr.owner == fru->sdr.addr) && (sens->sdr.entityId == fru->sdr.entityId ) &&
+			(sens->sdr.entityInst == fru->sdr.entityInst ) ) {
 			sens->fruIndex = i; /* FRU index for associated FRU */
 			return;
 		}
@@ -387,6 +387,12 @@ int i, j;
 				sens->fruIndex = i; /* FRU index for associated FRU */
 				return;
 			}			
+		}
+/* If AMC entity & owner is same as existing front-board FRU, can associate sensor with that front board
+ * In future, this may be sufficient information to create indepdendent AMC entities */
+		if ( (sens->sdr.entityId == ENTITY_ID_PICMG_AMC) && (fru->sdr.entityId == ENTITY_ID_PICMG_FRONT_BOARD) && (sens->sdr.owner == fru->sdr.addr) ) {
+			sens->fruIndex = i;
+			return;
 		}
 	}
 
