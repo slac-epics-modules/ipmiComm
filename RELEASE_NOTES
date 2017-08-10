@@ -1,3 +1,9 @@
+ipmiComm-R4-0-2:  10-Aug-2017 S. Hoobler
+		  Fix handling of session sequence numbers when they are greater than expected.
+   		    (Should fix problem of not successfully re-connecting to ATCA crates.)
+		  ATCA: Associate AMC sensors with Front Board (carrier).
+		  Other changes described in Changelog.
+
 ipmiComm-R4-0-1:  14-Jun-2017 S. Hoobler
 		  (See Changelog for details)
 		  Fix 'green' sensor records when system offline
