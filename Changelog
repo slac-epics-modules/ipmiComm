@@ -1,3 +1,14 @@
+10Aug2017 (SH)
+Release: ipmiComm-R4-0-2
+
+- drvMch.c: drvMchInit: Initialize FRU/Mgmt entity memory allocated flag 'entityAlloc' to 0
+  for every FRU/Mgmt. Previously incorrectly only performed for first of each.
+  mchCnfgReset: Check if FRU/Mgmt exists before memory operations
+  drvMchInit: Increase pause to wait for online status from 2 seconds to 5 (PING_PERIOD)
+- drvMchMsg.c: If IPMI sequence number greater than expected, store new number.
+- drvMchPicmg.c: ATCA: Associate AMC sensors with corresponding front board.
+- devMch.c: read_longin: Verify MCH communication is initialized before reading
+
 14Jun2017 (SH)
 Release: ipmiComm-R4-0-1
 
