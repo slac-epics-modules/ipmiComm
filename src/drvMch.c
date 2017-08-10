@@ -2134,14 +2134,19 @@ mchCnfgReset(MchData mchData) {
 MchSys mchSys = mchData->mchSys;
 int i;
 
-	for ( i = 0; i < mchSys->fruCountMax ; i++ )
-		freememory( mchSys->fru[i].entity, &mchSys->fru[i].entityAlloc );
+	if ( mchSys->fru ) { /* If FRU struct already allocated */
+		for ( i = 0; i < mchSys->fruCountMax ; i++ )
+			freememory( mchSys->fru[i].entity, &mchSys->fru[i].entityAlloc );
 
-	for ( i = 0; i < mchSys->mgmtCountMax ; i++ )
-		freememory( mchSys->mgmt[i].entity, &mchSys->mgmt[i].entityAlloc );
+		memset( mchSys->fru,  0, mchSys->fruCountMax*sizeof(FruRec)   );
+	}
 
-	memset( mchSys->fru,  0, mchSys->fruCountMax*sizeof(FruRec)   );
-	memset( mchSys->mgmt, 0, mchSys->mgmtCountMax*sizeof(MgmtRec) );
+	if ( mchSys->mgmt ) { /* If Mgmt struct already allocated */
+		for ( i = 0; i < mchSys->mgmtCountMax ; i++ )
+			freememory( mchSys->mgmt[i].entity, &mchSys->mgmt[i].entityAlloc );
+
+		memset( mchSys->mgmt, 0, mchSys->mgmtCountMax*sizeof(MgmtRec) );
+	}
 
 	/* move this to reset values routine, add fruid, fuindex, etc. */
 	set3DArrayVals( MAX_FRU_MGMT, MAX_SENSOR_TYPE, MAX_SENS_INST, mchSys->sensLkup, -1 );
@@ -2190,8 +2195,12 @@ int i;
 		if ( !(mchSys->mgmt = calloc( 1, mchSys->mgmtCountMax*sizeof(MgmtRec) )) )
 			cantProceed("FATAL ERROR: No memory for Management Controller data for %s\n", mchData->mchSess->name);
 
-		mchSys->fru->entityAlloc  = 0; /* Indicates memory has not been allocated for fru entity array;  this supports alloc/free scheme */
-		mchSys->mgmt->entityAlloc = 0; /* Indicates memory has not been allocated for mgmt entity array; this supports alloc/free scheme */
+		for ( i = 0; i < mchSys->fruCountMax ; i++ ) {
+			mchSys->fru[i].entityAlloc  = 0; /* Indicates memory has not been allocated for fru entity array;  this supports alloc/free scheme */
+		}
+		for ( i = 0; i < mchSys->mgmtCountMax ; i++ ) {
+			mchSys->mgmt[i].entityAlloc = 0; /* Indicates memory has not been allocated for mgmt entity array; this supports alloc/free scheme */
+		}
 
 	}
 
@@ -2312,7 +2321,7 @@ int      inst;
 	mchSess->pingThreadId = epicsThreadMustCreate( taskName, epicsThreadPriorityMedium, epicsThreadGetStackSize(epicsThreadStackMedium), mchPing, mch );
 
 	/* Wait for updated status from ping thread */ 
-	epicsThreadSleep( 2 ); 
+	epicsThreadSleep( PING_PERIOD ); 
 
 	if (  MCH_ONLN( mchStat[inst] ) ) {
 		epicsMutexLock( mch->mutex );
