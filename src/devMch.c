@@ -1249,11 +1249,6 @@ bail:
         return status;
 }
 
-/* Take advantage of regular read_longin calls
- * to periodically check that our MCH data matches
- * the live configuration. Thus read_ai does not check
- * that MCH_INIT_DONE is true, but other read routines do
- */
 static long 
 read_longin(struct longinRecord *plongin)
 {
@@ -1272,7 +1267,7 @@ int      inst;
 	mchSess = mchData->mchSess;
 	inst    = mchSess->instance;
 
-	if ( checkMchOnlnSess( mchSess ) ) {
+	if ( checkMchOnlnSessInitDone( mchSess ) ) {
 
 		epicsMutexLock( mch->mutex );
 
