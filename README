@@ -22,10 +22,17 @@ IOCManager_LIBS += ipmiComm
 
 3. Add to Db/Makefile
 
+At LCLS:
+
 DB_INSTALLS += $(IPMICOMM)/db/shelf_microtca_12slot_lcls.db
 DB_INSTALLS += $(IPMICOMM)/db/server_pc_lcls.db
 DB_INSTALLS += $(IPMICOMM)/db/shelf_atca_7slot_lcls.db
 
+At another facility that does not need the LCLS-specific functionality:
+
+DB_INSTALLS += $(IPMICOMM)/db/shelf_microtca_12slot.db
+DB_INSTALLS += $(IPMICOMM)/db/server_pc.db
+DB_INSTALLS += $(IPMICOMM)/db/shelf_atca_7slot.db
 
 4. Add to Db/<yourdbname>.substitutions, something like this, one substitutions
 line for each device:
