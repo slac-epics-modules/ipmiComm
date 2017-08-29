@@ -4,11 +4,11 @@
 #
 #	Auth: Sonya Hoobler
 #
-#	Last updated: 07 Apr 2016
+#	Last updated: 29 Aug 2017
 #
 ############################################################
 
-To add MicroTCA IPMI support to your application:
+To add IPMI support to your application:
 
 1. Add to configure/RELEASE:
 
@@ -22,22 +22,30 @@ IOCManager_LIBS += ipmiComm
 
 3. Add to Db/Makefile
 
-DB_INSTALLS += $(IPMICOMM)/db/shelf_microtca_12slot.db
-DB_INSTALLS += $(IPMICOMM)/db/server_supermicro.db
+DB_INSTALLS += $(IPMICOMM)/db/shelf_microtca_12slot_lcls.db
+DB_INSTALLS += $(IPMICOMM)/db/server_pc_lcls.db
+DB_INSTALLS += $(IPMICOMM)/db/shelf_atca_7slot_lcls.db
+
 
 4. Add to Db/<yourdbname>.substitutions, something like this, one substitutions
 line for each device:
 
-file server_supermicro.db
+file server_pc_lcls.db
 {
    pattern { dev            	, link     		, location		}  
            { CRAT:B084:PM01 	, cpu-b084-pm01-mgt 	, B084-Rm136		}
 }
 
-file shelf_microtca_12slot.db
+file shelf_microtca_12slot_lcls.db
 {
    pattern { dev          	, link          	, location            	}  
            { CRAT:B34:CD43 	, mch-b34-cd43 		, B34...           	}
+}
+
+file shelf_atca_7slot_lcls.db
+{
+   pattern { dev                , link          	, location      }       
+           { CRAT:LI28:SP02     , crat-li28-sp02	, KF28-2CXX     }    
 }
 
 
@@ -46,19 +54,19 @@ file shelf_microtca_12slot.db
 Example for mch-b34-cd38, *Note that order is important for first two commands*:
 
 drvAsynIPPortConfigure ("mch-b34-cd38","mch-b34-cd38:623 udp",0,0,0)
-mchInit("mch-b34-cd38")
+mchInit("mch-b34-cd43")
 
 dbLoadRecords("../../db/<yourdbname>.db")
 
 5. Archiving
 
-For each Supermicro, add the PVs in the Db/server_supermicro_archive_request.template
+For each 7-slot ATCA shelf, add the PVs in the IOCManager srcArchive/SHELF_ATCA_7SLOT_ARCHIVE.cwConfig
 to the archiver, substituting the device name for $(dev)
 
-For each MicroTCA crate, add the PVs in Db/shelf_archive_request.template to 
-the archiver, substituting the crate name for $(dev)
+For each Advantech or Supermicro PC, add the PVs in the IOCManager srcArchive/SERVER_PC.cwConfig
+to the archiver, substituting the device name for $(dev)
 
-LCLS example, $(dev) = CRAT:LI27:BP03
+(We do not currently have a MicroTCA archiving template.)
 
 The templates contain all possible PVs and will (nearly always) be a superset of the 
 PVs that are actually in use by the system. If you prefer, you can choose to only archive 
@@ -71,7 +79,11 @@ NOTES ON THIS RELEASE
 (below, 'ioc' refers to the managment ioc using ipmiComm to communicate 
  with a remote crate. at LCLS, this ioc is a soft ioc called IOCManager.)
 
--This release supports NAT and Vadatech MCHs and Supermicro servers
+-This release supports:
+
+  MicroTCA NAT and Vadatech MCHs (not well tested, especially Vadatech)
+  ATCA Pentair and Artesyn shelf managers
+  Supermicro and Advantech PCs
 
 -During ioc boot, the ioc will discover which modules/sensors exist
  for each MCH defined in st.cmd. If the system is offline, the ioc will do basic
@@ -84,3 +96,4 @@ NOTES ON THIS RELEASE
  after all of the modules/sensors have been discovered. It is set to "Not
  initialized" if not. During the discovery process, it is set to "Initializing...".
 
+-There is a EPICS PV $(crat):CONNECT for each system. It must be set to "Connect". 
