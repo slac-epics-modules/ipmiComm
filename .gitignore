@@ -6,3 +6,4 @@ db/
 dbd/
 iocBoot/*/envPaths
 *~
+lib/
