@@ -1,37 +1,17 @@
-#RELEASE Location of external products
+# RELEASE
+# Defines location of external products
 # Run "gnumake clean uninstall install" in the application
 # top directory each time this file is changed.
-include $(TOP)/RELEASE_SITE
+-include $(TOP)/configure/RELEASE.local
 
-# =============================================================
-# Define location of module tree with respect to
-# EPICS_SITE_TOP
-# =============================================================
-EPICS_MODULES=$(MODULES_SITE_TOP)
-
-# =============================================================
-# Define epics version 
-# =============================================================
-BASE_MODULE_VERSION=$(EPICS_BASE_VER)
-
-# =============================================================
-# Define the version of modules needed by
-# IOC apps or other Support apps
-# =============================================================
-ASYN_MODULE_VERSION=asyn-R4-21_1-0
-IOCADMIN_MODULE_VERSION=iocAdmin-R3-1-12_1-1
-# ============================================================
-# Support module locations
-# ============================================================
-ASYN=$(EPICS_MODULES)/asyn/$(ASYN_MODULE_VERSION)
-IOCADMIN=$(EPICS_MODULES)/iocAdmin/$(IOCADMIN_MODULE_VERSION)
-
-# =================================================================
-# Define EPICS_BASE
-# EPICS_BASE usually appears last so other apps can override stuff:
-# =================================================================
-EPICS_BASE=$(BASE_SITE_TOP)/$(BASE_MODULE_VERSION)
-
-
-
+# Check for valid macro definitions for module release directories
+# You can add tests here to make sure RELEASE.local defined valid
+# macros for all the module dependencies
+#ifeq ($(wildcard $(EPICS_BASE)/include),)
+#$(error Invalid EPICS_BASE: $(EPICS_BASE))
+#endif
+#ifeq ($(wildcard $(ASYN)/include),)
+#$(error Invalid ASYN: $(ASYN))
+#endif
+#...
 
