@@ -485,7 +485,7 @@ bail:
 	return rval;
 }
 
-/* Get FRU Inventory Info, optionally bridged message. If not bridged, caller, should set bridged arg to 0.
+/* Get FRU Inventory Info, optionally bridged message. If not bridged, caller should set bridged arg to 0.
  *
  *   RETURNS: status from ipmiMsgGetFruInfo
  *            0 on success
