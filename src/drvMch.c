@@ -359,9 +359,11 @@ int i;
 			return -1;
 
 		case FRU_DATA_TYPE_BINARY:
+/* Nuisance message, so comment out, even though we should probably add support
 #ifdef DEBUG
 	printf("\nFRU field data type binary or unspecified. Add support!\n");
 #endif
+*/
 			field->length = 2*field->rlength;
 			if ( mchFruFieldCheckLength(field->length , FRU_FIELD_LENGTH_TYPE_CONVERTED ) )
 				return -1;
@@ -801,11 +803,12 @@ uint8_t ownerChan = dassoc->ownerChan;
 			entity[*count].addr = cntndAddr;
 			entity[*count].chan = cntndChan;
 		}
-
+/*
 #ifdef DEBUG
 printf("mchStoreAssocDevEntInfo: Found assoc dev rel entity owner 0x%02x contained id 0x%02x inst 0x%02x index %i entity point addr %i %i\n", 
     entity[*count].addr, entity[*count].entityId, entity[*count].entityInst, *count, (int)(&entity[*count]), (int)entity);
 #endif
+*/
 	}
 
 	(*count)++;
@@ -1288,10 +1291,12 @@ int m = 0, b = 0;
        	}     
 
 #ifdef DEBUG
+if ( l > 0 )
+printf("mchSdrFullSens: owner 0x%02x lun %i sdr number %i type 0x%02x, m %i, b %i, rexp %i bexp %i, is logical entity %i, %s\n", 
+	sdr->owner, sdr->lun, sdr->number, sdr->sensType, sdr->m, sdr->b, sdr->rexp, sdr->bexp, SDR_ENTITY_LOGICAL(sdr->entityInst), sdr->str);
+else
 printf("mchSdrFullSens: owner 0x%02x lun %i sdr number %i type 0x%02x, m %i, b %i, rexp %i bexp %i, is logical entity %i\n", 
 	sdr->owner, sdr->lun, sdr->number, sdr->sensType, sdr->m, sdr->b, sdr->rexp, sdr->bexp, SDR_ENTITY_LOGICAL(sdr->entityInst));
-if ( l > 0 )
-printf("string %s\n", sdr->str);
 #endif
 
 }
@@ -1594,13 +1599,9 @@ int      rval = -1, err = 0, i, remainder = 0;
 			while ( size > 0 ) {
 				if ( mchMsgGetSdrWrapper( mchData, response, id, res, offset, size, parm, addr ) ) {
 					i--;
-					if ( err++ > 5 ) {
-						printf("mchSdrGetData: too many errors reading SDR for %s", mchSess->name);
-						continue;
-					}
+					err++;
 					break;
 				}
-
 				else {
 					memcpy( raw + + offset, response + IPMI_RPLY_IMSG2_GET_SDR_DATA_OFFSET, size );
 					offset += size;
@@ -1614,6 +1615,10 @@ int      rval = -1, err = 0, i, remainder = 0;
 					size = remainder;
 					remainder = 0;
 				}
+			}
+			if ( err > 5 ) {
+				printf("mchSdrGetData: too many errors reading SDR %i for %s", i, mchSess->name);
+				continue;
 			}
 
 			if ( mchSdrStoreData( mchData, raw, type, addr, chan ) )
@@ -2085,8 +2090,8 @@ for ( i = 0; i < s; i++ ) {
 	sens = &mchSys->sens[i];
 	if ( sens->fruIndex != -1 ) {
 		fru  = &mchSys->fru[sens->fruIndex];
-		printf("FRU sensor %s %i, type 0x%02x, inst %i, FRU addr 0x%02x, entId 0x%02x, entInst 0x%02x, "
-			"sens owner 0x%02x, entId 0x%02x  entInst 0x%02x recType %i fruId %i fruLkup %i fruIndex %i unavail %i\n",
+		printf("FRU sensor %s %i Type 0x%02x Inst %i FRUaddr 0x%02x Ent Id 0x%02x Inst 0x%02x "
+			"Sens owner 0x%02x EndId 0x%02x EndInst 0x%02x RecType %i FruId %i FruLkup %i FruIndex %i Unavail %i\n",
 			sens->sdr.str, sens->sdr.number, sens->sdr.sensType, sens->instance, fru->sdr.addr, 
 			fru->sdr.entityId, fru->sdr.entityInst, sens->sdr.owner, sens->sdr.entityId, 
 			sens->sdr.entityInst, sens->sdr.recType, fru->id, mchSys->fruLkup[fru->id], 
@@ -2094,14 +2099,14 @@ for ( i = 0; i < s; i++ ) {
 	}
 	else if ( sens->mgmtIndex != -1 ) {
 		mgmt  = &mchSys->mgmt[sens->mgmtIndex];
-		printf("Mgmt sensor %s %i, type 0x%02x, inst %i, MGMT addr 0x%02x, entId 0x%02x, entInst 0x%02x, "
-			"sens owner 0x%02x, entId 0x%02x  entInst 0x%02x recType %i unavail %i\n",
+		printf("Mgmt sensor %s %i Type 0x%02x inst %i MGMTaddr 0x%02x Ent Id 0x%02x Inst 0x%02x "
+			"Sens owner 0x%02x EntId 0x%02x EntInst 0x%02x RecType %i Unavail %i\n",
 			sens->sdr.str, sens->sdr.number, sens->sdr.sensType, sens->instance, mgmt->sdr.addr, 
 			mgmt->sdr.entityId, mgmt->sdr.entityInst, sens->sdr.owner, sens->sdr.entityId, 
 			sens->sdr.entityInst, sens->sdr.recType, sens->unavail);
 	}
 	else
-		printf("Sensor %s %i, type 0x%02x, inst %i, entId 0x%02x  entInst 0x%02x recType %i, "
+		printf("Sensor %s %i Type 0x%02x Inst %i EntId 0x%02x EntInst 0x%02x RecType %i "
 			"no corresponding FRU or MGTM unavail %i\n",
 			sens->sdr.str, sens->sdr.number, sens->sdr.sensType, sens->instance, sens->sdr.entityId, 
 			sens->sdr.entityInst, sens->sdr.recType, sens->unavail);
@@ -2267,6 +2272,7 @@ IpmiSess ipmiSess = 0;
 MchSys   mchSys  = 0;
 char     taskName[MAX_NAME_LENGTH+10];
 int      inst;
+int      online = 0, tries = 0;
 
 	/* Allocate memory for MCH data structures */
 	if ( ! (mchData = calloc( 1, sizeof( *mchData ))) )
@@ -2319,20 +2325,24 @@ int      inst;
 	sprintf( taskName, "%s-PING", mch->name ); 
 	mchSess->pingThreadId = epicsThreadMustCreate( taskName, epicsThreadPriorityMedium, epicsThreadGetStackSize(epicsThreadStackMedium), mchPing, mch );
 
-	/* Wait for updated status from ping thread */ 
-	epicsThreadSleep( PING_PERIOD ); 
-
-	if (  MCH_ONLN( mchStat[inst] ) ) {
-		epicsMutexLock( mch->mutex );
-		mchCnfg( mchData, MCH_CNFG_INIT ); /* flag 1 = at init, before run-time */
-		epicsMutexUnlock( mch->mutex );
+	/* Wait for updated status from ping thread, then try a few times to connect */ 
+	while ( (online == 0) && (tries < 3) ) {
+		epicsThreadSleep( PING_PERIOD ); 
+		tries++;
+		if (  MCH_ONLN( mchStat[inst] ) ) {
+			epicsMutexLock( mch->mutex );
+			mchCnfg( mchData, MCH_CNFG_INIT ); /* flag 1 = at init, before run-time */
+			epicsMutexUnlock( mch->mutex );
+			online = 1;
+			break;
+		}
 	}
-	else {
+	if ( online == 0 ) {
 		/* Since device type is unknown, assume max number of FRU/MGMT devices
 		 * in order to support whichever EPICS DB is loaded for this device
 		 */
 		mchCnfgReset( mchData ); /* Initialize some data structs and values */
-		printf("No response from %s; cannot complete initialization\n",mch->name);
+		printf("No response from %s after %i tries; cannot complete initialization\n",mch->name, tries);
 	}
 }
 
