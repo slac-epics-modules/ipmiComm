@@ -1436,9 +1436,9 @@ DevEntAssoc devEntAssoc;
 			if ( mchSdrFruDuplicate( mchSys, raw ) )
 				break;
 
-			if ( mchSys->fruCount > mchSys->fruCountMax ) {
+			if ( mchSys->fruCount >= mchSys->fruCountMax ) {
 				printf("ERROR: %s discovered %i FRUs but only allocated memory for %i.\n", 
-				    mchData->mchSess->name, mchSys->fruCount, mchSys->fruCountMax);
+				    mchData->mchSess->name, mchSys->fruCount, (int)mchSys->fruCountMax);
 				return -1;
 			}
 
@@ -1454,9 +1454,9 @@ DevEntAssoc devEntAssoc;
                         if ( mchSdrMgmtCtrlDuplicate( mchSys, raw ) )
                                 break;
 
-			if ( mchSys->mgmtCount > mchSys->mgmtCountMax ) {
+			if ( mchSys->mgmtCount >= mchSys->mgmtCountMax ) {
 				printf("ERROR: %s discovered %i MGMTs but only allocated memory for %i.\n", 
-				    mchData->mchSess->name, mchSys->mgmtCount, mchSys->mgmtCountMax);
+				    mchData->mchSess->name, mchSys->mgmtCount, (int)mchSys->mgmtCountMax);
 				return -1;
 			}
 
@@ -1575,7 +1575,7 @@ int      rval = -1, err = 0, i, remainder = 0;
        		if ( (mchMsgGetSdrWrapper( mchData, response, id, res, offset, size, parm, addr )) ) {
 			i--;
 			if ( err++ > 5 ) {
-			        printf("mchSdrGetData: too many errors reading SDR for %s\n", mchSess->name);
+			        printf("mchSdrGetData: too many errors reading SDR %i for %s\n", i, mchSess->name);
 				continue;
 			}
 		}
@@ -2005,12 +2005,12 @@ void    *mchcb = 0;
 			break;
 */
 		case MCH_MANUF_ID_SUPERMICRO:
-			if ( 0 == (mchcb = mchSetIdentity( mchData, "Supermicro", vers, MCH_TYPE_SUPERMICRO, "drvMchServerPcCb")) )
+			if ( 0 == (mchcb = mchSetIdentity( mchData, "Supermicro", vers, MCH_TYPE_SUPERMICRO, "drvMchSupermicroCb")) )
 				return -1;
 			break;
 
 		case MCH_MANUF_ID_ADVANTECH:
-			if ( 0 == (mchcb = mchSetIdentity( mchData, "Advantech", vers, MCH_TYPE_ADVANTECH, "drvMchServerPcCb")) )
+			if ( 0 == (mchcb = mchSetIdentity( mchData, "Advantech", vers, MCH_TYPE_ADVANTECH, "drvMchAdvantechCb")) )
 				return -1;
 			break;
 
@@ -2311,7 +2311,6 @@ int      inst;
 
        	mchSess->timeout = ipmiSess->timeout = RPLY_TIMEOUT_SENDMSG_RPLY; /* Default, until determine type */
 	mchSess->session = 1;   /* Default: enable session with MCH */
-
 
 	/* For sensor record scanning */
 	scanIoInit( &drvSensorScan[inst] );
