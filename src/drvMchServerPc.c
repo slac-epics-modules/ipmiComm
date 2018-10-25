@@ -32,7 +32,7 @@ assign_fru_lkup_supermicro(MchData mchData)
 uint8_t id, index;
 
 	/* Supermicro does not use FRU device locator records, so no means to read a FRU ID
-	 * Associate all Supermicro and Advantech sensors with single FRU, arbitrarily choose...0?
+	 * Associate all Supermicro and Advantech sensors with single FRU, arbitrarily choose 0
 	 * Set FRU address to BMC 
 	 * Force FRU count to be 1
 	 */
@@ -65,23 +65,6 @@ assign_fru_lkup_advantech(MchData mchData)
 {
 int i, found = 0;
 Fru fru;
-//uint8_t id, index;
-
-	/* Advantech does use FRU device locator records, but the BMC FRU 0 is not
-	 * in them. So manually add FRU ID 0 if it is missing.
-	 */
-
-/*Associate all Advantech sensors with single FRU, arbitrarily choose 0
-	 * Set FRU address to BMC 
-	 * Force FRU count to be 1
-	 *
-	id = index = 0;
-	mchData->mchSys->fru[index].id = id;
-	mchData->mchSys->fru[index].sdr.addr = IPMI_MSG_ADDR_BMC;
-	mchData->mchSys->fruLkup[id] = index;
-	mchData->mchSys->fruCount = 1;
-	*/
-
 	for ( i = 0; i < mchData->mchSys->fruCount ; i++ ) {
 
 	       	fru = &mchData->mchSys->fru[i];
@@ -93,12 +76,8 @@ Fru fru;
 			if ( fru->id == 0 )
 				found = 1;
 		}
-printf("assign_fru_lkup_advantech i %i instance %i\n", i, fru->instance);
-
 	}
 	if ( found == 0 ) { /* If FRU 0 not already in the data structure, add it */
-printf("assign_fru_lkup_advantech add missing fru 0 i %i\n", i);
-
 		fru = &mchData->mchSys->fru[mchData->mchSys->fruCount];
 		fru->id = 0;
 		mchData->mchSys->fruLkup[fru->id] = i;
