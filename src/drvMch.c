@@ -24,7 +24,6 @@
 #include <picmgDef.h>
 
 #undef DEBUG 
-#define DEBUG
 
 #define PING_PERIOD  5
 
@@ -359,11 +358,10 @@ int i;
 			return -1;
 
 		case FRU_DATA_TYPE_BINARY:
-/* Nuisance message, so comment out, even though we should probably add support
 #ifdef DEBUG
 	printf("\nFRU field data type binary or unspecified. Add support!\n");
 #endif
-*/
+
 			field->length = 2*field->rlength;
 			if ( mchFruFieldCheckLength(field->length , FRU_FIELD_LENGTH_TYPE_CONVERTED ) )
 				return -1;
@@ -544,7 +542,7 @@ int        rval;
 	if ( 0 == (sizeInt = arrayToUint16( fru->size )) )
 		return 0;
 
-	if ( MCH_DBG( mchStat[inst] ) )
+	if ( MCH_DBG( mchStat[inst] ) >= MCH_DBG_MED )
 		printf("%s mchFruDataGet: FRU addr 0x%02x ID %i inventory info size %i\n", 
 		    mchSess->name, fru->sdr.addr, fru->sdr.fruId, sizeInt);
 
@@ -803,12 +801,12 @@ uint8_t ownerChan = dassoc->ownerChan;
 			entity[*count].addr = cntndAddr;
 			entity[*count].chan = cntndChan;
 		}
-/*
+
 #ifdef DEBUG
 printf("mchStoreAssocDevEntInfo: Found assoc dev rel entity owner 0x%02x contained id 0x%02x inst 0x%02x index %i entity point addr %i %i\n", 
     entity[*count].addr, entity[*count].entityId, entity[*count].entityInst, *count, (int)(&entity[*count]), (int)entity);
 #endif
-*/
+
 	}
 
 	(*count)++;
@@ -1323,7 +1321,7 @@ size_t  tmp = sens->readMsgLength; /* Initially set to requested msg length,
 
 	bits = response[IPMI_RPLY_IMSG2_SENSOR_ENABLE_BITS_OFFSET];
 	if ( IPMI_SENSOR_READING_DISABLED(bits) || IPMI_SENSOR_SCANNING_DISABLED(bits) ) {
-		if ( MCH_DBG( mchStat[mchData->mchSess->instance] ) )
+		if ( MCH_DBG( mchStat[mchData->mchSess->instance] ) >= MCH_DBG_MED )
 			printf("%s mchGetSensorReadingStat: sensor %i reading/state unavailable or scanning disabled. Bits: %02x\n", 
 			    mchData->mchSess->name, sens->sdr.number, bits);
 		return -1;
@@ -1832,8 +1830,8 @@ int     inst = mchSess->instance, i = 0, j = 0;
 				mchStatSet( inst, MCH_MASK_ONLN, MCH_MASK_ONLN );
 				cos = 1;
 			}
-			/* Every 60 seconds (while mch online) , set flag to check if system configuration has changed */
-			if ( i > 60/PING_PERIOD ) {
+			/* Every 30 seconds (while mch online) , set flag to check if system configuration has changed */
+			if ( i > 30/PING_PERIOD ) {
 				mchStatSet( inst, MCH_MASK_CNFG_CHK, MCH_MASK_CNFG_CHK );
 				i = 0;
 			}
@@ -1866,8 +1864,10 @@ int    inst   = mchData->mchSess->instance;
 
 	mchStatSet( inst, MCH_MASK_CNFG_CHK, 0 );
 
-	if ( MCH_INIT_NOT_DONE( mchStat[inst] ) )
+	if ( MCH_INIT_NOT_DONE( mchStat[inst] ) ) {
+		printf("discovered init not done, run mch cnf\n");
 		return mchCnfg( mchData, MCH_CNFG_NOT_INIT );
+	}
 
 	else if ( MCH_INIT_DONE( mchStat[inst] ) ) { 
 		if ( mchSdrRepTsDiff( mchData ) )
@@ -2083,36 +2083,36 @@ Sensor  sens;
 		}
 	}
 
-#ifdef DEBUG
-int i;
-printf("mchSensorFruGetInstance:\n");
-for ( i = 0; i < s; i++ ) {
-	sens = &mchSys->sens[i];
-	if ( sens->fruIndex != -1 ) {
-		fru  = &mchSys->fru[sens->fruIndex];
-		printf("FRU sensor %s %i Type 0x%02x Inst %i FRUaddr 0x%02x Ent Id 0x%02x Inst 0x%02x "
-			"Sens owner 0x%02x EndId 0x%02x EndInst 0x%02x RecType %i FruId %i FruLkup %i FruIndex %i Unavail %i\n",
-			sens->sdr.str, sens->sdr.number, sens->sdr.sensType, sens->instance, fru->sdr.addr, 
-			fru->sdr.entityId, fru->sdr.entityInst, sens->sdr.owner, sens->sdr.entityId, 
-			sens->sdr.entityInst, sens->sdr.recType, fru->id, mchSys->fruLkup[fru->id], 
-			sens->fruIndex, sens->unavail);
-	}
-	else if ( sens->mgmtIndex != -1 ) {
-		mgmt  = &mchSys->mgmt[sens->mgmtIndex];
-		printf("Mgmt sensor %s %i Type 0x%02x inst %i MGMTaddr 0x%02x Ent Id 0x%02x Inst 0x%02x "
-			"Sens owner 0x%02x EntId 0x%02x EntInst 0x%02x RecType %i Unavail %i\n",
-			sens->sdr.str, sens->sdr.number, sens->sdr.sensType, sens->instance, mgmt->sdr.addr, 
-			mgmt->sdr.entityId, mgmt->sdr.entityInst, sens->sdr.owner, sens->sdr.entityId, 
-			sens->sdr.entityInst, sens->sdr.recType, sens->unavail);
-	}
-	else
-		printf("Sensor %s %i Type 0x%02x Inst %i EntId 0x%02x EntInst 0x%02x RecType %i "
-			"no corresponding FRU or MGTM unavail %i\n",
-			sens->sdr.str, sens->sdr.number, sens->sdr.sensType, sens->instance, sens->sdr.entityId, 
-			sens->sdr.entityInst, sens->sdr.recType, sens->unavail);
-}
-#endif
+	if ( MCH_DBG( mchStat[mchData->mchSess->instance] ) >= MCH_DBG_MED ) {
 
+		int i;
+		printf("Sensor summary:\n");
+		for ( i = 0; i < s; i++ ) {
+			sens = &mchSys->sens[i];
+			if ( sens->fruIndex != -1 ) {
+				fru  = &mchSys->fru[sens->fruIndex];
+				printf("FRU sensor %s %i Type 0x%02x Inst %i FRUaddr 0x%02x Ent Id 0x%02x Inst 0x%02x "
+					"Sens owner 0x%02x EndId 0x%02x EndInst 0x%02x RecType %i FruId %i FruLkup %i FruIndex %i Unavail %i\n",
+					sens->sdr.str, sens->sdr.number, sens->sdr.sensType, sens->instance, fru->sdr.addr, 
+					fru->sdr.entityId, fru->sdr.entityInst, sens->sdr.owner, sens->sdr.entityId, 
+					sens->sdr.entityInst, sens->sdr.recType, fru->id, mchSys->fruLkup[fru->id], 
+					sens->fruIndex, sens->unavail);
+			}
+			else if ( sens->mgmtIndex != -1 ) {
+				mgmt  = &mchSys->mgmt[sens->mgmtIndex];
+				printf("Mgmt sensor %s %i Type 0x%02x inst %i MGMTaddr 0x%02x Ent Id 0x%02x Inst 0x%02x "
+					"Sens owner 0x%02x EntId 0x%02x EntInst 0x%02x RecType %i Unavail %i\n",
+					sens->sdr.str, sens->sdr.number, sens->sdr.sensType, sens->instance, mgmt->sdr.addr, 
+					mgmt->sdr.entityId, mgmt->sdr.entityInst, sens->sdr.owner, sens->sdr.entityId, 
+					sens->sdr.entityInst, sens->sdr.recType, sens->unavail);
+			}
+			else
+				printf("Sensor %s %i Type 0x%02x Inst %i EntId 0x%02x EntInst 0x%02x RecType %i "
+					"no corresponding FRU or MGTM unavail %i\n",
+					sens->sdr.str, sens->sdr.number, sens->sdr.sensType, sens->instance, sens->sdr.entityId, 
+					sens->sdr.entityInst, sens->sdr.recType, sens->unavail);
+		}
+	}
 }
 
 /*
@@ -2177,8 +2177,8 @@ int i;
 
 	mchSeqInit( mchData->ipmiSess );
 
-	/* Turn on debug messages during initial messages with device */
-	mchStatSet( inst, MCH_MASK_DBG, MCH_DBG_SET(MCH_DBG_LOW) );
+	/* Turn on debug messages during initial messages with device
+	mchStatSet( inst, MCH_MASK_DBG, MCH_DBG_SET(MCH_DBG_LOW) ); */
 
 	/* Initiate communication session with MCH */
 	if ( mchCommStart( mchSess, mchData->ipmiSess ) ) {
@@ -2212,9 +2212,6 @@ int i;
 	/* Moved to after mchIdentify so that max fru/mgmt counts are defined */
 	mchCnfgReset( mchData );
 
-	/* Turn off debug messages after initial messages with device */
-	mchStatSet( inst, MCH_MASK_DBG, MCH_DBG_SET(MCH_DBG_OFF) );
-
 	/* Intialize sensor and device counts to 0 */
 	mchSys->sdrCount = mchSys->sensCount = mchSys->fruCount = mchSys->mgmtCount = 0;
 
@@ -2243,6 +2240,8 @@ int i;
 		scanIoRequest( drvMchFruScan );
 
 	mchStatSet( inst, MCH_MASK_DBG, MCH_DBG_SET(MCH_DBG_OFF) );
+
+	printf("%s Initialization complete\n", mchSess->name);
 
 	return 0;
 
