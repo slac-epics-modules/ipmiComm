@@ -9,12 +9,13 @@ Release: R4.2.0
 	-Fix off-by-one comparison for FRU/MGMT counts
 	-Fix continue/break arrangement that allowed infinite tries to
 	 read SDR even after max number of errors encountered.
+	-Abandon SDR read loop if cannot get ID for next SDR in line.
 	-On initial connect, try a few times to get ping response before
-	 giving up
-	-Turn off most messages during init
+	 giving up.
+	-Turn off most messages during init.
 	-Check for updated configuration every 30 seconds (prev 60).
 	 Partly motivated by turning off debug messages at init. User
-	 can set INITBYP to force re-init on next 30-second cycle
+	 can set INITBYP to force re-init on next 30-second cycle.
 
 15Nov2018 (Marcio P. Donadio)
 Release: R4.1.0:   Modified to build for git workflow and EPICS 3.15.
