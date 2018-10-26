@@ -1943,7 +1943,7 @@ static void
 {
 void *cb;
 
-	printf("Identified %s to be %s. IPMI V%i.%i. Start initialization...\n", mchData->mchSess->name, vendor, IPMI_VER_MSD( vers ), IPMI_VER_LSD( vers ));
+	printf("Identified %s to be %s. IPMI V%i.%i. Initializing...\n", mchData->mchSess->name, vendor, IPMI_VER_MSD( vers ), IPMI_VER_LSD( vers ));
 	mchData->mchSess->type = type;
 	if ( !(cb = registryFind( (void *)mchCbRegistryId, cbname )) ) {
 		printf("mchIdentify: ERROR for %s: failed to find callbacks %s\n", mchData->mchSess->name, cbname);
