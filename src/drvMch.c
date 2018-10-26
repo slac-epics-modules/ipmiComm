@@ -114,22 +114,19 @@ mchCommStart(MchSess mchSess, IpmiSess ipmiSess)
 uint8_t response[MSG_MAX_LENGTH] = { 0 };
 int     i, dbg = MCH_DBG( mchStat[mchSess->instance] );
 
-	if ( dbg )
-		printf("%s Connecting...\n", mchSess->name);
+	printf("%s Connecting...\n", mchSess->name);
 
 	mchSeqInit( ipmiSess );
 
 	if ( mchMsgGetChanAuth( mchSess, ipmiSess, response ) ) {
-		if ( dbg )
-			printf("%s Get Channel Authentication failed\n", mchSess->name);
+		printf("%s Get Channel Authentication failed\n", mchSess->name);
 		return -1;	
 	}
 
 	mchSetAuth( mchSess, ipmiSess, response[IPMI_RPLY_IMSG2_AUTH_CAP_AUTH_OFFSET] );
 
 	if ( mchMsgGetSess( mchSess, ipmiSess, response ) ) {
-		if ( dbg )
-			printf("%s Get Session failed\n", mchSess->name);
+		printf("%s Get Session failed\n", mchSess->name);
 		return -1;
 	}
 
@@ -142,8 +139,7 @@ int     i, dbg = MCH_DBG( mchStat[mchSess->instance] );
 		ipmiSess->str[i] = response[IPMI_RPLY_IMSG2_GET_SESS_CHALLENGE_STR_OFFSET + i];
 
 	if ( mchMsgActSess( mchSess, ipmiSess, response ) ) {
-		if ( dbg )
-			printf("%s Activate session failed\n", mchSess->name);
+		printf("%s Activate session failed\n", mchSess->name);
 		goto bail;;
 	}
 
@@ -157,8 +153,7 @@ int     i, dbg = MCH_DBG( mchStat[mchSess->instance] );
 
 	/* Need a non-hard-coded way to determine privelige level */
 	if ( mchMsgSetPriv( mchSess, ipmiSess, response, IPMI_MSG_PRIV_LEVEL_OPER ) ) {
-		if ( dbg )
-			printf("%s Set session privilege failed\n", mchSess->name);
+		printf("%s Set session privilege failed\n", mchSess->name);
 		goto bail;
 	}
 
@@ -723,7 +718,7 @@ uint8_t   buff[MSG_MAX_LENGTH] = { 0 };
 
 	if ( (add != *addTs) || (del != *delTs) ) {
 
-		if ( MCH_DBG( mchStat[mchSess->instance] ) )
+		if ( MCH_DBG( mchStat[mchSess->instance] ) >= MCH_DBG_MED )
 			printf("%s SDR rep TS before: 0x%08x 0x%08x, after: 0x%08x 0x%08x\n", 
 			    mchSess->name, *addTs, *delTs, add, del);
 
@@ -1321,7 +1316,7 @@ size_t  tmp = sens->readMsgLength; /* Initially set to requested msg length,
 
 	bits = response[IPMI_RPLY_IMSG2_SENSOR_ENABLE_BITS_OFFSET];
 	if ( IPMI_SENSOR_READING_DISABLED(bits) || IPMI_SENSOR_SCANNING_DISABLED(bits) ) {
-		if ( MCH_DBG( mchStat[mchData->mchSess->instance] ) >= MCH_DBG_MED )
+		if ( MCH_DBG( mchStat[mchData->mchSess->instance] ) >= MCH_DBG_LOW )
 			printf("%s mchGetSensorReadingStat: sensor %i reading/state unavailable or scanning disabled. Bits: %02x\n", 
 			    mchData->mchSess->name, sens->sdr.number, bits);
 		return -1;
@@ -1365,7 +1360,7 @@ size_t   sensReadMsgLength;
 	if ( IPMI_SENSOR_THRESH_IS_READABLE( IPMI_SDR_SENSOR_THRESH_ACCESS( sens->sdr.cap ) ) ) {
 
 		if (  mchMsgGetSensorThresholdsWrapper( mchData, response, sens ) ) {
-			if ( MCH_DBG( mchStat[mchData->mchSess->instance] ) )
+			if ( MCH_DBG( mchStat[mchData->mchSess->instance] >=  MCH_DBG_LOW) )
 				printf("%s mchGetSensorInfo: mchMsgGetSensorThresholds error, assume no thresholds are readable\n", mchData->mchSess->name);
 			return;
 		}
@@ -1948,7 +1943,7 @@ static void
 {
 void *cb;
 
-	printf("Identified %s to be %s. IPMI version %i.%i\n", mchData->mchSess->name, vendor, IPMI_VER_MSD( vers ), IPMI_VER_LSD( vers ));
+	printf("Identified %s to be %s. IPMI V%i.%i. Start initialization\n", mchData->mchSess->name, vendor, IPMI_VER_MSD( vers ), IPMI_VER_LSD( vers ));
 	mchData->mchSess->type = type;
 	if ( !(cb = registryFind( (void *)mchCbRegistryId, cbname )) ) {
 		printf("mchIdentify: ERROR for %s: failed to find callbacks %s\n", mchData->mchSess->name, cbname);
