@@ -1,3 +1,7 @@
+R4.2.0:		  25-Oct-2018 S. Hoobler
+		  - Update to handle latest Advantech firmware
+		  - Misc fixes and minor changes, see ChangeLog for details
+
 R4.1.0:		  15-Nov-2017 Marcio P. Donadio
 		  - Modified to build for git workflow and EPICS 3.15.
 
