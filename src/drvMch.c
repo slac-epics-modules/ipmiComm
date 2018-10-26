@@ -112,7 +112,7 @@ static int
 mchCommStart(MchSess mchSess, IpmiSess ipmiSess)
 {	
 uint8_t response[MSG_MAX_LENGTH] = { 0 };
-int     i, dbg = MCH_DBG( mchStat[mchSess->instance] );
+int     i;
 
 	printf("%s Connecting...\n", mchSess->name);
 
@@ -1360,7 +1360,7 @@ size_t   sensReadMsgLength;
 	if ( IPMI_SENSOR_THRESH_IS_READABLE( IPMI_SDR_SENSOR_THRESH_ACCESS( sens->sdr.cap ) ) ) {
 
 		if (  mchMsgGetSensorThresholdsWrapper( mchData, response, sens ) ) {
-			if ( MCH_DBG( mchStat[mchData->mchSess->instance] >=  MCH_DBG_LOW) )
+			if ( (MCH_DBG( mchStat[mchData->mchSess->instance]) >=  MCH_DBG_LOW) )
 				printf("%s mchGetSensorInfo: mchMsgGetSensorThresholds error, assume no thresholds are readable\n", mchData->mchSess->name);
 			return;
 		}
