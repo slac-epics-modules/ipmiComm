@@ -1,3 +1,24 @@
+25Oct2018 (SH)
+Release: R4.2.0
+
+-Update to work with latest Advantech FW version. Support multiple
+  FRUs for Advantech, but still only load db for one. Separate
+  callback sets for Advantech and Supermicro.
+	Changes to src/drvMchServerPc.c and drvMch.c
+-drvMch.c:
+	-Fix off-by-one comparison for FRU/MGMT counts
+	-Fix continue/break arrangement that allowed infinite tries to
+	 read SDR even after max number of errors encountered.
+	-On initial connect, try a few times to get ping response before
+	 giving up
+	-Turn off most messages during init
+	-Check for updated configuration every 30 seconds (prev 60).
+	 Partly motivated by turning off debug messages at init. User
+	 can set INITBYP to force re-init on next 30-second cycle
+
+15Nov2018 (Marcio P. Donadio)
+Release: R4.1.0:   Modified to build for git workflow and EPICS 3.15.
+
 10Aug2017 (SH)
 Release: ipmiComm-R4-0-2
 
@@ -13,10 +34,10 @@ Release: ipmiComm-R4-0-2
 Release: ipmiComm-R4-0-1
 
 - drvMch.c: Add single read of sensors when MCH goes offline in order to update
-  sensor PV severities (otherwise they remain 'green'). 
+  sensor PV severities (otherwise they remain 'green').
 - drvMch.c/h, devMch.c, system_common.db: Add mbbo record to override sensor
   scan period. Default is 10 seconds. (PAL had trouble at 10-second rate, so this
-  would allow increased scan period in a case like that.) 
+  would allow increased scan period in a case like that.)
 - ipmiComm/Db/Makefile and shelf_atca_7slot.substitutions: rename fru_atca_amc.db
   to fru_atca_fb.db which makes sense for ATCA architecture (should have been done
   in ipmiComm-R4-0-0 with related changes, but it was missed).
@@ -26,13 +47,13 @@ Release: ipmiComm-R4-0-1
 02Jun2017 (SH)
 Release: ipmiComm-R4-0-0
 
-* N.B: * 
+* N.B: *
 * Not tested with Vadatech MicroTCA MCH *
 * Workaround in place for Advantech non-increasing sequence numbers *
 
-Many many changes. 
+Many many changes.
 
-- Add support for ATCA systems, which includes support for 
+- Add support for ATCA systems, which includes support for
   associated entitities
 - Add support for Advantech server (combine with Supermicro in 'ServerPc')
 - Move architecture and vendor specific functionality to callbacks
