@@ -1515,6 +1515,25 @@ bail:
 	return dest;
 }
 
+/* First read of SDR to get record length */
+
+static int				  
+mchSdrGetLength(MchData mchData, uint8_t parm, uint8_t addr, SdrRep sdrRep, uint8_t *id, uint8_t *res, uint8_t *response)
+{
+uint8_t  offset = 0;
+int      size = 5; /* readSize = 5 because 5th byte is remaining record length; 0xFF reads entire record */
+int      err = 0;
+
+	while ( err <= 3 ) {
+		if ( (mchMsgGetSdrWrapper( mchData, response, id, res, offset, size, parm, addr )) ) {
+			err++;
+		}
+		else
+			return 0;
+	}
+	return -1;
+}
+
 /*
  * Read sensor data records. Call ipmiMsgGetSdr twice per record;
  * once to get record length, then to read record. This prevents timeouts,
@@ -1529,7 +1548,7 @@ MchSess  mchSess = mchData->mchSess;
 MchSys   mchSys  = mchData->mchSys;
 uint8_t  response[MSG_MAX_LENGTH] = { 0 };
 uint32_t sdrCount;
-uint8_t  id[2]  = { 0 };
+uint8_t  id[2]  = { 0 }, nextid[2]  = { 0 };
 uint8_t  res[2] = { 0 };
 Sensor   sens   = 0;
 uint8_t  offset = 0;
@@ -1537,7 +1556,7 @@ uint8_t  type   = 0;
 uint8_t *raw    = 0;
 int      size; /* SDR record read size (after header) */
 uint32_t sdrCount_i  = mchSys->sdrCount; /* Initial SDR count */
-int      rval = -1, err = 0, i, remainder = 0;
+int      rval = -1, err = 0, sdrFailedCount = 0, i, remainder = 0;
 
 	if ( mchSdrRepGetInfo( mchData, parm, addr, sdrRep, &sdrCount ) )
 		return rval;
@@ -1556,7 +1575,6 @@ int      rval = -1, err = 0, i, remainder = 0;
 		printf("mchSdrGetData: Error reserving SDR repository %s\n", mchSess->name);
 		goto bail;
 	}
-
 	res[0] = response[IPMI_RPLY_IMSG2_GET_SDR_RES_LSB_OFFSET];
 	res[1] = response[IPMI_RPLY_IMSG2_GET_SDR_RES_MSB_OFFSET];
 
@@ -1567,67 +1585,65 @@ int      rval = -1, err = 0, i, remainder = 0;
 			goto bail;
 		}
 
+		/* If failed to read this SDR, cannot get ID for subsequent units. */
+		if ( mchSdrGetLength( mchData, parm, addr, sdrRep, id, res, response) ) {
+			sdrFailedCount++;
+			printf("%s cannot read SDR %i nor subsequent SDRs\n", mchSess->name, i);
+			goto bail;
+		}
+		nextid[0]  = response[IPMI_RPLY_IMSG2_GET_SDR_NEXT_ID_LSB_OFFSET];
+		nextid[1]  = response[IPMI_RPLY_IMSG2_GET_SDR_NEXT_ID_MSB_OFFSET];
+
+		size = response[IPMI_RPLY_IMSG2_GET_SDR_DATA_OFFSET + SDR_LENGTH_OFFSET] + SDR_HEADER_LENGTH;
+		if ( size > SDR_MAX_LENGTH )
+			size = SDR_MAX_LENGTH;
+		type = response[IPMI_RPLY_IMSG2_GET_SDR_DATA_OFFSET + SDR_REC_TYPE_OFFSET];
+		if ( size > SDR_MAX_READ_SIZE ) {
+			remainder = size - SDR_MAX_READ_SIZE;
+			size = SDR_MAX_READ_SIZE;
+		}
+		err = 0;
 		offset = 0;
 
-		size = 5; /* readSize = 5 because 5th byte is remaining record length; 0xFF reads entire record */
-       		if ( (mchMsgGetSdrWrapper( mchData, response, id, res, offset, size, parm, addr )) ) {
-			i--;
-			if ( err++ > 5 ) {
-			        printf("mchSdrGetData: too many errors reading SDR %i for %s\n", i, mchSess->name);
+		while ( size > 0 ) {
+			if ( mchMsgGetSdrWrapper( mchData, response, id, res, offset, size, parm, addr ) ) {
+				/* If too many errors, break out of while loop, move on to next SDR */
+				if ( err++ > 3 )
+					break;
 				continue;
 			}
-		}
-		else {
-
-			size = response[IPMI_RPLY_IMSG2_GET_SDR_DATA_OFFSET + SDR_LENGTH_OFFSET] + SDR_HEADER_LENGTH;
-			if ( size > SDR_MAX_LENGTH )
-				size = SDR_MAX_LENGTH;
-			type = response[IPMI_RPLY_IMSG2_GET_SDR_DATA_OFFSET + SDR_REC_TYPE_OFFSET];
-
-			if ( size > SDR_MAX_READ_SIZE ) {
-				remainder = size - SDR_MAX_READ_SIZE;
+			memcpy( raw + offset, response + IPMI_RPLY_IMSG2_GET_SDR_DATA_OFFSET, size );
+			offset += size;
+			if ( remainder > SDR_MAX_READ_SIZE ) {
+				remainder = remainder - SDR_MAX_READ_SIZE;
 				size = SDR_MAX_READ_SIZE;
 			}
-
-			while ( size > 0 ) {
-				if ( mchMsgGetSdrWrapper( mchData, response, id, res, offset, size, parm, addr ) ) {
-					i--;
-					err++;
-					break;
-				}
-				else {
-					memcpy( raw + + offset, response + IPMI_RPLY_IMSG2_GET_SDR_DATA_OFFSET, size );
-					offset += size;
-				}
-
-				if ( remainder > SDR_MAX_READ_SIZE ) {
-					remainder = remainder - SDR_MAX_READ_SIZE;
-					size = SDR_MAX_READ_SIZE;
-				}
-				else {
-					size = remainder;
-					remainder = 0;
-				}
+			else {
+				size = remainder;
+				remainder = 0;
 			}
-			if ( err > 5 ) {
-				printf("mchSdrGetData: too many errors reading SDR %i for %s", i, mchSess->name);
-				continue;
-			}
-
-			if ( mchSdrStoreData( mchData, raw, type, addr, chan ) )
-				goto bail;
-			id[0]  = response[IPMI_RPLY_IMSG2_GET_SDR_NEXT_ID_LSB_OFFSET];
-			id[1]  = response[IPMI_RPLY_IMSG2_GET_SDR_NEXT_ID_MSB_OFFSET];
-
-			if ( arrayToUint16( id ) == SDR_ID_LAST_SENSOR ) // last record in SDR
-				break;
 		}
-       	}
 
+		/* If too many errors, move on to next SDR */
+		if ( err > 3 ) {
+			sdrFailedCount++;
+			continue;
+		}
+		if ( mchSdrStoreData( mchData, raw, type, addr, chan ) )
+			goto bail;
+
+		id[0] = nextid[0];
+		id[1] = nextid[1];
+
+		if ( arrayToUint16( id ) == SDR_ID_LAST_SENSOR ) /* last record in SDR */
+			break;
+       	}
 	mchSys->sdrCount += sdrCount;
 	rval = 0;
 
 bail:
+	if ( sdrFailedCount > 0 ) 
+	    printf("%s: failed to read %i SDRs due to too many read errors\n", mchSess->name, sdrFailedCount);
 
 	if ( raw )
 		free( raw );
@@ -1639,7 +1655,7 @@ mchSdrGetDataAll(MchData mchData)
 {
 MchSess  mchSess = mchData->mchSess;
 MchSys   mchSys  = mchData->mchSys;
-int      i, j, rval = 0; /* think about how to handle rval */
+int      i, j;
 Mgmt     mgmt;
 uint8_t  addr = 0;
 int      inst = mchSess->instance;
@@ -1652,8 +1668,8 @@ uint8_t  chan = 0;
 
 	/* First get BMC SDR Rep info */
 	if ( mchSdrGetData( mchData, IPMI_SDRREP_PARM_GET_SDR, IPMI_MSG_ADDR_BMC, chan, &mchSys->sdrRep ) ) {
-		printf("mchSdrGetData: Error in reading primary SDR\n");
-		return rval;
+		printf("mchSdrGetDataAll: Error in reading primary SDR\n");
+		return -1;
 	}
 	for ( i = 0; i < mchSys->mgmtCount; i++ ) {
 
@@ -1759,7 +1775,7 @@ uint8_t  chan = 0;
 		}
 	}
 
-	return rval;
+	return 0;
 }
 
 /* 
