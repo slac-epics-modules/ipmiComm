@@ -19,8 +19,7 @@
 # Don't set your version to anything such as "test" that
 # could match a directory name.
 # ==========================================================
-ASYN_MODULE_VERSION=R4.31-1.0.0
-IOCADMIN_MODULE_VERSION=R3.1.15-1.0.0
+ASYN_MODULE_VERSION=R4.32-1.0.0
 
 # ==========================================================
 # Define module paths using pattern
@@ -29,7 +28,6 @@ IOCADMIN_MODULE_VERSION=R3.1.15-1.0.0
 # FOO = /Full/Path/To/Development/Version 
 # ==========================================================
 ASYN=$(EPICS_MODULES)/asyn/$(ASYN_MODULE_VERSION)
-IOCADMIN=$(EPICS_MODULES)/iocAdmin/$(IOCADMIN_MODULE_VERSION)
 
 
 # Set EPICS_BASE last so it appears last in the DB, DBD, INCLUDE, and LIB search paths

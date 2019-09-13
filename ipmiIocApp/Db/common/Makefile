@@ -13,7 +13,6 @@ USR_DBFLAGS_DEG=
 # Create and install (or just install) into <top>/db
 # databases, templates, substitutions like this
 #
-DB_INSTALLS += $(IOCADMIN)/db/iocAdminSoft.db
 DB_INSTALLS += $(ASYN)/db/asynRecord.db
 
 include $(TOP)/configure/RULES

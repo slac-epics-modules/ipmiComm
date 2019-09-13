@@ -28,7 +28,6 @@ cd ../../
 dbLoadDatabase("dbd/ipmiCommIoc.dbd")
 ipmiCommIoc_registerRecordDeviceDriver(pdbbase)
 
-dbLoadRecords("db/iocAdminSoft.db","IOC=MCHTEST")
 
 # Order of commands is important
 #drvAsynIPPortConfigure ("mch-li27-bp03","mch-li27-bp03:623 udp",0,0,0)

@@ -18,7 +18,6 @@ DBD += ipmiCommIoc.dbd
 ipmiCommIoc_DBD += base.dbd
 ipmiCommIoc_DBD += asyn.dbd
 ipmiCommIoc_DBD += drvAsynIPPort.dbd
-ipmiCommIoc_DBD += iocAdmin.dbd
 
 ipmiCommIoc_DBD += ipmiComm.dbd
 
@@ -30,7 +29,6 @@ ipmiCommIoc_SRCS_RTEMS   += -nil-
 ipmiCommIoc_SRCS_DEFAULT += ipmiCommIocMain.cpp
 
 ipmiCommIoc_LIBS += asyn
-ipmiCommIoc_LIBS += devIocStats
 
 ipmiCommIoc_LIBS += ipmiComm
 
