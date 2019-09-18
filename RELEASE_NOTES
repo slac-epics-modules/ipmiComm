@@ -1,3 +1,6 @@
+R4.2.2: 18-Sep-2019 S. Hoobler
+		  - Prevent timeous for ATCA FRU power info requests. See Changelog for details.
+
 R4.2.1:           12 Sept. 2019 E. Williams
                   - build against asyn/R4.32-1.0.0 for upgrade to EPICS 7.0.2-1.1
                   - Remove dependency on iocAdmin for test IOC
