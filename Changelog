@@ -1,3 +1,18 @@
+19Sep2019 (SH)
+Release: R4.2.2
+
+-To prevent ATCA FRU get power level timeouts, reduce expected
+  message length to match SLAC ATCA systems, which only provide
+  information for one power level. This will need to be handled
+  differently if we add systems that have multiple power levels.
+  Change to: src/picmgDef.h
+
+12Sep2019 (EW)
+Release: R4.2.1
+
+-Build against asyn R4.32-1.0.0
+-Remove dependency on iocAdmin for the test IOC
+
 25Oct2018 (SH)
 Release: R4.2.0
 

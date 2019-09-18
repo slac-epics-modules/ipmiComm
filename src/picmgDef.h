@@ -73,7 +73,7 @@ extern uint8_t FRU_I2C_ADDR[102];
 #define IPMI_RPLY_GET_FRU_POLICY_LENGTH   3
 #define IPMI_RPLY_GET_FAN_PROP_LENGTH     6
 #define IPMI_RPLY_GET_FAN_LEVEL_LENGTH    5  /* max length due to optional bytes */
-#define IPMI_RPLY_GET_POWER_LEVEL_LENGTH  25 /* max length due to optional bytes */
+#define IPMI_RPLY_GET_POWER_LEVEL_LENGTH  6  /* min length--currently only read lowest power level values, which is all SLAC ATCA systems provide */
 #define IPMI_RPLY_SET_FAN_LEVEL_LENGTH    3  /* ignore optional byte for now */
 #define IPMI_RPLY_IMSG2_GET_PICMG_PROP_LENGTH 4
 #define PICMG_RPLY_GET_ADDR_INFO_LENGTH   8 
