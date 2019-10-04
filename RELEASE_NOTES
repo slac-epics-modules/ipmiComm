@@ -1,3 +1,8 @@
+R4.2.3: 04-Oct-2019 S. Hoobler
+		  Bug fix--expected sensor read message length was overwitten,
+			causing one extra round of message timeouts during sensor reads.
+		  See Changelog for details.
+
 R4.2.2: 18-Sep-2019 S. Hoobler
 		  - Prevent timeous for ATCA FRU power info requests. See Changelog for details.
 
