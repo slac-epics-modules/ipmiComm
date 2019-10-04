@@ -1662,11 +1662,14 @@ MchSys   mchSys;
 		if ( -1 == (index = fruLkup( mchSys, plongout->out.value.camacio )) )
 			goto bail;
 
-		plongout->dpvt = recPvt;
+		if ( checkMchInitDone( mchSess ) ) {
 
-		if ( 0 == strcmp( task, "fan" ) ) {
+			plongout->dpvt = recPvt;
+
+			if ( 0 == strcmp( task, "fan" ) ) {
        			plongout->drvl = plongout->lopr = mchSys->fru[index].fanMin;
        			plongout->drvh = plongout->hopr = mchSys->fru[index].fanMax;
+			}
 		}
 	}
 
