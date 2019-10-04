@@ -1,3 +1,17 @@
+04Oct2019 (SH)
+Release: R4.2.3
+
+-Bug fixes:
+  drvMch.c: mchGetSensorInfo: No longer overwrite sens->readMsgLength
+    with default value. At that point, correct message length value
+    is already stored. This was causing the next sensor read to time out.
+  devMch.c: init_fru_longout_record: Check that FRU structure has
+    been initialized before accessing its contents.
+-drvMch.c:
+  No longer use ping thread to determine if online during initial
+    connection. That added an unnecessary multiple-second delay.
+-White space cleanup (more needed)
+
 19Sep2019 (SH)
 Release: R4.2.2
 
