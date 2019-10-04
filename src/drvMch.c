@@ -151,7 +151,7 @@ int     i;
         for ( i = 0; i < IPMI_RPLY_INIT_SEND_SEQ_LENGTH ; i++)
                 ipmiSess->seqSend[i] = response[IPMI_RPLY_IMSG2_ACT_SESS_INIT_SEND_SEQ_OFFSET + i];
 
-	/* Need a non-hard-coded way to determine privelige level */
+	/* Need a non-hard-coded way to determine privilege level */
 	if ( mchMsgSetPriv( mchSess, ipmiSess, response, IPMI_MSG_PRIV_LEVEL_OPER ) ) {
 		printf("%s Set session privilege failed\n", mchSess->name);
 		goto bail;
@@ -1353,8 +1353,6 @@ size_t   sensReadMsgLength;
 	if ( sens->unavail )
 		return;
 
-	sens->readMsgLength = sensReadMsgLength;
-
 	sens->tmask = 0; /* Set default to no readable thresholds */
 
 	if ( IPMI_SENSOR_THRESH_IS_READABLE( IPMI_SDR_SENSOR_THRESH_ACCESS( sens->sdr.cap ) ) ) {
@@ -1404,7 +1402,6 @@ DevEntAssoc devEntAssoc;
 		 */
 
 		case SDR_TYPE_FULL_SENSOR:
-		
 			if ( mchSdrSensDuplicate( mchSys, raw ) )
 				break;
 			sens = &mchSys->sens[mchSys->sensCount];
@@ -1417,7 +1414,6 @@ DevEntAssoc devEntAssoc;
 			break;
 
 		case SDR_TYPE_COMPACT_SENSOR:
-
 			if ( mchSdrSensDuplicate( mchSys, raw ) )
 				break;
 			sens = &mchSys->sens[mchSys->sensCount];
@@ -1430,7 +1426,6 @@ DevEntAssoc devEntAssoc;
 			break;
 
 		case SDR_TYPE_FRU_DEV:
-
 			if ( mchSdrFruDuplicate( mchSys, raw ) )
 				break;
 
@@ -1447,10 +1442,9 @@ DevEntAssoc devEntAssoc;
 
 			break;
 
-                case SDR_TYPE_MGMT_CTRL_DEV:
-
-                        if ( mchSdrMgmtCtrlDuplicate( mchSys, raw ) )
-                                break;
+		case SDR_TYPE_MGMT_CTRL_DEV:
+			if ( mchSdrMgmtCtrlDuplicate( mchSys, raw ) )
+            	break;
 
 			if ( mchSys->mgmtCount >= mchSys->mgmtCountMax ) {
 				printf("ERROR: %s discovered %i MGMTs but only allocated memory for %i.\n", 
@@ -1458,11 +1452,11 @@ DevEntAssoc devEntAssoc;
 				return -1;
 			}
 
-                        mgmt = &mchSys->mgmt[mchSys->mgmtCount];
-                        mchSdrMgmtCtrlDev( &mgmt->sdr, raw );
-                        mchSys->mgmtCount++;
+			mgmt = &mchSys->mgmt[mchSys->mgmtCount];
+			mchSdrMgmtCtrlDev( &mgmt->sdr, raw );
+			mchSys->mgmtCount++;
 
-                        break;
+			break;
 
 		/* need to check duplicates for entity assoc records ? */
 		case SDR_TYPE_ENTITY_ASSOC:
@@ -1578,7 +1572,7 @@ int      rval = -1, err = 0, sdrFailedCount = 0, i, remainder = 0;
 	res[0] = response[IPMI_RPLY_IMSG2_GET_SDR_RES_LSB_OFFSET];
 	res[1] = response[IPMI_RPLY_IMSG2_GET_SDR_RES_MSB_OFFSET];
 
-       	for ( i = 0; i < sdrCount; i++) { /* memset raw to zeros on each sdr? */
+	for ( i = 0; i < sdrCount; i++) { /* memset raw to zeros on each sdr? */
 
 		if ( !(raw = calloc( 1, SDR_MAX_LENGTH ) ) ) {
 			printf("mchSdrGetData: No memory for raw SDR data for %s\n", mchSess->name);
@@ -1778,6 +1772,16 @@ uint8_t  chan = 0;
 	return 0;
 }
 
+static void
+buildPingMsg(uint8_t *message, size_t *responseSize)
+{
+	memcpy( message, RMCP_HEADER, sizeof( RMCP_HEADER ) );
+	message[RMCP_MSG_CLASS_OFFSET] = RMCP_MSG_CLASS_ASF;
+	memcpy( message + ASF_MSG_OFFSET, ASF_MSG, sizeof( ASF_MSG ) );
+	*responseSize = RMCP_MSG_HEADER_LENGTH + ASF_MSG_HEADER_LENGTH + ASF_RPLY_PONG_PAYLOAD_LENGTH;
+
+}
+
 /* 
  *  Periodically ping MCH. This runs in its own thread.
  *  If MCH online/offline status changes, update global
@@ -1803,16 +1807,13 @@ size_t  responseSize, responseLen; /* expected, actual */
 int     cos; /* change of state */
 int     inst = mchSess->instance, i = 0, j = 0;
 
-	memcpy( message, RMCP_HEADER, sizeof( RMCP_HEADER ) );
-
-	message[RMCP_MSG_CLASS_OFFSET] = RMCP_MSG_CLASS_ASF;
-
-	memcpy( message + ASF_MSG_OFFSET, ASF_MSG, sizeof( ASF_MSG ) );
+	buildPingMsg( message, &responseSize );
 
 	while (1) {
 
+		epicsThreadSleep( PING_PERIOD );
+
 		cos = 0;
-		responseSize = RMCP_MSG_HEADER_LENGTH + ASF_MSG_HEADER_LENGTH + ASF_RPLY_PONG_PAYLOAD_LENGTH;
 
 		ipmiMsgWriteRead( mchSess->name, message, sizeof( RMCP_HEADER ) + sizeof( ASF_MSG ), 
 			response, &responseSize, RPLY_TIMEOUT_DEFAULT, &responseLen );
@@ -1841,7 +1842,7 @@ int     inst = mchSess->instance, i = 0, j = 0;
 				mchStatSet( inst, MCH_MASK_ONLN, MCH_MASK_ONLN );
 				cos = 1;
 			}
-			/* Every 30 seconds (while mch online) , set flag to check if system configuration has changed */
+			/* Every 30 seconds (while mch online), set flag to check if system configuration has changed */
 			if ( i > 30/PING_PERIOD ) {
 				mchStatSet( inst, MCH_MASK_CNFG_CHK, MCH_MASK_CNFG_CHK );
 				i = 0;
@@ -1860,8 +1861,6 @@ int     inst = mchSess->instance, i = 0, j = 0;
        			if ( drvMchStatScan )
        				scanIoRequest( drvMchStatScan );
 		}
-
-		epicsThreadSleep( PING_PERIOD );
 	}
 }
 
@@ -2112,7 +2111,7 @@ Sensor  sens;
 			else if ( sens->mgmtIndex != -1 ) {
 				mgmt  = &mchSys->mgmt[sens->mgmtIndex];
 				printf("Mgmt sensor %s %i Type 0x%02x inst %i MGMTaddr 0x%02x Ent Id 0x%02x Inst 0x%02x "
-					"Sens owner 0x%02x EntId 0x%02x EntInst 0x%02x RecType %i Unavail %i\n",
+				"Sens owner 0x%02x EntId 0x%02x EntInst 0x%02x RecType %i Unavail %i\n",
 					sens->sdr.str, sens->sdr.number, sens->sdr.sensType, sens->instance, mgmt->sdr.addr, 
 					mgmt->sdr.entityId, mgmt->sdr.entityInst, sens->sdr.owner, sens->sdr.entityId, 
 					sens->sdr.entityInst, sens->sdr.recType, sens->unavail);
@@ -2188,8 +2187,8 @@ int i;
 
 	mchSeqInit( mchData->ipmiSess );
 
-	/* Turn on debug messages during initial messages with device
-	mchStatSet( inst, MCH_MASK_DBG, MCH_DBG_SET(MCH_DBG_LOW) ); */
+	/* Turn on debug messages during initial messages with device 
+	mchStatSet( inst, MCH_MASK_DBG, MCH_DBG_SET(MCH_DBG_MED) ); */
 
 	/* Initiate communication session with MCH */
 	if ( mchCommStart( mchSess, mchData->ipmiSess ) ) {
@@ -2283,6 +2282,9 @@ MchSys   mchSys  = 0;
 char     taskName[MAX_NAME_LENGTH+10];
 int      inst;
 int      online = 0, tries = 0;
+uint8_t  message[MSG_MAX_LENGTH]  = { 0 }; /* for ping message */
+uint8_t  response[MSG_MAX_LENGTH] = { 0 };
+size_t   responseSize, responseLen; /* expected, actual */
 
 	/* Allocate memory for MCH data structures */
 	if ( ! (mchData = calloc( 1, sizeof( *mchData ))) )
@@ -2303,20 +2305,20 @@ int      online = 0, tries = 0;
 
 	mchStatMtx[inst] = epicsMutexMustCreate(); /* Used for global mchStat mask */
 
-       	/* Allocate memory for MCH device support structure */
-       	if ( ! (mch = calloc( 1, sizeof( *mch ) )) )
-       		cantProceed("FATAL ERROR: No memory for MchDev structure\n");
+	/* Allocate memory for MCH device support structure */
+	if ( ! (mch = calloc( 1, sizeof( *mch ) )) )
+		cantProceed("FATAL ERROR: No memory for MchDev structure\n");
 
-       	if ( ! (mch = devMchRegister( name )) )
-       		printf("FATAL ERROR: Unable to register MCH %s with device support\n", name);
+	if ( ! (mch = devMchRegister( name )) )
+		printf("FATAL ERROR: Unable to register MCH %s with device support\n", name);
 
 	mchData->ipmiSess = ipmiSess;
 	mchData->mchSess = mchSess;
 	mchData->mchSys  = mchSys;
 
-       	strncpy( mchSess->name, mch->name, MAX_NAME_LENGTH );
-       	strncpy( mchSys->name,  mch->name, MAX_NAME_LENGTH ); // okay to remove this and from drvMch.h?
-       	mch->udata = mchData;
+	strncpy( mchSess->name, mch->name, MAX_NAME_LENGTH );
+	strncpy( mchSys->name,  mch->name, MAX_NAME_LENGTH ); // okay to remove this and from drvMch.h?
+	mch->udata = mchData;
 
 	/* Set default maximum counts (for this device) for FRU/MGMT to max
 	 * Individual device types can override this in callbacks
@@ -2325,35 +2327,41 @@ int      online = 0, tries = 0;
 	mchSys->mgmtCountMax = MAX_MGMT;
 	mchSys->sensAlloc = 0; /* Indicates memory has not been allocated for sensor struct; this supports alloc/free scheme */
 
-       	mchSess->timeout = ipmiSess->timeout = RPLY_TIMEOUT_SENDMSG_RPLY; /* Default, until determine type */
+	mchSess->timeout = ipmiSess->timeout = RPLY_TIMEOUT_SENDMSG_RPLY; /* Default, until determine type */
 	mchSess->session = 1;   /* Default: enable session with MCH */
 
 	/* For sensor record scanning */
 	scanIoInit( &drvSensorScan[inst] );
 
-	/* Start task to periodically ping MCH */
-	sprintf( taskName, "%s-PING", mch->name ); 
-	mchSess->pingThreadId = epicsThreadMustCreate( taskName, epicsThreadPriorityMedium, epicsThreadGetStackSize(epicsThreadStackMedium), mchPing, mch );
-
-	/* Wait for updated status from ping thread, then try a few times to connect */ 
-	while ( (online == 0) && (tries < 3) ) {
-		epicsThreadSleep( PING_PERIOD ); 
-		tries++;
-		if (  MCH_ONLN( mchStat[inst] ) ) {
-			epicsMutexLock( mch->mutex );
-			mchCnfg( mchData, MCH_CNFG_INIT ); /* flag 1 = at init, before run-time */
-			epicsMutexUnlock( mch->mutex );
+	buildPingMsg( message, &responseSize);
+	while ((online == 0) && ( tries < 3)) {
+		ipmiMsgWriteRead( mchSess->name, message, sizeof( RMCP_HEADER ) + sizeof( ASF_MSG ), 
+			response, &responseSize, RPLY_TIMEOUT_DEFAULT, &responseLen );
+		if (responseSize != 0){
 			online = 1;
-			break;
+			break;			
 		}
+		epicsThreadSleep( 1 ); 
+		tries++;
 	}
-	if ( online == 0 ) {
+
+	if (online == 1) {
+		mchStatSet( inst, MCH_MASK_ONLN, MCH_MASK_ONLN );
+		epicsMutexLock( mch->mutex );
+		mchCnfg( mchData, MCH_CNFG_INIT ); /* flag 1 = at init, before run-time */
+		epicsMutexUnlock( mch->mutex );
+	}
+	else {
 		/* Since device type is unknown, assume max number of FRU/MGMT devices
 		 * in order to support whichever EPICS DB is loaded for this device
 		 */
 		mchCnfgReset( mchData ); /* Initialize some data structs and values */
 		printf("No response from %s after %i tries; cannot complete initialization\n",mch->name, tries);
 	}
+
+	/* Start task to periodically ping MCH */
+	sprintf( taskName, "%s-PING", mch->name ); 
+	mchSess->pingThreadId = epicsThreadMustCreate( taskName, epicsThreadPriorityMedium, epicsThreadGetStackSize(epicsThreadStackMedium), mchPing, mch );
 }
 
 static long
