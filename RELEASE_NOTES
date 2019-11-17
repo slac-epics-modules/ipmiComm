@@ -1,3 +1,9 @@
+R4.2.4: 17-Nov-2019 S. Hoobler
+		  In device initialization, fix which variable was being used to 
+			determine if device online. This did not cause functional problems,
+			just slightly misleading messages and a short delay.
+		  See Changelog for details.
+
 R4.2.3: 04-Oct-2019 S. Hoobler
 		  Bug fix--expected sensor read message length was overwitten,
 			causing one extra round of message timeouts during sensor reads.

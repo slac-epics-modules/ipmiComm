@@ -1,3 +1,10 @@
+17Nov2019 (SH)
+Release: R4.2.4
+
+-Bug fixes:
+  drvMch.c: mchInit: check ping responseLen (actual), not
+    responseSize (expected) to determine if device online
+
 04Oct2019 (SH)
 Release: R4.2.3
 

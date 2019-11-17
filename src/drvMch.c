@@ -2337,7 +2337,7 @@ size_t   responseSize, responseLen; /* expected, actual */
 	while ((online == 0) && ( tries < 3)) {
 		ipmiMsgWriteRead( mchSess->name, message, sizeof( RMCP_HEADER ) + sizeof( ASF_MSG ), 
 			response, &responseSize, RPLY_TIMEOUT_DEFAULT, &responseLen );
-		if (responseSize != 0){
+		if (responseLen != 0){
 			online = 1;
 			break;			
 		}
