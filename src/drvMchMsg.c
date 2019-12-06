@@ -207,11 +207,11 @@ int
 mchMsgCheckSizes(size_t destSize, int offset, size_t srcSize)
 {
 	if ( 0 >= (int)srcSize ) {
-		printf("mchMsgCheckSizes: message size %i less than zero\n", (int)srcSize);
+		/* printf("mchMsgCheckSizes: message size %i less than zero\n", (int)srcSize); */
 		return -1;
 	}
 	else if ( (offset + (int)srcSize) > (int)destSize ) {
-		printf("mchMsgCheckSizes: copy size %i larger than destination %i \n", offset+(int)srcSize, (int)destSize);
+		/* printf("mchMsgCheckSizes: copy size %i larger than destination %i \n", offset+(int)srcSize, (int)destSize); */
 		return -1;
 	}
 	
