@@ -1,3 +1,6 @@
+R4.2.5: 09-Dec-2019 S. Hoobler
+          Comment out some informational warning messages
+
 R4.2.4: 17-Nov-2019 S. Hoobler
 		  In device initialization, fix which variable was being used to 
 			determine if device online. This did not cause functional problems,

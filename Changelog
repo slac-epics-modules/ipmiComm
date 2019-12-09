@@ -1,3 +1,10 @@
+06Dec2019 (SH)
+Release R4.2.5
+	
+  src/drvMchMsg.c: do not print warning messages related
+    to incorrect message size. Error is handled and the message
+    is just confusing.
+
 17Nov2019 (SH)
 Release: R4.2.4
 
