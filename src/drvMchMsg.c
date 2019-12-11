@@ -750,7 +750,7 @@ uint8_t  rqAddr;
 
 	payloadSize = *sensReadMsgSize = responseSize - roffs - FOOTER_LENGTH;
 	if ( (rval = mchMsgCheckSizes( sizeof( response ), roffs, payloadSize )) ) {
-		printf("mchMsgReadSensor size error\n");
+		/* printf("mchMsgReadSensor size error\n"); */
 		goto bail;
 	}
 
