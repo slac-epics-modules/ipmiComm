@@ -114,71 +114,147 @@ record(bo, "$(dev):CONNECT") {
 # PVs to be consistent with other SLAC systems       
 record(bo, "$(dev):POWEROFF") {     
   field(DESC, "Power off system")            
-  field(FLNK, "$(dev):POWEROFFSEQ")
+  field(FLNK, "$(dev):POWEROFF1")
   field(PINI, "NO")             
 }                                               
-
-record(seq, "$(dev):POWEROFFSEQ") {
-  field(SELM, "All")               
-  field(DOL1, "1")                 
-  field(LNK1, "$(dev):POWERMSG PP")
-  field(DOL2, "0")                 
-  field(LNK2, "$(dev):POWERCTL PP")
-  field(DLY3, "5")                
-  field(DOL3, "0")                
-  field(LNK3, "$(dev):POWERMSG PP")
-}                                   
+record(longout, "$(dev):POWEROFF1") {     
+  field(DESC, "Power off system")            
+  field(DOL, "1")
+  field(OUT, "$(dev):POWERMSG PP")
+  field(FLNK, "$(dev):POWEROFF2")
+}  
+record(longout, "$(dev):POWEROFF2") {     
+  field(DESC, "Power off system")            
+  field(DOL, "0")
+  field(OUT, "$(dev):POWERCTL PP")
+  field(FLNK, "$(dev):POWEROFF3")
+}  
+record(calcout, "$(dev):POWEROFF3") {     
+  field(DESC, "Power off system")            
+  field(CALC, "0")
+  field(OOPT, "Every Time")
+  field(ODLY, "5")
+  field(OUT, "$(dev):POWERMSG PP")
+} 
+# Replaced SEQ with linked records above
+#record(seq, "$(dev):POWEROFFSEQ") {
+#  field(SELM, "All")               
+#  field(DOL1, "1")                 
+#  field(LNK1, "$(dev):POWERMSG PP")
+#  field(DOL2, "0")                 
+#  field(LNK2, "$(dev):POWERCTL PP")
+#  field(DLY3, "5")                
+#  field(DOL3, "0")                
+#  field(LNK3, "$(dev):POWERMSG PP")
+#}                                   
 
 record(bo, "$(dev):POWERON") {
   field(DESC, "Power on system")            
-  field(FLNK, "$(dev):POWERONSEQ")
+  field(FLNK, "$(dev):POWERON1")
   field(PINI, "NO")             
 }                                 
-
-record(seq, "$(dev):POWERONSEQ") {
-  field(SELM, "All")              
-  field(DOL1, "2")                 
-  field(LNK1, "$(dev):POWERMSG PP")
-  field(DOL2, "1")                
-  field(LNK2, "$(dev):POWERCTL PP")
-  field(DLY3, "5")                
-  field(DOL3, "0")                
-  field(LNK3, "$(dev):POWERMSG PP")
-}                                   
+record(longout, "$(dev):POWERON1") {     
+  field(DESC, "Power off system")            
+  field(DOL, "2")
+  field(OUT, "$(dev):POWERMSG PP")
+  field(FLNK, "$(dev):POWERON2")
+}  
+record(longout, "$(dev):POWERON2") {     
+  field(DESC, "Power off system")            
+  field(DOL, "1")
+  field(OUT, "$(dev):POWERCTL PP")
+  field(FLNK, "$(dev):POWERON3")
+}  
+record(calcout, "$(dev):POWERON3") {     
+  field(DESC, "Power off system")            
+  field(CALC, "0")
+  field(OOPT, "Every Time")
+  field(ODLY, "5")
+  field(OUT, "$(dev):POWERMSG PP")
+} 
+# Replaced SEQ with linked records above
+#record(seq, "$(dev):POWERONSEQ") {
+#  field(SELM, "All")              
+#  field(DOL1, "2")                 
+#  field(LNK1, "$(dev):POWERMSG PP")
+#  field(DOL2, "1")                
+#  field(LNK2, "$(dev):POWERCTL PP")
+#  field(DLY3, "5")                
+#  field(DOL3, "0")                
+#  field(LNK3, "$(dev):POWERMSG PP")
+#}                                   
 
 record(bo, "$(dev):HARDRESET") {
   field(DESC, "Power cycle system")            
-  field(FLNK, "$(dev):HARDRESETSEQ")
+  field(FLNK, "$(dev):HARDRESET1")
   field(PINI, "NO")
 }                                   
-
-record(seq, "$(dev):HARDRESETSEQ") {
-  field(SELM, "All")                
-  field(DOL1, "3")                 
-  field(LNK1, "$(dev):POWERMSG PP")
-  field(DOL2, "2")                  
-  field(LNK2, "$(dev):POWERCTL PP") 
-  field(DLY3, "5")                 
-  field(DOL3, "0")                 
-  field(LNK3, "$(dev):POWERMSG PP")
-}                                   
+record(longout, "$(dev):HARDRESET1") {     
+  field(DESC, "Power off system")            
+  field(DOL, "3")
+  field(OUT, "$(dev):POWERMSG PP")
+  field(FLNK, "$(dev):HARDRESET2")
+}  
+record(longout, "$(dev):HARDRESET2") {     
+  field(DESC, "Power off system")            
+  field(DOL, "2")
+  field(OUT, "$(dev):POWERCTL PP")
+  field(FLNK, "$(dev):HARDRESET3")
+}  
+record(calcout, "$(dev):HARDRESET3") {     
+  field(DESC, "Power off system")            
+  field(CALC, "0")
+  field(OOPT, "Every Time")
+  field(ODLY, "5")
+  field(OUT, "$(dev):POWERMSG PP")
+} 
+# Replaced SEQ with linked records above
+#record(seq, "$(dev):HARDRESETSEQ") {
+#  field(SELM, "All")                
+#  field(DOL1, "3")                 
+#  field(LNK1, "$(dev):POWERMSG PP")
+#  field(DOL2, "2")                  
+#  field(LNK2, "$(dev):POWERCTL PP") 
+#  field(DLY3, "5")                 
+#  field(DOL3, "0")                 
+#  field(LNK3, "$(dev):POWERMSG PP")
+#}                                   
 
 record(bo, "$(dev):SOFTSHUTDOWN") {     
   field(DESC, "Soft shutdown system")            
-  field(FLNK, "$(dev):SOFTSHUTDOWNSEQ")
+  field(FLNK, "$(dev):SOFTSHUTDOWN1")
   field(PINI, "NO")             
 }                                               
-
-record(seq, "$(dev):SOFTSHUTDOWNSEQ") {
-  field(SELM, "All")               
-  field(DOL1, "1")                 
-  field(LNK1, "$(dev):POWERMSG PP")
-  field(DOL2, "5")                 
-  field(LNK2, "$(dev):POWERCTL PP")
-  field(DLY3, "5")                
-  field(DOL3, "0")                
-  field(LNK3, "$(dev):POWERMSG PP")
-}                                   
+record(longout, "$(dev):SOFTSHUTDOWN1") {     
+  field(DESC, "Power off system")            
+  field(DOL, "1")
+  field(OUT, "$(dev):POWERMSG PP")
+  field(FLNK, "$(dev):SOFTSHUTDOWN2")
+}  
+record(longout, "$(dev):SOFTSHUTDOWN2") {     
+  field(DESC, "Power off system")            
+  field(DOL, "5")
+  field(OUT, "$(dev):POWERCTL PP")
+  field(FLNK, "$(dev):SOFTSHUTDOWN3")
+}  
+record(calcout, "$(dev):SOFTSHUTDOWN3") {     
+  field(DESC, "Power off system")            
+  field(CALC, "0")
+  field(OOPT, "Every Time")
+  field(ODLY, "5")
+  field(OUT, "$(dev):POWERMSG PP")
+} 
+# Replaced SEQ with linked records above
+#record(seq, "$(dev):SOFTSHUTDOWNSEQ") {
+#  field(SELM, "All")               
+#  field(DOL1, "1")                 
+#  field(LNK1, "$(dev):POWERMSG PP")
+#  field(DOL2, "5")                 
+#  field(LNK2, "$(dev):POWERCTL PP")
+#  field(DLY3, "5")                
+#  field(DOL3, "0")                
+#  field(LNK3, "$(dev):POWERMSG PP")
+#}                                   
 
 record(mbbo, "$(dev):POWERMSG") {
   field(ZRVL, "0")               

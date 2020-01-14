@@ -1,6 +1,14 @@
+13Jan2020 (SH)
+Release R4.2.6
+
+  Db/system_common.db: For power on/off sequences, replace seq
+    records with series of linked records. Sometimes seq
+    records are found with PACT=TRUE and so record does not process.
+    Cause of that is not understood. This is a workaround.
+
 06Dec2019 (SH)
 Release R4.2.5
-	
+
   src/drvMchMsg.c: do not print warning messages related
     to incorrect message size. Error is handled and the message
     is just confusing.
