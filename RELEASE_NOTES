@@ -1,3 +1,8 @@
+R4.2.6: 13-Jan-2020 S. Hoobler
+          Change how power on/off sequences are executed to hopefully
+            avoid problem causing that sequence to stall.
+		  See Changelog for details.
+
 R4.2.5: 09-Dec-2019 S. Hoobler
           Comment out some informational warning messages
 
