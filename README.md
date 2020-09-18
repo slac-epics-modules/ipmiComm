@@ -1,6 +1,6 @@
 ############################################################
 #
-#	IPMI module README 
+#	IPMI module README
 #
 #	Auth: Sonya Hoobler
 #
@@ -39,24 +39,24 @@ line for each device:
 
 file server_pc_lcls.db
 {
-   pattern { dev            	, link     		, location		}  
+   pattern { dev            	, link     		, location		}
            { CRAT:B084:PM01 	, cpu-b084-pm01-mgt 	, B084-Rm136		}
 }
 
 file shelf_microtca_12slot_lcls.db
 {
-   pattern { dev          	, link          	, location            	}  
+   pattern { dev          	, link          	, location            	}
            { CRAT:B34:CD43 	, mch-b34-cd43 		, B34...           	}
 }
 
 file shelf_atca_7slot_lcls.db
 {
-   pattern { dev                , link          	, location      }       
-           { CRAT:LI28:SP02     , crat-li28-sp02	, KF28-2CXX     }    
+   pattern { dev                , link          	, location      }
+           { CRAT:LI28:SP02     , crat-li28-sp02	, KF28-2CXX     }
 }
 
 
-5. Add these lines to st.cmd for each device before iocInit. 
+5. Add these lines to st.cmd for each device before iocInit.
 
 Example for mch-b34-cd38, *Note that order is important for first two commands*:
 
@@ -75,15 +75,15 @@ to the archiver, substituting the device name for $(dev)
 
 (We do not currently have a MicroTCA archiving template.)
 
-The templates contain all possible PVs and will (nearly always) be a superset of the 
-PVs that are actually in use by the system. If you prefer, you can choose to only archive 
+The templates contain all possible PVs and will (nearly always) be a superset of the
+PVs that are actually in use by the system. If you prefer, you can choose to only archive
 those that you know are in use.
 
 
 NOTES ON THIS RELEASE
 ---------------------------
 
-(below, 'ioc' refers to the managment ioc using ipmiComm to communicate 
+(below, 'ioc' refers to the managment ioc using ipmiComm to communicate
  with a remote crate. at LCLS, this ioc is a soft ioc called IOCManager.)
 
 -This release supports:
@@ -103,4 +103,4 @@ NOTES ON THIS RELEASE
  after all of the modules/sensors have been discovered. It is set to "Not
  initialized" if not. During the discovery process, it is set to "Initializing...".
 
--There is a EPICS PV $(crat):CONNECT for each system. It must be set to "Connect". 
+-There is a EPICS PV $(crat):CONNECT for each system. It must be set to "Connect".

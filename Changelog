@@ -117,7 +117,7 @@ Many many changes.
     then freed on subsequent configuration re-reads
 - Add facility-specific database with accompanying subroutine. Used to
   translate ipmiComm device types to LCLS IOCManager values
-- configure/CONFIG - change to static build for testing 
+- configure/CONFIG - change to static build for testing
 
 28May2016 (SH)
 Release: ipmiComm-R3-0-2
@@ -153,11 +153,11 @@ Release: ipmiComm-R3-0-0
 Many many changes. Refactor code to support non-MicroTCA systems,
 to determine (instead of hard-code) message lengths, offsets, etc.
 based on system type and properties. Add support for Supermicro
-server. Change privilege level to Operator (from Administrator). 
+server. Change privilege level to Operator (from Administrator).
 PV name changes but aliases added for backward compatibility.
 
-*NOTE* that none of this has yet been tested with a Vadatech MCH 
-MicroTCA system. 
+*NOTE* that none of this has yet been tested with a Vadatech MCH
+MicroTCA system.
 
 Release: ipmiComm-R2-0-4
 
@@ -183,10 +183,10 @@ src:
     (MCH does not respond to threshold query for discrete sensors and
     this is causing out-of-order sequence numbers and timeouts)
  -  Add support to detect and store data for Management Controller Devices
-    in SDR. 
+    in SDR.
  -  Read, store, and print ipmi version supported by device.
  -  Add support for NAT hot swap sensors. There is a problem with their
-    sensor numbers, so current work-around is to parse sensor string 
+    sensor numbers, so current work-around is to parse sensor string
     in order to find associated FRU
 Db/shelf.substitutions:
  -  Add support for more FRUs
@@ -196,14 +196,14 @@ Release: ipmiComm-R2-0-1
 
 27Jan2014 (SH)
 Minor changes, including changes to build on RHEL64 and for SPEAR
- - src/devMch.c: Ignore status from ipmiMsgColdReset; it will always 
+ - src/devMch.c: Ignore status from ipmiMsgColdReset; it will always
    return an error. (Aspects of this can be improved; added to TODO LIST)
  - src/drvMchMsg.c: mchMsgWriteReadHelper: Fix casting types, remove
    redundant debug messages
  - New file configure/RELEASE_SPEAR
  - New archive request template Db/shelf_archive_request_template
    Update README accordingly
- 
+
 
 Release: ipmiComm-R2-0-0
 
@@ -213,7 +213,7 @@ Major changes to handle dynamic changes in system configurations and MCHs
   routines, etc.
   - Db:
      -No longer generate record list at init; instead load full subset
-      of possible records. Now ioc only needs to load shelf.db for each 
+      of possible records. Now ioc only needs to load shelf.db for each
       system.
      -Increase number of sensors; changes to module_basic.sub, module_cu.sub,
       module_pm.sub
@@ -222,30 +222,30 @@ Major changes to handle dynamic changes in system configurations and MCHs
      -Use sensor_ai.db; remove sensor type specific dbs
      -Lots of reorganizing...
   - src:
-     -drvMch.h/c: Move MCH-specific defines from ipmiDef.h to .h; move mchSys 
-      struct into mchData struct; add new MCH status MASK, remove old status 
-      variables; remove unused mchFruDiff; new routines to periodically detect 
-      system configuration changes and update our data structs; move 
+     -drvMch.h/c: Move MCH-specific defines from ipmiDef.h to .h; move mchSys
+      struct into mchData struct; add new MCH status MASK, remove old status
+      variables; remove unused mchFruDiff; new routines to periodically detect
+      system configuration changes and update our data structs; move
       mchSensorFruGetInstance, mchIdentify frobsolete drvMchUtil.c/.h;
       move msg sequence number init to new routine and call it before mchIdentiy
       (otherwise VT MCH doesn't respond)
-     -new drvMchMsg.c/.h: contains mch/microtca-specific message routines and 
+     -new drvMchMsg.c/.h: contains mch/microtca-specific message routines and
       defines, moved from ipmiMsg.c/.h and ipmiDef.h
      -ipmiDef.h: move mch/microtca-specific defines to drvMchMsg.h
-     -remove drvMchUtil.c/.h 
-     -ipmiMsg.c/.h: move mch/microtca-specific stuff to drvMchMsg.c/.h; remove 
-      debug routine and registration (now EPICS PV); add responseLen arg to 
+     -remove drvMchUtil.c/.h
+     -ipmiMsg.c/.h: move mch/microtca-specific stuff to drvMchMsg.c/.h; remove
+      debug routine and registration (now EPICS PV); add responseLen arg to
       ipmiMsgWriteRead
-     -devMch.c/.h: change from vmeio to camacio (more args); incorporate new 
-      mch status mask; sensor number (not address) is now indexed by fru, 
-      sensor type, and sensor type instance (so that it can be dynamic and no 
-      longer needs to be hardcoded in db); use sensor's specified units (no 
-      longer convert to slac-preferred units because it can be confusing if 
+     -devMch.c/.h: change from vmeio to camacio (more args); incorporate new
+      mch status mask; sensor number (not address) is now indexed by fru,
+      sensor type, and sensor type instance (so that it can be dynamic and no
+      longer needs to be hardcoded in db); use sensor's specified units (no
+      longer convert to slac-preferred units because it can be confusing if
       value is 0.0, which seems to mean non working, and we display it as 32.5,
-      for example); break out common dev sup init tasks to separate routines; 
-      launch routine to check if our mch 'configuration' is up to date; set 
-      previously static values (fru info) to be scanned on interrupt when we 
-      detect new configuration; 
+      for example); break out common dev sup init tasks to separate routines;
+      launch routine to check if our mch 'configuration' is up to date; set
+      previously static values (fru info) to be scanned on interrupt when we
+      detect new configuration;
   - Update README
 
 Release: ipmiComm-R1-6-0
@@ -257,7 +257,7 @@ Reduce time to initialize MCH, mostly by reducing number of read timeouts:
   Define 'max' sensor read timeout and use that first time calling 'get
     sensor reading' for each sensor (reduces read timeouts)
   ipmiDef.h, ipmiMsg.h, ipmiMsg.c, drvMchUtil.c: misc changes to support above
-Abort mchSdrGetDataAll for excessive read errors 
+Abort mchSdrGetDataAll for excessive read errors
 
 Release: ipmiComm-R1-5-1
 
@@ -267,15 +267,15 @@ Hot swap sensor implementation under NAT is not consistent among modules;
   drvMchUtil.c, devMch.c
 
 03Jun2013 (SH)
-Use manufacturer ID from Get Device ID command to distinguish NAT and Vadatech 
+Use manufacturer ID from Get Device ID command to distinguish NAT and Vadatech
   MCHs; no longer use MAC address. Changes:
     ipimDef.h, ipmiMsg.h: Add definitions for Get Device ID command and for
       vendor manufacturer ID values
     ipmiMsg.c: Test/fix Get Device ID command (previously unused)
-    drvMchUtil.c: Change mchIdentify to use manufacturer ID instead of MAC 
+    drvMchUtil.c: Change mchIdentify to use manufacturer ID instead of MAC
       address to identify MCH vendor
     drvMch.c: mchInit: Abort MCH initialization if mchIdentify returns error
-    
+
 Release: ipmiComm-R1-5-0
 
 16May2013 (SH)
@@ -289,7 +289,7 @@ NAT and Vadatech use different message protocols, so:
 -Replace sensor_hotswap.db with sensor_hotswap_vt.db and sensor_hotswap_nat.db
 
 Other changes:
-ipmiMsg.c: Have all msg routines call ipmiWriteReadHelper (even outside 
+ipmiMsg.c: Have all msg routines call ipmiWriteReadHelper (even outside
   of a session); augment ipmiCompletionCode
 ipmiDef.c: Change user name to null from 'admin' because latest VT FW
   no longer supports 'admin'
@@ -309,7 +309,7 @@ Add PICMG Get Power Level message
   Changes to ipmiMsg.c/.h, ipmiDef.c/.h
 Add records and device support to get FRU power levels and info
   Changes to src/devMch.c and Db/module.db
-Revive module_cu.db 
+Revive module_cu.db
 Set FRU ID in devSup INP field Card number (not Signal)
 Print non-zero completion code information
   Changes to ipmiMsg.c, ipmiDef.h
@@ -322,16 +322,16 @@ drvMch.c: during FRU data read if error returned is 'sensor/data
   not present', abort read
 
 01Oct2012 (SH)
-src/drvMch.c: Sensor addresses can change when system power cycled, 
+src/drvMch.c: Sensor addresses can change when system power cycled,
   even if FRU configuration is unchanged. Thus if we detect
   MCH was offline, set communication status to 'not initialized'.
 src/ipmiMsg.c: ipmiMsgWriteReadHelper: reorganize routine; do not
   check asyn status from ipmiMsgWriteRead; check session sequence number
   in first response (often in send message response) so that NAT and MCH
-  checks can be identical (NAT sends one message only).  
+  checks can be identical (NAT sends one message only).
 
 27Sep2012 (SH)
-NETFN macros no longer include LUN; break LUN and NetFn out. 
+NETFN macros no longer include LUN; break LUN and NetFn out.
 Rename IPMI_MSG1_NETFNLUN_OFFSET IPMI_MSG1_NETFN_OFFSET
 Changes to src/ipmiDef.c, ipmiDef.h, ipmiMsg.c
 
@@ -364,7 +364,7 @@ src/ipmiMsg.c/.h - Return asyn status from all msg routines. Use mchSess struct
    instead of mchData. Count msg errors, when reaches 10, restart session.
 src/devMch.c and ipmiComm.dbd - Add devBiMch bi support with i/o scan support.
    Add support for "initialized" record. Use mchSess/mchSys instead of mchData.
-Db/shelf_default.db - New INIT and INITBYP records to reflect if the saved 
+Db/shelf_default.db - New INIT and INITBYP records to reflect if the saved
    system configuration matches the actual system configuration. Change STAT to bi.
 
 14Aug2012 (SH)
@@ -374,25 +374,25 @@ Add PV to enable/disable communication with MCH. Disable closes session.
 Increase reply timeout during init, change to drvMch.c
 
 13Aug2012 (SH)
-src/ipmiMsg.c/.h - When possible, specify expected msg response length so that 
-  we don't have to wait for timeout. Return actual response length to be saved 
-  for later write/reads. Keep track of incoming msg sequence numbers. 
-  ipmiMsgWriteReadHelper: check msg sequence number and completion code, 
-  return status. ipmiMsgReadSensor: add expected msg response length argument. 
+src/ipmiMsg.c/.h - When possible, specify expected msg response length so that
+  we don't have to wait for timeout. Return actual response length to be saved
+  for later write/reads. Keep track of incoming msg sequence numbers.
+  ipmiMsgWriteReadHelper: check msg sequence number and completion code,
+  return status. ipmiMsgReadSensor: add expected msg response length argument.
   New routine ipmiSetDebug to set debug message flag. Register for ioc shell.
 src/drvMch.c - mchPing was not locking mutex properly, fixed. Call asyn connect
   in mchInit. Intialize msg arrays to 0. Remove unneeded malloc/free. Save
-  sensor read msg lengths into data structure for use later. 
+  sensor read msg lengths into data structure for use later.
   mchInit: Always call sensorFruRecordScript, even if device offline in order
   to load the default shelf records.
 src/drvMch.h - Add timeout to mchData structure, for asyn reads
-src/drvMchUtil.c/.h - sensorFruRecordScript: add argument to indicate device 
+src/drvMchUtil.c/.h - sensorFruRecordScript: add argument to indicate device
   online/configured. If it is not, load only shelf records.
 src/devMch.c - In sensor reads, pass expected response length as argument. Check
   return status before setting record val/status. Remove unneeded malloc/free.
   read_mbbi: set reading in rval (not val) and return 0 instead of NO_CONVERT.
   Add debug print statements.
-src/ipmiDef.h - Add reply message lengths. Add from-MCH sequence number offset and 
+src/ipmiDef.h - Add reply message lengths. Add from-MCH sequence number offset and
   lengths.
 src/ipmiComm.dbd - register drvIpmiRegisterCommands
 Db/sensor*.db - Change sensor record scan rate from 5 second to 10 second
