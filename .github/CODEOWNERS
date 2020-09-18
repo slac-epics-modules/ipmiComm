@@ -1,0 +1,4 @@
+# Theses are the default owners for everything. Unless 
+# a later match takes precedence, they will be requested
+# for review when someone opens a pull request.
+*     @shoobler @marciodo @jesusvasquez333
