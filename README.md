@@ -79,7 +79,6 @@ those that you know are in use.
 
 
 ## NOTES ON THIS RELEASE
----------------------------
 
 (below, 'ioc' refers to the managment ioc using ipmiComm to communicate
  with a remote crate. at LCLS, this ioc is a soft ioc called IOCManager.)
