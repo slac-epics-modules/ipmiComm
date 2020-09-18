@@ -7,7 +7,7 @@ R4.2.5: 09-Dec-2019 S. Hoobler
           Comment out some informational warning messages
 
 R4.2.4: 17-Nov-2019 S. Hoobler
-		  In device initialization, fix which variable was being used to 
+		  In device initialization, fix which variable was being used to
 			determine if device online. This did not cause functional problems,
 			just slightly misleading messages and a short delay.
 		  See Changelog for details.
@@ -45,7 +45,7 @@ ipmiComm-R4-0-1:  14-Jun-2017 S. Hoobler
 		  Add iocAdmin to configure/RELEASE_SPEAR
 
 ipmiComm-R4-0-0:  02-Jun-2017 S. Hoobler
-		  N.B: 
+		  N.B:
 		       * Not tested with Vadatech MicroTCA MCH *
 		       * Workaround in place for Advantech non-increasing sequence numbers *
 		  Many changes:
@@ -63,7 +63,7 @@ ipmiComm-R3-0-2:  28-May-2016 S. Hoobler
 
 ipmiComm-R3-0-1:  16-May-2016 S. Hoobler
 		  configure/RELEASE: Use asyn-R4-25_1-0
-		  src/drvMch.c: Restrict debug verbosity on startup to only during 
+		  src/drvMch.c: Restrict debug verbosity on startup to only during
 			initial connection and identifying device
 
 ipmiComm-R3-0-0:  18-Apr-2016 S. Hoobler
@@ -82,23 +82,23 @@ ipmiComm-R2-0-3:  04-Nov-2014 S. Hoobler
                   (left inactive until further testing complete)
 		  Read IPMI version of device
 		  Add databases for more FRU types
-		  Decode data format for sensor values and limits and then convert			
+		  Decode data format for sensor values and limits and then convert
 
 ipmiComm-R2-0-2:  17-Apr-2014   K. Luchini
                   Upgrade asyn from R4-18-lcls1 to R4-21_1-0
 
 ipmiComm-R2-0-1:  Copy base RULES.Db patch to Makefile/Db so build works on all
-                    systems. Changes to support SPEAR and to build in RHEL64. 
+                    systems. Changes to support SPEAR and to build in RHEL64.
                     Add PV archiving intructions.
                     See Changelog for details
 
 ipmiComm-R2-0-0:  Major changes, mostly to handle dynamic configuration changes
                     See Changelog for details
 
-ipmiComm-R1-6-0:  Significantly reduce MCH init time by eliminating read 
+ipmiComm-R1-6-0:  Significantly reduce MCH init time by eliminating read
                     timeouts where possible. Abort mchSdrGetDataAll for
                     excessive read errors.
-                  
+
 ipmiComm-R1-5-1:  Use manufacturer ID to distinguish NAT and Vadatech MCHs
                   No longer implement hot swap sensors for NAT, as they
                     are not implemented consistently among modules
@@ -111,7 +111,7 @@ ipmiComm-R1-4-1:  Check sensor 'scanning enabled' before copying
                     sensor reading to PV. Changes to src/devMch.c and src/ipmiDef.c
 
 ipmiComm-R1-4-0:  Add PICMG Get Power Level message and related EPICS records
-                  If system was offline, set flag to "not initialized" 
+                  If system was offline, set flag to "not initialized"
                     (sensor addresses can change with no HW change)
                   Misc changes other changes; see Changelog for details
 
@@ -126,14 +126,14 @@ ipmiComm-R1-3-2:  Set message seq number in request and verify response contains
 ipmiComm-R1-3-1:  Fix FRU board and part serial number data type: should be string instead of number
                     Changes to Db/module.db and src/devMch.c
 
-ipmiComm-R1-3-0:  Use "initialized" flag to reflect whether our saved system 
-                  configuration matches the actual configuration. If we detect that 
+ipmiComm-R1-3-0:  Use "initialized" flag to reflect whether our saved system
+                  configuration matches the actual configuration. If we detect that
                   the system has just come back online, check hw configuration.
-                  If there have been any changes, set flag to "not initialized". 
+                  If there have been any changes, set flag to "not initialized".
                   Misc other changes; see Changelog.
 
 ipmiComm-R1-2-0:  Many changes. See Changelog for more details.
-                  Determine and specify expected response msg lengths to avoid timeouts, 
+                  Determine and specify expected response msg lengths to avoid timeouts,
                   where possible.
                   Keep track of incoming msg sequence numbers.
                   Set errors based on seq numbers, completion code, asyn status.
@@ -142,7 +142,7 @@ ipmiComm-R1-2-0:  Many changes. See Changelog for more details.
 
 ipmiComm-R1-1-0:  Add support for fan level readback, control, and to read fan properties
                   Additional minor cleanup/changes
-                  
+
 ipmiComm-R1-0-0:  Initial release. Built against EPICS base-R3-14-12
 
-                  
+
