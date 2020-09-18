@@ -96,8 +96,8 @@ those that you know are in use.
 -During runtime, if the ioc detects that a system's configuration has changed, it will
  re-discover the modules/sensors and modify the PVs as appropriate.
 
--There is a EPICS PV $(crat):INIT for each system. It is set to "Initialized"
+-There is a EPICS PV `$(crat):INIT` for each system. It is set to "Initialized"
  after all of the modules/sensors have been discovered. It is set to "Not
  initialized" if not. During the discovery process, it is set to "Initializing...".
 
--There is a EPICS PV $(crat):CONNECT for each system. It must be set to "Connect".
+-There is a EPICS PV `$(crat):CONNECT` for each system. It must be set to "Connect".
