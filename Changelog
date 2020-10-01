@@ -1,8 +1,20 @@
+01Oct2020 (SH)
+Release R4.2.7
+
+  Reduce number of sensor records for LCLS ATCA shelf,
+  now that we have more experience with the systems
+  New files:
+	Db/fru_atca_fb_lcls.substitutions
+	Db/fru_atca_rtm_lcls.substitutions
+  Changes to:
+	Db/Makefile
+	Db/shelf_atca_7slot_lcls.substitutions
+
 13Jan2020 (SH)
 Release R4.2.6
 
   Db/system_common.db: For power on/off sequences, replace seq
-    records with series of linked records. Sometimes seq
+records with series of linked records. Sometimes seq
     records are found with PACT=TRUE and so record does not process.
     Cause of that is not understood. This is a workaround.
 

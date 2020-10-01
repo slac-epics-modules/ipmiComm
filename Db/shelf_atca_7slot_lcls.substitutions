@@ -22,15 +22,89 @@
 #==============================================================================
 #
 
-file shelf_atca_7slot.db
+file system_common_lcls.db
 {
    pattern { dev	, link		, location	}
 	   { $(dev)	, $(link)	, $(location)	}	
 }
 
-file system_common_lcls.db
+file system_common.db
 {
    pattern { dev	, link		, location	}
 	   { $(dev)	, $(link)	, $(location)	}	
+}
+
+file system_chassis_status.db
+{
+   pattern { dev	}
+	   { $(dev)	}	
+}
+
+file fru_common.db
+{
+   pattern { dev	, id	, unit	, fruid		}
+           { $(dev)	, SHM	, 1  	, 254		}
+           { $(dev)	, SHM	, 2  	, 253		}
+}
+
+file sensor_ai.db
+{
+   pattern { dev	, prefix	, aliasprefix	,  attr		, sensinst	, type	, fru 	}
+           { $(dev)	, SHM1:		, SHM1_			,  TEMP		, 1			, 1		, 254	}
+           { $(dev)	, SHM1:		, SHM1_			,  TEMP		, 2			, 1		, 254	}
+           { $(dev)	, SHM1:		, SHM1_			,  V		, 1			, 2		, 254	}
+           { $(dev)	, SHM1:		, SHM1_			,  V		, 2			, 2		, 254	}
+           { $(dev)	, SHM1:		, SHM1_			,  I		, 1			, 3		, 254	}
+           { $(dev)	, SHM1:		, SHM1_			,  I		, 2			, 3		, 254	}
+           { $(dev)	, SHM2:		, SHM2_			,  TEMP		, 1			, 1		, 253	}
+           { $(dev)	, SHM2:		, SHM2_			,  TEMP		, 2			, 1		, 253	}
+           { $(dev)	, SHM2:		, SHM2_			,  V		, 1			, 2		, 253	}
+           { $(dev)	, SHM2:		, SHM2_			,  V		, 2			, 2		, 253	}
+           { $(dev)	, SHM2:		, SHM2_			,  I		, 1			, 3		, 253	}
+           { $(dev)	, SHM2:		, SHM2_			,  I		, 2			, 3		, 253	}
+}			
+
+file fru_atca_fb_lcls.db
+{
+   pattern { dev	, id	, unit	, fruid	}
+           { $(dev)	, FB	, 1  	, 5		}
+           { $(dev)	, FB	, 2  	, 6		}
+           { $(dev)	, FB	, 3  	, 7		}
+           { $(dev)	, FB	, 4  	, 8		}
+           { $(dev)	, FB	, 5  	, 9		}
+           { $(dev)	, FB	, 6  	, 10	}
+           { $(dev)	, FB	, 7  	, 11	}
+}
+
+file fru_atca_rtm_lcls.db
+{
+   pattern { dev	, id	, unit	, fruid	}
+           { $(dev)	, RTM	, 1  	, 90	}
+           { $(dev)	, RTM	, 2  	, 91	}
+           { $(dev)	, RTM	, 3  	, 92	}
+           { $(dev)	, RTM	, 4  	, 93	}
+           { $(dev)	, RTM	, 5  	, 94	}
+           { $(dev)	, RTM	, 6  	, 95	}
+           { $(dev)	, RTM	, 7  	, 96	}
+}
+
+file fru_cu.db
+{
+   pattern { dev	, id	, unit	, fruid	}
+           { $(dev)	, CU	, 1  	, 40	}
+           { $(dev)	, CU	, 2  	, 41	}
+           { $(dev)	, CU	, 3  	, 42	}
+           { $(dev)	, CU	, 4  	, 43	}
+}
+
+file fru_common.db
+{
+   pattern { dev	, id	, unit	, fruid }
+           { $(dev)	, PM	, 1    	, 50	}
+           { $(dev)	, PM	, 2  	, 51	}
+           { $(dev)	, PM	, 3  	, 52	}
+           { $(dev)	, PM	, 4  	, 53	}
+           { $(dev)	, SH	, 1  	, 1		}
+           { $(dev)	, SH	, 2  	, 2		}
 }
 
