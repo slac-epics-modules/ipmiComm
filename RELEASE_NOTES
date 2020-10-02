@@ -1,3 +1,7 @@
+R4.2.7: 01-Oct-2020 S. Hoobler
+  		Reduce number of sensor records for LCLS ATCA shelf,
+  		now that we have more experience with the systems
+
 R4.2.6: 13-Jan-2020 S. Hoobler
           Change how power on/off sequences are executed to hopefully
             avoid problem causing that sequence to stall.
