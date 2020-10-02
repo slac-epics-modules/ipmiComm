@@ -49,7 +49,7 @@ file fru_common.db
 
 file sensor_ai.db
 {
-   pattern { dev	, prefix	, aliasprefix	,  attr		, sensinst	, type	, fru 	}
+   pattern { dev	, prefix	, aliasprefix	,  attr		, sensinst	, type	, fruid }
            { $(dev)	, SHM1:		, SHM1_			,  TEMP		, 1			, 1		, 254	}
            { $(dev)	, SHM1:		, SHM1_			,  TEMP		, 2			, 1		, 254	}
            { $(dev)	, SHM1:		, SHM1_			,  V		, 1			, 2		, 254	}
