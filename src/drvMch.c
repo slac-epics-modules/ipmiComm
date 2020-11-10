@@ -1266,7 +1266,9 @@ int m = 0, b = 0;
 		sdr->nominal    = raw[SDR_NOMINAL_OFFSET];   
 		sdr->normMax    = raw[SDR_NORM_MAX_OFFSET];   
 		sdr->normMin    = raw[SDR_NORM_MIN_OFFSET];   
-		sdr->strLength  = raw[SDR_STR_LENGTH_OFFSET];    
+		sdr->maxReading = raw[SDR_MAX_READING_OFFSET];
+		sdr->minReading = raw[SDR_MIN_READING_OFFSET];
+		sdr->strLength  = raw[SDR_STR_LENGTH_OFFSET];
 
 		m = SENSOR_CONV_M_B( sdr->M, sdr->MTol );
 		b = SENSOR_CONV_M_B( sdr->B, sdr->BAcc );
