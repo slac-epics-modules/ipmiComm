@@ -462,7 +462,7 @@ mchFruProdDataGet(FruProd prod, uint8_t *raw, unsigned *offset)
 {
 	if ( 0 != (*offset = 8*raw[FRU_DATA_COMMON_HEADER_OFFSET + FRU_DATA_COMMON_HEADER_PROD_AREA_OFFSET]) ) {
 
-		prod->lang = raw[*offset + FRU_DATA_BOARD_AREA_LANG_OFFSET];
+		prod->lang = raw[*offset + FRU_DATA_PROD_AREA_LANG_OFFSET];
 
 		*offset += FRU_DATA_PROD_AREA_MANUF_LENGTH_OFFSET;
 
