@@ -20,7 +20,9 @@ jobs:
         submodules: recursive
         path: epics-base
     - name: make epics-base
-      run: make
+      run: |
+        cd epics-base
+        make
     - name: ipmiComm checkout
       uses: actions/checkout@v2
     - name: make ipmiComm
