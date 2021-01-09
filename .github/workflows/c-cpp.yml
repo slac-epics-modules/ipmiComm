@@ -12,6 +12,12 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+    - name: EPICS base
+      uses: actions/checkout@v2
+      with:
+        repository: epics-base/epics-base
+        ref: R7.0.3.1
+        submodules: recursive
     - uses: actions/checkout@v2
     - name: make
       run: make
