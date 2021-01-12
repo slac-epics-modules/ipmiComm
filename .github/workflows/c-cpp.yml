@@ -31,4 +31,4 @@ jobs:
     - name: make ipmiComm
       run: make
       env: 
-        EPICS_SITE_TOP: ${{GITHUB_WORKSPACE}}
+        EPICS_SITE_TOP: ${{ env.GITHUB_WORKSPACE}}
