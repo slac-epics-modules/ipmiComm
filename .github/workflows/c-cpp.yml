@@ -2,9 +2,12 @@ name: C/C++ CI
 
 on:
   push:
-    branches: [ master ]
+    branches:
+      - master
+      - actions-dev
   pull_request:
-    branches: [ master ]
+    branches: 
+      - master
 
 jobs:
   build:
@@ -28,4 +31,4 @@ jobs:
     - name: make ipmiComm
       run: make
       env: 
-        EPICS_SITE_TOP: $GITHUB_WORKSPACE
+        EPICS_SITE_TOP: ${{GITHUB_WORKSPACE}}
