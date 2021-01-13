@@ -28,8 +28,12 @@ jobs:
       run: |
         cd base
         make
-    - name: view base workspace
-      run : ls ${{ github.workspace }}
+    - name: asyn checkout
+      uses: actions/checkout@v2
+      with:
+        repository: epics-modules/asyn
+        ref: R4-41
+        path: asyn
     - name: ipmiComm checkout
       uses: actions/checkout@v2
       with:
