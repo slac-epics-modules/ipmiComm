@@ -11,9 +11,10 @@ on:
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
-
+    env:
+      BASE_MODULE_VERSION: R7.0.3.1
+      EPICS_MODULES: ${{ github.workspace }}
     steps:
     - name: EPICS base checkout
       uses: actions/checkout@v2
@@ -38,6 +39,8 @@ jobs:
       run: |
         cd asyn
         make
+      env:
+        EPICS_SITE_TOP: base
     - name: ipmiComm checkout
       uses: actions/checkout@v2
       with:
@@ -49,4 +52,4 @@ jobs:
         cd ipmiComm
         make
       env:
-        EPICS_SITE_TOP: ${{ github.workspace }}
+        EPICS_SITE_TOP: base
