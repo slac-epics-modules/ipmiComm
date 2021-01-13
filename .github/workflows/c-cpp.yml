@@ -37,6 +37,6 @@ jobs:
     - name: view workspace
       run: ls ${{ github.workspace }}
     - name: make ipmiComm
-      run: make
-      env: 
-        EPICS_SITE_TOP: ${{ github.workspace }}
+      run: |
+        cd ipmiComm
+        make
