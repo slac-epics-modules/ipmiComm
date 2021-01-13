@@ -28,6 +28,8 @@ jobs:
       run: |
         cd base
         make
+    - name: view base workspace
+      run : ls ${{ github.workspace }}
     - name: ipmiComm checkout
       uses: actions/checkout@v2
     - name: view workspace
