@@ -28,8 +28,9 @@ jobs:
         make
     - name: ipmiComm checkout
       uses: actions/checkout@v2
+    - name: view workspace
+      run: ls $env.GITHUB_WORKSPACE
     - name: make ipmiComm
-      run: ls $GITHUB_WORKSPACE
       run: make
       env: 
-        EPICS_SITE_TOP: ${{ GITHUB_WORKSPACE }}
+        EPICS_SITE_TOP: ${{ env.GITHUB_WORKSPACE }}
