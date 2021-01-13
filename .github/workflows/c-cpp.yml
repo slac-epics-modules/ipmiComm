@@ -34,6 +34,10 @@ jobs:
         repository: epics-modules/asyn
         ref: R4-41
         path: asyn
+    - name: make asyn
+      run: |
+        cd asyn
+        make
     - name: ipmiComm checkout
       uses: actions/checkout@v2
       with:
