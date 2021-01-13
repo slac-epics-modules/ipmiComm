@@ -32,6 +32,8 @@ jobs:
       run : ls ${{ github.workspace }}
     - name: ipmiComm checkout
       uses: actions/checkout@v2
+      with:
+        path: ipmiComm
     - name: view workspace
       run: ls ${{ github.workspace }}
     - name: make ipmiComm
