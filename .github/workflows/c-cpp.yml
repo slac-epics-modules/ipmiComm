@@ -40,3 +40,5 @@ jobs:
       run: |
         cd ipmiComm
         make
+      env:
+        EPICS_SITE_TOP: ${{ github.workspace }}
