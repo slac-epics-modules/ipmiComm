@@ -23,7 +23,7 @@ jobs:
         submodules: recursive
         path: base
     - name: view empty workspace
-      run: ls ${{ GITHUB_WORKSPACE}}
+      run: ls GITHUB_WORKSPACE
     - name: make epics-base
       run: |
         cd base
@@ -31,7 +31,7 @@ jobs:
     - name: ipmiComm checkout
       uses: actions/checkout@v2
     - name: view workspace
-      run: ls ${{GITHUB_WORKSPACE}}
+      run: ls GITHUB_WORKSPACE
     - name: make ipmiComm
       run: make
       env: 
