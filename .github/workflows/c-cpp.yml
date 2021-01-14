@@ -29,8 +29,6 @@ jobs:
       run: |
         cd base
         make
-        ls
-        ls configure/
     - name: asyn checkout
       uses: actions/checkout@v2
       with:
@@ -40,7 +38,7 @@ jobs:
     - name: update asyn config file
       run: |
         cd asyn/configure
-        sed -i 's+/corvette/usr/local/epics-devel/base-7.0.4+/base+' RELEASE
+        sed -i 's+/corvette/usr/local/epics-devel/base-7.0.4+/home/runner/work/ipmiComm/ipmiComm/base+' RELEASE
         cd ../..
     - name: make asyn
       run: |
