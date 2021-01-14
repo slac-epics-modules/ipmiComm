@@ -30,6 +30,7 @@ jobs:
         cd base
         make
         ls
+        ls configure/
     - name: asyn checkout
       uses: actions/checkout@v2
       with:
