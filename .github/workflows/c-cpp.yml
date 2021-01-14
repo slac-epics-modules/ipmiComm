@@ -45,7 +45,7 @@ jobs:
         cd asyn
         make
       env:
-        EPICS_SITE_TOP: base
+        EPICS_SITE_TOP: ${{ github.workspace }}/base
     - name: ipmiComm checkout
       uses: actions/checkout@v2
       with:
