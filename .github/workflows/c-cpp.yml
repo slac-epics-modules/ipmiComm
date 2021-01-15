@@ -34,14 +34,14 @@ jobs:
       with:
         repository: epics-modules/asyn
         ref: R4-41
-        path: asyn
+        path: modules/asyn
     - name: update asyn config file
       run: |
-        cd asyn/configure
+        cd modules/asyn/configure
         sed -i 's+/corvette/usr/local/epics-devel/base-7.0.4+/home/runner/work/ipmiComm/ipmiComm/base+' RELEASE
         sed -i 's/IPAC=/#IPAC=/g' RELEASE
         sed -i 's/SNCSEQ=/#SNCSEQ=/g' RELEASE
-        cd ../..
+        cd ../../..
     - name: make asyn
       run: |
         cd asyn
@@ -57,6 +57,8 @@ jobs:
     - name: make ipmiComm
       run: |
         cd ipmiComm
+        sed -i 's/ASYN_MODULE_VERSION=/#ASYN_MODULE_VERSION=/g' configure/RELEASE.local
         make
       env:
-        EPICS_SITE_TOP: base
+        EPICS_SITE_TOP: ${{ github.workspace }}/base
+        EPICS_MODULES: ${{ github.workspace }}/modules
