@@ -39,6 +39,8 @@ jobs:
       run: |
         cd asyn/configure
         sed -i 's+/corvette/usr/local/epics-devel/base-7.0.4+/home/runner/work/ipmiComm/ipmiComm/base+' RELEASE
+        sed -i 's/IPAC=/#IPAC=/g' RELEASE
+        sed -i 's/SNCSEQ=/#SNCSEQ=/g' RELEASE
         cd ../..
     - name: make asyn
       run: |
