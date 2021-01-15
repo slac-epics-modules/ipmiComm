@@ -60,5 +60,5 @@ jobs:
         sed -i 's/ASYN_MODULE_VERSION=/#ASYN_MODULE_VERSION=/g' configure/RELEASE.local
         make
       env:
-        EPICS_SITE_TOP: ${{ github.workspace }}/base
+        EPICS_SITE_TOP: ${{ github.workspace }}
         EPICS_MODULES: ${{ github.workspace }}/modules
