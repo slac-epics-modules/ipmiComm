@@ -20,37 +20,46 @@ jobs:
         ref: R7.0.3.1
         submodules: recursive
         path: base
-    - name: view empty workspace
+
+    - name: List workspace with base
       run: ls ${{ github.workspace }}
+
     - name: make epics-base
       run: |
         cd base
         make
+
     - name: asyn checkout
       uses: actions/checkout@v2
       with:
         repository: epics-modules/asyn
         ref: R4-41
         path: modules/asyn
-    - name: update asyn config file
+
+    - name: Update asyn config file
       run: |
         cd modules/asyn/configure
-        sed -i 's+/corvette/usr/local/epics-devel/base-7.0.4+/home/runner/work/ipmiComm/ipmiComm/base+' RELEASE
+        # sed -i 's+/corvette/usr/local/epics-devel/base-7.0.4+/home/runner/work/ipmiComm/ipmiComm/base+' RELEASE
+        sed -i 's/EPICS_BASE=/#EPICS_BASE=/g' RELEASE
         sed -i 's/IPAC=/#IPAC=/g' RELEASE
         sed -i 's/SNCSEQ=/#SNCSEQ=/g' RELEASE
         cd ../../..
+
     - name: make asyn
       run: |
         cd modules/asyn
         make
       env:
-        EPICS_SITE_TOP: ${{ github.workspace }}/base
+        EPICS_BASE: ${{ github.workspace }}/base
+
     - name: ipmiComm checkout
       uses: actions/checkout@v2
       with:
         path: ipmiComm
-    - name: view workspace
+
+    - name: Tree view of the workspace
       run: tree -d -L 2 ${{ github.workspace }}
+
     - name: make ipmiComm
       run: |
         cd ipmiComm
