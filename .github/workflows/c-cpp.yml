@@ -44,7 +44,7 @@ jobs:
         cd ../../..
     - name: make asyn
       run: |
-        cd asyn
+        cd modules/asyn
         make
       env:
         EPICS_SITE_TOP: ${{ github.workspace }}/base
@@ -53,7 +53,7 @@ jobs:
       with:
         path: ipmiComm
     - name: view workspace
-      run: ls ${{ github.workspace }}
+      run: tree -d -L 2 ${{ github.workspace }}
     - name: make ipmiComm
       run: |
         cd ipmiComm
