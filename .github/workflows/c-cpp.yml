@@ -59,8 +59,8 @@ jobs:
       with:
         path: ipmiComm
 
-    - name: Tree view of the workspace
-      run: tree -d -L 2 ${{ github.workspace }}
+    - name: List the workspace contents
+      run: find ${{ github.workspace }} -maxdepth 2 -mindepth 2 -type d
 
     - name: make ipmiComm
       run: |
