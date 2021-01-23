@@ -12,12 +12,19 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        epics_base: [R3.15.5, R3.15.8, R7.0.3.1, R7.0.4.1]
+        asyn: [R4-32, R4-39, R4-41]
+
     steps:
     - name: EPICS base checkout
       uses: actions/checkout@v2
       with:
         repository: epics-base/epics-base
-        ref: R7.0.3.1
+        ref: ${{ matrix.epics_base }}
         submodules: recursive
         path: base
 
@@ -33,13 +40,12 @@ jobs:
       uses: actions/checkout@v2
       with:
         repository: epics-modules/asyn
-        ref: R4-41
+        ref: ${{ matrix.asyn }}
         path: modules/asyn
 
     - name: Update asyn config file
       run: |
         cd modules/asyn/configure
-        # sed -i 's+/corvette/usr/local/epics-devel/base-7.0.4+/home/runner/work/ipmiComm/ipmiComm/base+' RELEASE
         sed -i 's/EPICS_BASE=/#EPICS_BASE=/g' RELEASE
         sed -i "/EPICS_BASE=/a EPICS_BASE=$EPICS_BASE" RELEASE
         sed -i 's/IPAC=/#IPAC=/g' RELEASE
