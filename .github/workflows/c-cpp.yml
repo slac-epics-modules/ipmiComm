@@ -41,16 +41,18 @@ jobs:
         cd modules/asyn/configure
         # sed -i 's+/corvette/usr/local/epics-devel/base-7.0.4+/home/runner/work/ipmiComm/ipmiComm/base+' RELEASE
         sed -i 's/EPICS_BASE=/#EPICS_BASE=/g' RELEASE
+        sed -i "/EPICS_BASE=/a EPICS_BASE=$EPICS_BASE" RELEASE
         sed -i 's/IPAC=/#IPAC=/g' RELEASE
         sed -i 's/SNCSEQ=/#SNCSEQ=/g' RELEASE
+        cat RELEASE
         cd ../../..
+      env:
+        EPICS_BASE: ${{ github.workspace }}/base
 
     - name: make asyn
       run: |
         cd modules/asyn
         make
-      env:
-        EPICS_BASE: ${{ github.workspace }}/base
 
     - name: ipmiComm checkout
       uses: actions/checkout@v2
