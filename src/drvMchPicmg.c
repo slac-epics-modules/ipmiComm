@@ -28,7 +28,7 @@
  * limit memory usage. Can be increased if
  * necessary
  */
-static int MAX_MGMT_ATCA = 10;
+static int MAX_MGMT_ATCA = 15;
 static int MAX_FRU_ATCA  = 25;
 
 /* Get Address Info - this is version that attempts to get physical location 
