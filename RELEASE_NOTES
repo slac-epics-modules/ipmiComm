@@ -1,3 +1,7 @@
+R4.3.0: 20-Aug-2021 S. Hoobler
+		- Change number of maximum MGMT devices from 10 to 15, based on experience
+                  with FACET ATCA crates.
+
 R4.2.7: 01-Oct-2020 S. Hoobler
   		Reduce number of sensor records for LCLS ATCA shelf,
   		now that we have more experience with the systems
