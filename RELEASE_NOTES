@@ -1,3 +1,6 @@
+R4.3.1: 04-Mar-2020 egumtow
+		- upgrade to asyn R4.39-1.0.1
+
 R4.3.0: 20-Aug-2021 S. Hoobler
 		- Change number of maximum MGMT devices from 10 to 15, based on experience
                   with FACET ATCA crates.
