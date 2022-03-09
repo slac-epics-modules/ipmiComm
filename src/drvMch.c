@@ -70,6 +70,7 @@ static int mchSdrGetDataAll(MchData mchData);
 static int mchFruGetDataAll(MchData mchData);
 int mchGetFruIdFromIndex(MchData mchData, int index);
 static int  mchCnfg(MchData mchData, int initFlag);
+static void mchCnfgReset(MchData mchData);
 
 
 static void
@@ -1815,8 +1816,38 @@ uint8_t response[MSG_MAX_LENGTH] = { 0 };
 size_t  responseSize, responseLen; /* expected, actual */
 int     cos; /* change of state */
 int     inst = mchSess->instance, i = 0, j = 0;
+int     online = 0, tries = 0;
 
 	buildPingMsg( message, &responseSize );
+
+	/* first we perform some initialization */
+
+	while ((online == 0) && ( tries < 3)) {
+		ipmiMsgWriteRead( mchSess->name, message, sizeof( RMCP_HEADER ) + sizeof( ASF_MSG ), 
+			response, &responseSize, RPLY_TIMEOUT_DEFAULT, &responseLen );
+		if (responseLen != 0){
+			online = 1;
+			break;
+		}
+		epicsThreadSleep( 1 );
+		tries++;
+	}
+
+	if (online == 1) {
+		mchStatSet( inst, MCH_MASK_ONLN, MCH_MASK_ONLN );
+		epicsMutexLock( mch->mutex );
+		mchCnfg( mchData, MCH_CNFG_INIT ); /* flag 1 = at init, before run-time */
+		epicsMutexUnlock( mch->mutex );
+	}
+	else {
+		/* Since device type is unknown, assume max number of FRU/MGMT devices
+		 * in order to support whichever EPICS DB is loaded for this device
+		 */
+		mchCnfgReset( mchData ); /* Initialize some data structs and values */
+		printf("No response from %s after %i tries; cannot complete initialization\n",mch->name, tries);
+	}
+
+	/* initialization is done.  now we can go do work. */
 
 	while (1) {
 
@@ -2290,10 +2321,6 @@ IpmiSess ipmiSess = 0;
 MchSys   mchSys  = 0;
 char     taskName[MAX_NAME_LENGTH+10];
 int      inst;
-int      online = 0, tries = 0;
-uint8_t  message[MSG_MAX_LENGTH]  = { 0 }; /* for ping message */
-uint8_t  response[MSG_MAX_LENGTH] = { 0 };
-size_t   responseSize, responseLen; /* expected, actual */
 
 	/* Allocate memory for MCH data structures */
 	if ( ! (mchData = calloc( 1, sizeof( *mchData ))) )
@@ -2342,33 +2369,7 @@ size_t   responseSize, responseLen; /* expected, actual */
 	/* For sensor record scanning */
 	scanIoInit( &drvSensorScan[inst] );
 
-	buildPingMsg( message, &responseSize);
-	while ((online == 0) && ( tries < 3)) {
-		ipmiMsgWriteRead( mchSess->name, message, sizeof( RMCP_HEADER ) + sizeof( ASF_MSG ), 
-			response, &responseSize, RPLY_TIMEOUT_DEFAULT, &responseLen );
-		if (responseLen != 0){
-			online = 1;
-			break;			
-		}
-		epicsThreadSleep( 1 ); 
-		tries++;
-	}
-
-	if (online == 1) {
-		mchStatSet( inst, MCH_MASK_ONLN, MCH_MASK_ONLN );
-		epicsMutexLock( mch->mutex );
-		mchCnfg( mchData, MCH_CNFG_INIT ); /* flag 1 = at init, before run-time */
-		epicsMutexUnlock( mch->mutex );
-	}
-	else {
-		/* Since device type is unknown, assume max number of FRU/MGMT devices
-		 * in order to support whichever EPICS DB is loaded for this device
-		 */
-		mchCnfgReset( mchData ); /* Initialize some data structs and values */
-		printf("No response from %s after %i tries; cannot complete initialization\n",mch->name, tries);
-	}
-
-	/* Start task to periodically ping MCH */
+	/* Start task to continue initialization and periodically ping MCH */
 	sprintf( taskName, "%s-PING", mch->name ); 
 	mchSess->pingThreadId = epicsThreadMustCreate( taskName, epicsThreadPriorityMedium, epicsThreadGetStackSize(epicsThreadStackMedium), mchPing, mch );
 }
