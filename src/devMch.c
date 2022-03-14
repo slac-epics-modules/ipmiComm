@@ -308,16 +308,21 @@ MchDev rval = 0, d;
                          *       (_must_ pass d->name, not 'name'!!)
                          */
                         if ( registryAdd( registryId, d->name, d ) ) {
-                                rval = d; d = 0;
+                                /* success */
+                                rval = d;
+                                d = 0;
                         }
                 }
         }
 
         if (d) {
+                /* an error happened and we need to clean up */
                 if (d->mutex)
                         epicsMutexDestroy(d->mutex);
                 free(d);
         }
+
+        /* return address of MchDev struct for success, 0 for error */
         return rval;
 }
 

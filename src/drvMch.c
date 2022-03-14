@@ -2341,10 +2341,7 @@ int      inst;
 
 	mchStatMtx[inst] = epicsMutexMustCreate(); /* Used for global mchStat mask */
 
-	/* Allocate memory for MCH device support structure */
-	if ( ! (mch = calloc( 1, sizeof( *mch ) )) )
-		cantProceed("FATAL ERROR: No memory for MchDev structure\n");
-
+	/* Allocate and initialize memory for MCH device support structure */
 	if ( ! (mch = devMchRegister( name )) )
 		printf("FATAL ERROR: Unable to register MCH %s with device support\n", name);
 
