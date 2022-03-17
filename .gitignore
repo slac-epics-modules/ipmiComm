@@ -4,6 +4,6 @@ O.*/
 RELEASE_SITE
 db/
 dbd/
-iocBoot/*/envPaths
+iocs/**/envPaths
 *~
 lib/

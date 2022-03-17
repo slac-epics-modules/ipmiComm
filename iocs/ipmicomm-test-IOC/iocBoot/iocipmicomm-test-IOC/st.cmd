@@ -1,4 +1,4 @@
-#!../../bin/rhel6-x86_64/ipmiCommIoc
+#!../../bin/rhel6-x86_64/ipmicomm-test-IOC
 #==============================================================
 #
 #  Abs:  Startup script for Network IOC
@@ -21,22 +21,21 @@
 < envPaths
 
 # Change to TOP of ioc application
-#cd ${TOP}
-cd ../../
+cd ${TOP}
 
 # Load EPICS Database
-dbLoadDatabase("dbd/ipmiCommIoc.dbd")
-ipmiCommIoc_registerRecordDeviceDriver(pdbbase)
+dbLoadDatabase("dbd/ipmicomm-test-IOC.dbd")
+ipmicomm_test_IOC_registerRecordDeviceDriver(pdbbase)
 
 
 # Order of commands is important
 #drvAsynIPPortConfigure ("mch-li27-bp03","mch-li27-bp03:623 udp",0,0,0)
 #drvAsynIPPortConfigure ("b34-mp03","ioc-b34-mp03-mgt:623 udp",0,0,0)
-drvAsynIPPortConfigure ("cpu-test","cpu-b084-hp03-mgt:623 udp",0,0,0)
+drvAsynIPPortConfigure ("cpu-test","cpu-b084-sp18-mgt:623 udp",0,0,0)
 #drvAsynIPPortConfigure ("cpu-test","cpu-b084-pm01-mgt:623 udp",0,0,0)
 #drvAsynIPPortConfigure ("shm-test1","shm-b084-hp05:623 udp",0,0,0)
 ##drvAsynIPPortConfigure ("shm-test1","shm-b084-hp02:623 udp",0,0,0)
-drvAsynIPPortConfigure ("shm-test","shm-b084-sp17:623 udp",0,0,0)
+drvAsynIPPortConfigure ("shm-test","shm-b084-sp17-2:623 udp",0,0,0)
 
 
 #mchInit("mch-li27-bp03")
