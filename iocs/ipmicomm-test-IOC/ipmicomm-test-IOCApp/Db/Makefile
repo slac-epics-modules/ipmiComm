@@ -9,6 +9,7 @@ include $(TOP)/configure/CONFIG
 #DB += 
 DB_INSTALLS += $(IPMICOMM)/db/shelf_atca_7slot_lcls.db
 DB_INSTALLS += $(IPMICOMM)/db/server_pc_lcls.db
+DB_INSTALLS += $(ASYN)/db/asynRecord.db
 # DB += for locally provided database files belonging to this app.
 # DB_INSTALLS += for database files not owned by this app.
 

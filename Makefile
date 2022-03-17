@@ -11,7 +11,6 @@ DIRS := $(DIRS) $(filter-out $(DIRS), $(wildcard iocs))
 endif
 
 include $(TOP)/configure/RULES_TOP
-include $(TOP)/configure/RULES_TOP
 
 ifeq ($(BUILD_IOCS), YES)
 uninstall: uninstall_iocs

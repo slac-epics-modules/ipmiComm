@@ -8,11 +8,6 @@
 # any files from outside the application, so it is safest to
 # rebuild it completely if any modules it depends on change.
 #
-# Host- or target-specific settings can be given in files named
-#  RELEASE.$(EPICS_HOST_ARCH).Common
-#  RELEASE.Common.$(T_A)
-#  RELEASE.$(EPICS_HOST_ARCH).$(T_A)
-#
 # This file is parsed by both GNUmake and an EPICS Perl script,
 # so it may ONLY contain definititions of paths to other support
 # modules, variable definitions that are used in module paths,
@@ -20,17 +15,6 @@
 # Variables may be used before their values have been set.
 # Build variables that are NOT used in paths should be set in
 # the CONFIG_SITE file.
-
-# Variables and paths to dependent modules:
-#MODULES = /path/to/modules
-#MYMODULE = $(MODULES)/my-module
-
-# If using the sequencer, point SNCSEQ at its top directory:
-#SNCSEQ = $(MODULES)/seq-ver
-
-# Set RULES here if you want to use build rules from somewhere
-# other than EPICS_BASE:
-#RULES = $(MODULES)/build-rules
 
 # These lines allow developers to override these RELEASE settings
 # without having to modify this file directly.
@@ -40,9 +24,26 @@
 -include $(TOP)/../../RELEASE_SITE
 
 # modules this app depends upon. this builds a search path for libraries, header files, db files.
+# ==========================================================
+# Define the version strings for all needed modules
+# Use naming pattern:
+#   FOO_MODULE_VERSION = R1.2
+# so scripts can extract version strings
+# Don't set your version to anything such as "test" that
+# could match a directory name.
+# ==========================================================
 ASYN_MODULE_VERSION=R4.39-1.0.1
+
+# ==========================================================
+# Define module paths using pattern
+# FOO = $(EPICS_MODULES)/foo/$(FOO_MODULE_VERSION)
+#  or
+# FOO = /Full/Path/To/Development/Version
+# ==========================================================
 ASYN=$(EPICS_MODULES)/asyn/$(ASYN_MODULE_VERSION)
 IPMICOMM=$(TOP)/../..
 
-# EPICS_BASE should appear last so earlier modules can override stuff:
-EPICS_BASE = /afs/slac/g/lcls/epics/base/R7.0.3.1-1.0
+# =====================================================================
+# Set EPICS_BASE last so it appears last in the DB, DBD, INCLUDE, and LIB search paths
+# ====================================================================
+EPICS_BASE=$(BASE_SITE_TOP)/$(BASE_MODULE_VERSION)
