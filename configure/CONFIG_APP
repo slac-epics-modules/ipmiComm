@@ -19,3 +19,7 @@ endif
 
 # dbst based database optimization (default: NO)
 DB_OPT = NO
+
+# BUILD_IOCS should be YES or commented out, so that like with any variable,
+# you can override on the command line with "make BUILD_IOCS=YES".
+#BUILD_IOCS=YES

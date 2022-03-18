@@ -1,0 +1,49 @@
+# RELEASE - Location of external support modules
+#
+# IF YOU CHANGE ANY PATHS in this file or make API changes to
+# any modules it refers to, you should do a "make rebuild" in
+# this application's top level directory.
+#
+# The EPICS build process does not check dependencies against
+# any files from outside the application, so it is safest to
+# rebuild it completely if any modules it depends on change.
+#
+# This file is parsed by both GNUmake and an EPICS Perl script,
+# so it may ONLY contain definititions of paths to other support
+# modules, variable definitions that are used in module paths,
+# and include statements that pull in other RELEASE files.
+# Variables may be used before their values have been set.
+# Build variables that are NOT used in paths should be set in
+# the CONFIG_SITE file.
+
+# These lines allow developers to override these RELEASE settings
+# without having to modify this file directly.
+-include $(TOP)/../RELEASE.local
+-include $(TOP)/../RELEASE.$(EPICS_HOST_ARCH).local
+-include $(TOP)/configure/RELEASE.local
+-include $(TOP)/../../RELEASE_SITE
+
+# modules this app depends upon. this builds a search path for libraries, header files, db files.
+# ==========================================================
+# Define the version strings for all needed modules
+# Use naming pattern:
+#   FOO_MODULE_VERSION = R1.2
+# so scripts can extract version strings
+# Don't set your version to anything such as "test" that
+# could match a directory name.
+# ==========================================================
+ASYN_MODULE_VERSION=R4.39-1.0.1
+
+# ==========================================================
+# Define module paths using pattern
+# FOO = $(EPICS_MODULES)/foo/$(FOO_MODULE_VERSION)
+#  or
+# FOO = /Full/Path/To/Development/Version
+# ==========================================================
+ASYN=$(EPICS_MODULES)/asyn/$(ASYN_MODULE_VERSION)
+IPMICOMM=$(TOP)/../..
+
+# =====================================================================
+# Set EPICS_BASE last so it appears last in the DB, DBD, INCLUDE, and LIB search paths
+# ====================================================================
+EPICS_BASE=$(BASE_SITE_TOP)/$(BASE_MODULE_VERSION)
