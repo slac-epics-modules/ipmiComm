@@ -1,4 +1,12 @@
-R4.3.1: 04-Mar-2020 egumtow
+R4.4.0: 17-Mar-2022 M. Donadio
+                Changes implemented by Eric Gumtow:
+		- Multi-threaded mchInit resulted on a boot time considerable
+                  reduction. For 20 devices the boot went from almost 4 minutes
+                  to 20 seconds.
+                - Fixed memory leaks.
+                - Disentangled ipmiComm module from test application.
+
+R4.3.1: 04-Mar-2022 egumtow
 		- upgrade to asyn R4.39-1.0.1
 
 R4.3.0: 20-Aug-2021 S. Hoobler
