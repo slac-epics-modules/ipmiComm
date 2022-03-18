@@ -1,6 +1,5 @@
 # IPMI module
 - Author: Sonya Hoobler
-- Last updated: 29 Aug 2017
 
 ## To add IPMI support to your application:
 
