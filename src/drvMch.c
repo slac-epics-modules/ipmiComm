@@ -1199,12 +1199,13 @@ mchSdrSensDuplicate(MchSys mchSys, uint8_t *raw)
 int i;
 SdrFullRec tmp;
 SensorRec  sens;
+sdr_fru_marshall_t *sdr_fru = (sdr_fru_marshall_t *) raw;
 
-	tmp.owner      = raw[SDR_OWNER_OFFSET];
-	tmp.lun        = raw[SDR_LUN_OFFSET];
-	tmp.number     = raw[SDR_NUMBER_OFFSET];
-	tmp.entityId   = raw[SDR_ENTITY_ID_OFFSET];
-	tmp.entityInst = raw[SDR_ENTITY_INST_OFFSET];
+	tmp.owner      = sdr_fru->owner;
+	tmp.lun        = sdr_fru->lun;
+	tmp.number     = sdr_fru->number;
+	tmp.entityId   = sdr_fru->entityId;
+	tmp.entityInst = sdr_fru->entityInst;
 
 	for ( i = 0; i < mchSys->sensCount; i++ ) {
 
@@ -1261,22 +1262,23 @@ int m = 0, b = 0;
 
 	/* Full Sensor fields */
 	if ( type == SDR_TYPE_FULL_SENSOR ) {
+		sdr_fru_marshall_t *sdr_fru = (sdr_fru_marshall_t *) raw;
 
-		sdr->units1     = raw[SDR_UNITS1_OFFSET];      
-		sdr->units2     = raw[SDR_UNITS2_OFFSET];    
-		sdr->units3     = raw[SDR_UNITS3_OFFSET];    
-		sdr->linear     = raw[SDR_LINEAR_OFFSET];   
-		sdr->M          = raw[SDR_M_OFFSET];   
-		sdr->MTol       = raw[SDR_M_TOL_OFFSET];   
-		sdr->B          = raw[SDR_B_OFFSET];   
-		sdr->BAcc       = raw[SDR_B_ACC_OFFSET];
-		sdr->acc        = raw[SDR_ACC_OFFSET];   
-		sdr->RexpBexp   = raw[SDR_EXP_OFFSET];   
-		sdr->anlgChar   = raw[SDR_ANLG_CHAR_OFFSET];   
-		sdr->nominal    = raw[SDR_NOMINAL_OFFSET];   
-		sdr->normMax    = raw[SDR_NORM_MAX_OFFSET];   
-		sdr->normMin    = raw[SDR_NORM_MIN_OFFSET];   
-		sdr->strLength  = raw[SDR_STR_LENGTH_OFFSET];    
+		sdr->units1     = sdr_fru->units1;
+		sdr->units2     = sdr_fru->units2;
+		sdr->units3     = sdr_fru->units3;
+		sdr->linear     = sdr_fru->linear;
+		sdr->M          = sdr_fru->M;
+		sdr->MTol       = sdr_fru->MTol;
+		sdr->B          = sdr_fru->B;
+		sdr->BAcc       = sdr_fru->BAcc;
+		sdr->acc        = sdr_fru->acc;
+		sdr->RexpBexp   = sdr_fru->RexpBexp;
+		sdr->anlgChar   = sdr_fru->anlgChar;
+		sdr->nominal    = sdr_fru->nominal;
+		sdr->normMax    = sdr_fru->normMax;
+		sdr->normMin    = sdr_fru->normMin;
+		sdr->strLength  = sdr_fru->strLength;
 
 		m = SENSOR_CONV_M_B( sdr->M, sdr->MTol );
 		b = SENSOR_CONV_M_B( sdr->B, sdr->BAcc );
@@ -1290,7 +1292,7 @@ int m = 0, b = 0;
 		l = IPMI_DATA_LENGTH( sdr->strLength );
 		for ( i = 0; i < l; i++ )
 			sdr->str[i] = raw[SDR_STR_OFFSET + i];
-		sdr->str[i+1] = '\0';
+			sdr->str[i+1] = '\0';
        	}     
 
 #ifdef DEBUG

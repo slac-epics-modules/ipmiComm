@@ -629,6 +629,39 @@ extern size_t IPMI_MSG1_LENGTH;
 #define SDR_REC_TYPE_OFFSET    3
 #define SDR_LENGTH_OFFSET      4
 
+typedef struct __attribute__ ((packed)) {
+	uint8_t unknown1[5];
+	uint8_t owner;
+	uint8_t lun;
+	uint8_t number;
+	uint8_t entityId;
+	uint8_t entityInst;
+	uint8_t init;
+	uint8_t capOffset;
+	uint8_t sensType;
+	uint8_t readType;
+	uint16_t assertMask;
+	uint16_t deassertMaxK;
+	uint16_t readMask;
+	uint8_t units1;
+	uint8_t units2;
+	uint8_t units3;
+	uint8_t linear;
+	uint8_t M;
+	uint8_t MTol;
+	uint8_t B;
+	uint8_t BAcc;
+	uint8_t acc;
+	uint8_t RexpBexp;
+	uint8_t anlgChar;
+	uint8_t nominal;
+	uint8_t normMax;
+	uint8_t normMin;
+	uint8_t strLength;
+	uint8_t str;
+} sdr_fru_marshall_t;
+
+
 /* SDR Full Sensor contents */
 #define SDR_OWNER_OFFSET        5  /* SDR Key Fields */
 #define SDR_LUN_OFFSET          6
