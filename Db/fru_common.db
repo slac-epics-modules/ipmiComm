@@ -35,6 +35,8 @@ record(mbbi, "$(dev):$(id)$(unit):MSTATE") {
   field(SVST, "Deactivation In Progress")
   field(EIVL, "0x80")
   field(EIST, "Communication Lost")
+  field(NIVL, "0x0")
+  field(NIST, "Not Available")
   alias("$(dev):$(id)$(unit)_MSTATE")
 }
 

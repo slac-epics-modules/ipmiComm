@@ -1029,6 +1029,8 @@ int      s = 0, inst;
 	inst    = mchSess->instance;
 	task    = recPvt->task;
 
+	pmbbi->rval = 0; /* default state */
+
 	/* Read initialized status */
        	if ( !(strcmp( task, "init" )) )
        		pmbbi->rval = mchStat[inst] & MCH_MASK_INIT;
@@ -1061,7 +1063,8 @@ int      s = 0, inst;
 		else if ( !(strcmp( task, "hs")) && checkMchOnlnSess( mchSess ) ) {
 
 			if ( -1 == (sindex = sensLkup( mchSys, pmbbi->inp.value.camacio )) ) {
-				return ERROR;
+				/* return 0 here rather than ERROR so we can provide "Not Available" */
+				return 0;
 			}
 
 			sens = &mchSys->sens[sindex];
@@ -1581,6 +1584,8 @@ uint8_t  l = 0, *d = 0; /* FRU data length and raw */
 	fru = &mchSys->fru[index];
 
 	/* index check may be sufficient; may no longer need to check recType */
+
+	strncpy(pstringin->val, "N/A", sizeof(pstringin->val));
 
 	if ( checkMchInitDone( mchSess ) ) {
 
