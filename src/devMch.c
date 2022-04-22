@@ -1596,7 +1596,7 @@ uint8_t  l = 0, *d = 0; /* FRU data length and raw */
 			}
 		}
 		else if ( !(strcmp( task, "bp" )) ) {
-			if (fru->board.manuf.length == 0) {
+			if (fru->board.prod.length == 0) {
 				d = "N/A";
 				l = 4;
 			} else {
@@ -1605,7 +1605,7 @@ uint8_t  l = 0, *d = 0; /* FRU data length and raw */
 			}
 		}
 		else if ( !(strcmp( task, "pmf" )) ) {
-			if (fru->board.manuf.length == 0) {
+			if (fru->prod.manuf.length == 0) {
 				d = "N/A";
 				l = 4;
 			} else {
@@ -1614,7 +1614,7 @@ uint8_t  l = 0, *d = 0; /* FRU data length and raw */
 			}
 		}
 		else if ( !(strcmp( task, "pp" )) ) {
-			if (fru->board.manuf.length == 0) {
+			if (fru->prod.prod.length == 0) {
 				d = "N/A";
 				l = 4;
 			} else {
@@ -1623,7 +1623,7 @@ uint8_t  l = 0, *d = 0; /* FRU data length and raw */
 			}
 		}
 		else if ( !(strcmp( task, "bpn" )) ) {
-			if (fru->board.manuf.length == 0) {
+			if (fru->board.part.length == 0) {
 				d = "N/A";
 				l = 4;
 			} else {
@@ -1632,7 +1632,7 @@ uint8_t  l = 0, *d = 0; /* FRU data length and raw */
 			}
 		}
 		else if ( !(strcmp( task, "ppn" )) ) {
-			if (fru->board.manuf.length == 0) {
+			if (fru->prod.part.length == 0) {
 				d = "N/A";
 				l = 4;
 			} else {
@@ -1641,7 +1641,7 @@ uint8_t  l = 0, *d = 0; /* FRU data length and raw */
 			}
 		}
 		else if ( !(strcmp( task, "bsn" )) ) {
-			if (fru->board.manuf.length == 0) {
+			if (fru->board.sn.length == 0) {
 				d = "N/A";
 				l = 4;
 			} else {
@@ -1651,7 +1651,7 @@ uint8_t  l = 0, *d = 0; /* FRU data length and raw */
 		} 
 
 		else if ( !(strcmp( task, "psn" )) ) {
-			if (fru->board.manuf.length == 0) {
+			if (fru->prod.sn.length == 0) {
 				d = "N/A";
 				l = 4;
 			} else {
