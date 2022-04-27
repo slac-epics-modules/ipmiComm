@@ -1061,7 +1061,9 @@ int      s = 0, inst;
 		else if ( !(strcmp( task, "hs")) && checkMchOnlnSess( mchSess ) ) {
 
 			if ( -1 == (sindex = sensLkup( mchSys, pmbbi->inp.value.camacio )) ) {
-				return ERROR;
+				pmbbi->rval = 0x100; /* default state */
+				/* return 0 here rather than ERROR so we can provide "Not Available" */
+				return 0;
 			}
 
 			sens = &mchSys->sens[sindex];
@@ -1585,37 +1587,77 @@ uint8_t  l = 0, *d = 0; /* FRU data length and raw */
 	if ( checkMchInitDone( mchSess ) ) {
 
 		if ( !(strcmp( task, "bmf" )) ) {
-			d = fru->board.manuf.data;
-			l = fru->board.manuf.length;
+			if (fru->board.manuf.length == 0) {
+				d = "N/A";
+				l = 4;
+			} else {
+				d = fru->board.manuf.data;
+				l = fru->board.manuf.length;
+			}
 		}
 		else if ( !(strcmp( task, "bp" )) ) {
-			d = fru->board.prod.data;
-			l = fru->board.prod.length;
+			if (fru->board.prod.length == 0) {
+				d = "N/A";
+				l = 4;
+			} else {
+				d = fru->board.prod.data;
+				l = fru->board.prod.length;
+			}
 		}
 		else if ( !(strcmp( task, "pmf" )) ) {
-			d = fru->prod.manuf.data;
-			l = fru->prod.manuf.length;
+			if (fru->prod.manuf.length == 0) {
+				d = "N/A";
+				l = 4;
+			} else {
+				d = fru->prod.manuf.data;
+				l = fru->prod.manuf.length;
+			}
 		}
 		else if ( !(strcmp( task, "pp" )) ) {
-			d = fru->prod.prod.data;
-			l = fru->prod.prod.length;
+			if (fru->prod.prod.length == 0) {
+				d = "N/A";
+				l = 4;
+			} else {
+				d = fru->prod.prod.data;
+				l = fru->prod.prod.length;
+			}
 		}
 		else if ( !(strcmp( task, "bpn" )) ) {
-			d = fru->board.part.data;
-			l = fru->board.part.length;
+			if (fru->board.part.length == 0) {
+				d = "N/A";
+				l = 4;
+			} else {
+				d = fru->board.part.data;
+				l = fru->board.part.length;
+			}
 		}
 		else if ( !(strcmp( task, "ppn" )) ) {
-			d = fru->prod.part.data;
-			l = fru->prod.part.length;
+			if (fru->prod.part.length == 0) {
+				d = "N/A";
+				l = 4;
+			} else {
+				d = fru->prod.part.data;
+				l = fru->prod.part.length;
+			}
 		}
 		else if ( !(strcmp( task, "bsn" )) ) {
-			d = fru->board.sn.data;
-			l = fru->board.sn.length;
+			if (fru->board.sn.length == 0) {
+				d = "N/A";
+				l = 4;
+			} else {
+				d = fru->board.sn.data;
+				l = fru->board.sn.length;
+			}
 		} 
 
 		else if ( !(strcmp( task, "psn" )) ) {
-			d = fru->prod.sn.data;
-			l = fru->prod.sn.length;
+			if (fru->prod.sn.length == 0) {
+				d = "N/A";
+				l = 4;
+			} else {
+				d = fru->prod.sn.data;
+				l = fru->prod.sn.length;
+			}
 		}
 
 		if ( d ) {
