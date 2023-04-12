@@ -12,6 +12,7 @@
 #include <string.h>
 #include <math.h>    /* floor, pow */
 #include <ctype.h>   /* toupper */
+#include <unistd.h>
 
 #include <arpa/inet.h>
 #include <netinet/in.h>
@@ -31,6 +32,7 @@
 #include <drvMchMsg.h>
 #include <ipmiMsg.h>
 #include <picmgDef.h>
+#include <initHooks.h>
 
 #undef DEBUG 
 
@@ -61,7 +63,10 @@ char mchDescString[MCH_TYPE_MAX][MCH_DESC_MAX_LENGTH] =
                     ""
                 };
 
-int mchCounter = 0;
+static int mchCounter = 0;
+static int mchInitSuccessCounter = 0;
+static int mchInitFailCounter = 0;
+static int postIocStart = 0;
 
 epicsMutexId mchStatMtx[MAX_MCH];
 uint32_t     mchStat[MAX_MCH] = { 0 };
@@ -72,6 +77,24 @@ int mchGetFruIdFromIndex(MchData mchData, int index);
 static int  mchCnfg(MchData mchData, int initFlag);
 static void mchCnfgReset(MchData mchData);
 
+
+// we must wait for the IPMI sessions to finish initializing before
+// the IOC continues on and tries to write/read IPMI SDRs.
+static void mchInitHook(initHookState state)
+{
+	if (state != initHookAtIocBuild) {
+		return;
+	}
+
+	postIocStart = 1;
+
+	printf("sync %d mchInit\n", mchCounter);
+	while (mchInitSuccessCounter + mchInitFailCounter < mchCounter) {
+		sleep(1);
+	}
+
+	printf("sync mchInit: %d succeeded, %d failed\n", mchInitSuccessCounter, mchInitFailCounter);
+}
 
 static void
 mchSeqInit(IpmiSess ipmiSess)
@@ -1838,6 +1861,7 @@ int     online = 0, tries = 0;
 		epicsMutexLock( mch->mutex );
 		mchCnfg( mchData, MCH_CNFG_INIT ); /* flag 1 = at init, before run-time */
 		epicsMutexUnlock( mch->mutex );
+		mchInitSuccessCounter++;
 	}
 	else {
 		/* Since device type is unknown, assume max number of FRU/MGMT devices
@@ -1845,6 +1869,7 @@ int     online = 0, tries = 0;
 		 */
 		mchCnfgReset( mchData ); /* Initialize some data structs and values */
 		printf("No response from %s after %i tries; cannot complete initialization\n",mch->name, tries);
+		mchInitFailCounter++;
 	}
 
 	/* initialization is done.  now we can go do work. */
@@ -2322,6 +2347,11 @@ MchSys   mchSys  = 0;
 char     taskName[MAX_NAME_LENGTH+10];
 int      inst;
 
+	if (postIocStart) {
+		printf("Error: calling mchInit() too late\n");
+		return;
+	}
+
 	/* Allocate memory for MCH data structures */
 	if ( ! (mchData = calloc( 1, sizeof( *mchData ))) )
 		cantProceed("FATAL ERROR: No memory for MchData structure for %s\n", name);
@@ -2415,6 +2445,7 @@ drvMchRegisterCommands(void)
 {
 	static int firstTime = 1;
 	if ( firstTime ) {
+		initHookRegister(mchInitHook);
 		iocshRegister(&mchInitFuncDef, mchInitCallFunc);
 		firstTime = 0;
 	}
