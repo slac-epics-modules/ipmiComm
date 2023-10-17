@@ -25,9 +25,9 @@ extern "C" {
 #define MAX_NAME_LENGTH 50 
 #define MAX_TASK_LENGTH 10
 
-IOSCANPVT drvMchStatScan;
-IOSCANPVT drvMchInitScan;
-IOSCANPVT drvMchFruScan;
+extern IOSCANPVT drvMchStatScan;
+extern IOSCANPVT drvMchInitScan;
+extern IOSCANPVT drvMchFruScan;
 
 /* Much of this stolen from devBusMapped */
 

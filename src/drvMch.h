@@ -30,7 +30,7 @@ extern volatile uint8_t mchSensorScanPeriod;
 extern epicsMutexId mchStatMtx[MAX_MCH];
 
 /* Used for sensor scanning; one list per MCH */
-IOSCANPVT drvSensorScan[MAX_MCH];
+extern IOSCANPVT drvSensorScan[MAX_MCH];
 
 /* Vadatech typically sends 2 replies; NAT sends 1 */
 #define RPLY_TIMEOUT_SENDMSG_RPLY    0.50
@@ -254,7 +254,7 @@ extern char mchDescString[MCH_TYPE_MAX][MCH_DESC_MAX_LENGTH]; /* Defined in drvM
 #define VT_ENTITY_ID_RTM      0xC0  /* asked Vivek to verify */
 
 extern const void *mchCbRegistryId;
-struct MchCbRec_ {
+extern struct MchCbRec_ {
     void   (*assign_sys_sizes)   (MchData mchData);
     void   (*assign_site_info)   (MchData mchData);
     void   (*assign_fru_lkup)    (MchData mchData);    
