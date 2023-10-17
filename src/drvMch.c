@@ -71,6 +71,9 @@ static int postIocStart = 0;
 epicsMutexId mchStatMtx[MAX_MCH];
 uint32_t     mchStat[MAX_MCH] = { 0 };
 
+IOSCANPVT drvSensorScan[MAX_MCH];
+struct MchCbRec_ *MchCb;
+
 static int mchSdrGetDataAll(MchData mchData);
 static int mchFruGetDataAll(MchData mchData);
 int mchGetFruIdFromIndex(MchData mchData, int index);
