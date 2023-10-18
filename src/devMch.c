@@ -206,6 +206,10 @@ extern uint32_t mchStat[MAX_MCH];
  */
 uint8_t SENSOR_SCAN_PERIODS[5] = { 5, 10, 20, 30, 60 }; 
 
+IOSCANPVT drvMchStatScan;
+IOSCANPVT drvMchInitScan;
+IOSCANPVT drvMchFruScan;
+
 #define MAX_STRING_LENGTH 39
 #define MAX_EGU_LENGTH 16
 

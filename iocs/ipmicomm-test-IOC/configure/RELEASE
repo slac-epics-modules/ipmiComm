@@ -16,13 +16,6 @@
 # Build variables that are NOT used in paths should be set in
 # the CONFIG_SITE file.
 
-# These lines allow developers to override these RELEASE settings
-# without having to modify this file directly.
--include $(TOP)/../RELEASE.local
--include $(TOP)/../RELEASE.$(EPICS_HOST_ARCH).local
--include $(TOP)/configure/RELEASE.local
--include $(TOP)/../../RELEASE_SITE
-
 # modules this app depends upon. this builds a search path for libraries, header files, db files.
 # ==========================================================
 # Define the version strings for all needed modules
@@ -47,3 +40,10 @@ IPMICOMM=$(TOP)/../..
 # Set EPICS_BASE last so it appears last in the DB, DBD, INCLUDE, and LIB search paths
 # ====================================================================
 EPICS_BASE=$(BASE_SITE_TOP)/$(BASE_MODULE_VERSION)
+
+# These lines allow developers to override these RELEASE settings
+# without having to modify this file directly.
+-include $(TOP)/../RELEASE.local
+-include $(TOP)/../RELEASE.$(EPICS_HOST_ARCH).local
+-include $(TOP)/configure/RELEASE.local
+-include $(TOP)/../../RELEASE_SITE
