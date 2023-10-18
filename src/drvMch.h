@@ -20,8 +20,6 @@
 #define MAX_MCH             255
 #define MAX_SENS_INST       32    /* Max instances of one sensor type on one FRU or Management Controller entity */
 
-extern const void *mchCbRegistryId;
-
 extern uint32_t mchStat[MAX_MCH];
 
 /* Sensor scan period [seconds] */
