@@ -97,23 +97,21 @@ Fru fru;
 }
 
 MchCbRec drvMchSupermicroCb = {
-    assign_sys_sizes: assign_sys_sizes_supermicro,   
-    assign_site_info: 0,
-    assign_fru_lkup:  assign_fru_lkup_supermicro,
-    fru_data_suppl:   0,
-    sensor_get_fru:   sensor_get_fru_supermicro,
-    get_chassis_status: mchMsgGetChassisStatus
-
+    .assign_sys_sizes	= assign_sys_sizes_supermicro,   
+    .assign_site_info	= 0,
+    .assign_fru_lkup	= assign_fru_lkup_supermicro,
+    .fru_data_suppl		= 0,
+    .sensor_get_fru		= sensor_get_fru_supermicro,
+    .get_chassis_status	= mchMsgGetChassisStatus
 };
 
 MchCbRec drvMchAdvantechCb = {
-    assign_sys_sizes: 0,   
-    assign_site_info: 0,
-    assign_fru_lkup:  assign_fru_lkup_advantech,
-    fru_data_suppl:   0,
-    sensor_get_fru:   sensor_get_fru_advantech,
-    get_chassis_status: mchMsgGetChassisStatus
-
+    .assign_sys_sizes 	= 0,   
+    .assign_site_info 	= 0,
+    .assign_fru_lkup 	= assign_fru_lkup_advantech,
+    .fru_data_suppl 	= 0,
+    .sensor_get_fru 	= sensor_get_fru_advantech,
+    .get_chassis_status = mchMsgGetChassisStatus
 };
 
 static void
