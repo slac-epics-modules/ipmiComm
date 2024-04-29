@@ -182,8 +182,8 @@ typedef struct MchSysRec_ {
 					     */
 	int           sensLkup[MAX_FRU_MGMT][MAX_SENSOR_TYPE][MAX_SENS_INST]; /* Index into sens struct array, used by devsup, -1 if not used */
 				     /* First index is FRU index (not FRU ID) */
-	uint32_t      sensCount;     /* Sensor count, data type must be larger than MAX_FRU_MGMT*MAX_SENSOR_TYPE*MAX_SENS_INST */
-	SensorRec    *sens;          /* Array of sensors (size of sensCount) */	
+	int           sensCount;     /* Sensor count, data type must be larger than MAX_FRU_MGMT*MAX_SENSOR_TYPE*MAX_SENS_INST */
+	SensorRec    *sens;          /* Array of sensors (size of sensCount) */
 	int           sensAlloc;     /* Flag indicating sensor array memory has been allocated and can be freed during configuration update*/
 	uint8_t       mgmtCount;     /* Management controller device count */
 	MgmtRec      *mgmt;          /* Array of management controller devices (size of mgmtCount) */	

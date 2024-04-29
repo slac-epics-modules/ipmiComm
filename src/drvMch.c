@@ -702,7 +702,7 @@ int rval = 0;
  * Caller must perform locking.
  */
 static void
-mchSensorGetFru(MchData mchData, uint8_t index)
+mchSensorGetFru(MchData mchData, int index)
 {
 MchSys mchSys = mchData->mchSys;
 Sensor sens   = &mchSys->sens[index];
