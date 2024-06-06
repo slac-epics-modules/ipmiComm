@@ -22,6 +22,13 @@ include $(TOP)/configure/CONFIG
 #  Optimization of db files using dbst (DEFAULT: NO)
 #DB_OPT = YES.
 
+# General modules
+DB += fru_common.db
+DB += fru_cu_common.db
+DB += sensor_ai.db
+DB += system_chassis_status.db
+DB += system_common.db
+
 # Files that make up our high-level templates
 DB += fru_basic.db
 DB += fru_extended.db
