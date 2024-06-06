@@ -36,7 +36,6 @@ DB += fru_pm.db
 DB += fru_cu.db
 DB += fru_atca_fb.db
 DB += fru_atca_rtm.db
-DB += system_common_lcls.db
 
 # Templates to be loaded per device 
 DB += shelf_microtca_12slot.db
@@ -49,6 +48,7 @@ DB += server_pc_lcls.db
 DB += fru_atca_fb_lcls.db
 DB += fru_atca_rtm_lcls.db
 DB += shelf_atca_7slot_lcls.db
+DB += system_common_lcls.db
 
 #----------------------------------------------------
 # Create and install (or just install) into <top>/db
