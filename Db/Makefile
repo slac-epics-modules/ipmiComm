@@ -22,6 +22,13 @@ include $(TOP)/configure/CONFIG
 #  Optimization of db files using dbst (DEFAULT: NO)
 #DB_OPT = YES.
 
+# General modules
+DB += fru_common.db
+DB += fru_cu_common.db
+DB += sensor_ai.db
+DB += system_chassis_status.db
+DB += system_common.db
+
 # Files that make up our high-level templates
 DB += fru_basic.db
 DB += fru_extended.db
@@ -29,7 +36,6 @@ DB += fru_pm.db
 DB += fru_cu.db
 DB += fru_atca_fb.db
 DB += fru_atca_rtm.db
-DB += system_common_lcls.db
 
 # Templates to be loaded per device 
 DB += shelf_microtca_12slot.db
@@ -42,6 +48,7 @@ DB += server_pc_lcls.db
 DB += fru_atca_fb_lcls.db
 DB += fru_atca_rtm_lcls.db
 DB += shelf_atca_7slot_lcls.db
+DB += system_common_lcls.db
 
 #----------------------------------------------------
 # Create and install (or just install) into <top>/db
