@@ -43,12 +43,12 @@ DB += shelf_atca_7slot.db
 DB += server_pc.db
 
 # Templates specific to LCLS
+DB += system_common_lcls.db
 DB += shelf_microtca_12slot_lcls.db
 DB += server_pc_lcls.db
 DB += fru_atca_fb_lcls.db
 DB += fru_atca_rtm_lcls.db
 DB += shelf_atca_7slot_lcls.db
-DB += system_common_lcls.db
 
 #----------------------------------------------------
 # Create and install (or just install) into <top>/db
