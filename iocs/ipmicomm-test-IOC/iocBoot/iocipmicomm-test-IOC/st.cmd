@@ -1,4 +1,4 @@
-#!../../bin/rhel6-x86_64/ipmicomm-test-IOC
+#!../../bin/rhel7-x86_64/ipmicomm-test-IOC
 #==============================================================
 #
 #  Abs:  Startup script for Network IOC
