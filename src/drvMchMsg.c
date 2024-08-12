@@ -57,8 +57,9 @@ int mchMsgWriteReadHelper(MchSess mchSess, IpmiSess ipmiSess, uint8_t* message, 
                       : RMCP_MSG_HEADER_LENGTH + IPMI_WRAPPER_AUTH_LENGTH + IPMI_MSG1_LENGTH + IPMI_MSG2_SEQLUN_OFFSET;
 
     /* seems we check this twice for sensor reads -- look into this */
-    if (!MCH_ONLN(mchStat[inst]))
+    if (!MCH_ONLN(mchStat[inst])) {
         return -1;
+    }
 
     status =
         ipmiMsgWriteRead(mchSess->name, message, messageSize, response, responseSize, mchSess->timeout, &responseLen);
@@ -68,28 +69,33 @@ int mchMsgWriteReadHelper(MchSess mchSess, IpmiSess ipmiSess, uint8_t* message, 
         if (MCH_DBG(mchStat[inst]) >= MCH_DBG_HIGH) {
             printf("%s Message status %i, received %i, expected %i, raw data:\n", mchSess->name, status,
                    (int)responseLen, *(int*)responseSize);
-            for (i = 0; i < responseLen; i++)
+            for (i = 0; i < responseLen; i++) {
                 printf("%02x ", response[i]);
+            }
             printf("\n");
-        } else if (status)
+        } else if (status) {
             printf("%s Message status %i, received %i, expected %i\n", mchSess->name, status, (int)responseLen,
                    *(int*)responseSize);
+        }
     }
 
     *responseSize = responseLen; /* Pass actual response length back to caller */
 
     if (outSess) {
-        if (status)
+        if (status) {
             return status;
+        }
 
-        if ((code = response[codeOffs]) && MCH_DBG(mchStat[inst]))
+        if ((code = response[codeOffs]) && MCH_DBG(mchStat[inst])) {
             ipmiCompletionCode(mchSess->name, code, cmd, netfn);
+        }
         return code;
     }
 
     if (mchSess->err > 9) {
-        if (MCH_DBG(mchStat[inst]))
+        if (MCH_DBG(mchStat[inst])) {
             printf("%s start new session; err count is %i\n", mchSess->name, mchSess->err);
+        }
 
         /* Reset error count to 0 */
         mchSess->err = 0;
@@ -108,22 +114,25 @@ int mchMsgWriteReadHelper(MchSess mchSess, IpmiSess ipmiSess, uint8_t* message, 
     /* Verify IPMI message sequence number. If incorrect, increment error count and return error */
     ipmiSeq = IPMI_SEQLUN_EXTRACT_SEQ(response[ipmiSeqOffs]);
     if (ipmiSeq != ipmiSess->seq) {
-        if (MCH_DBG(mchStat[inst]))
+        if (MCH_DBG(mchStat[inst])) {
             printf("%s Incorrect IPMI sequence; got %i but expected %i\n", mchSess->name, ipmiSeq, ipmiSess->seq);
+        }
         mchSess->err++;
         return -1;
     }
 
     /* Extract session sequence number from reply */
-    for (i = 0; i < IPMI_RPLY_SEQ_LENGTH; i++)
+    for (i = 0; i < IPMI_RPLY_SEQ_LENGTH; i++) {
         seq[i] = response[RMCP_MSG_HEADER_LENGTH + IPMI_WRAPPER_SEQ_OFFSET + i]; /* bridged offset ? */
+    }
 
     seqInt     = arrayToUint32(seq);
     seqRplyInt = arrayToUint32(ipmiSess->seqRply);
     seqDiff    = seqInt - seqRplyInt;
 
-    if (MCH_DBG(mchStat[inst]) >= MCH_DBG_HIGH)
+    if (MCH_DBG(mchStat[inst]) >= MCH_DBG_HIGH) {
         printf("%s new sequence number %i, stored %i\n", mchSess->name, seqInt, seqRplyInt);
+    }
 
     /* Check session sequence number. If it is not increasing or more than
      * 7 counts higher than last time, discard message and set error.
@@ -135,13 +144,16 @@ int mchMsgWriteReadHelper(MchSess mchSess, IpmiSess ipmiSess, uint8_t* message, 
      * Else reset error count to 0 and return success.
      */
     if ((seqInt <= seqRplyInt) || (seqDiff > 7)) {
-        if (MCH_DBG(mchStat[inst]) >= MCH_DBG_MED)
+        if (MCH_DBG(mchStat[inst]) >= MCH_DBG_MED) {
             printf("%s sequence number %i, previous %i\n", mchSess->name, seqInt, seqRplyInt);
+        }
         if ((seqDiff > 7)) {
-            for (i = 0; i < IPMI_RPLY_SEQ_LENGTH; i++)
+            for (i = 0; i < IPMI_RPLY_SEQ_LENGTH; i++) {
                 ipmiSess->seqRply[i] = seq[i];
-        } else
+            }
+        } else {
             incr4Uint8Array(ipmiSess->seqRply, 1);
+        }
 
         /* Dumb workaround for Advantech non-increasing numbers */
         if (!(mchSess->type == MCH_TYPE_ADVANTECH)) {
@@ -149,12 +161,14 @@ int mchMsgWriteReadHelper(MchSess mchSess, IpmiSess ipmiSess, uint8_t* message, 
             return -1;
         }
     } else {
-        for (i = 0; i < IPMI_RPLY_SEQ_LENGTH; i++)
+        for (i = 0; i < IPMI_RPLY_SEQ_LENGTH; i++) {
             ipmiSess->seqRply[i] = seq[i];
+        }
 
         if ((code = response[codeOffs])) {
-            if (MCH_DBG(mchStat[inst]))
+            if (MCH_DBG(mchStat[inst])) {
                 ipmiCompletionCode(mchSess->name, code, cmd, netfn);
+            }
             // mchSess->err++; // only increment error count for some errors ? --not parameter out of range, for example
             return code;
         }
@@ -237,8 +251,9 @@ int mchMsgGetChanAuth(MchSess mchSess, IpmiSess ipmiSess, uint8_t* data) {
     roffs        = IPMI_RPLY_HEADER_LENGTH;
     responseSize = (payloadSize == 0) ? 0 : roffs + payloadSize + FOOTER_LENGTH;
 
-    if ((rval = ipmiMsgGetChanAuth(mchSess, ipmiSess, response, &responseSize, roffs)))
+    if ((rval = ipmiMsgGetChanAuth(mchSess, ipmiSess, response, &responseSize, roffs))) {
         goto bail;
+    }
 
     if ((rval = mchMsgCheckSizes(sizeof(response), roffs, payloadSize))) {
         printf("mchMsgGetChanAuth size error\n");
@@ -279,8 +294,9 @@ int mchMsgGetSess(MchSess mchSess, IpmiSess ipmiSess, uint8_t* data) {
             break;
     }
 
-    if ((rval = ipmiMsgGetSess(mchSess, ipmiSess, response, &responseSize, msg, roffs)))
+    if ((rval = ipmiMsgGetSess(mchSess, ipmiSess, response, &responseSize, msg, roffs))) {
         goto bail;
+    }
 
     if ((rval = mchMsgCheckSizes(sizeof(response), roffs, payloadSize))) {
         printf("mchMsgGetSess size error\n");
@@ -306,8 +322,9 @@ int mchMsgActSess(MchSess mchSess, IpmiSess ipmiSess, uint8_t* data) {
 
     mchSetSizeOffs(ipmiSess, payloadSize, &roffs, &responseSize, &bridged, &rsAddr, &rqAddr);
 
-    if ((rval = ipmiMsgActSess(mchSess, ipmiSess, response, &responseSize, roffs)))
+    if ((rval = ipmiMsgActSess(mchSess, ipmiSess, response, &responseSize, roffs))) {
         goto bail;
+    }
 
     if ((rval = mchMsgCheckSizes(sizeof(response), roffs, payloadSize))) {
         printf("mchMsgActSess size error\n");
@@ -333,8 +350,9 @@ int mchMsgSetPriv(MchSess mchSess, IpmiSess ipmiSess, uint8_t* data, uint8_t lev
 
     mchSetSizeOffs(ipmiSess, payloadSize, &roffs, &responseSize, &bridged, &rsAddr, &rqAddr);
 
-    if ((rval = ipmiMsgSetPriv(mchSess, ipmiSess, response, &responseSize, level, roffs)))
+    if ((rval = ipmiMsgSetPriv(mchSess, ipmiSess, response, &responseSize, level, roffs))) {
         goto bail;
+    }
 
     if ((rval = mchMsgCheckSizes(sizeof(response), roffs, payloadSize))) {
         printf("mchMsgSetPriv size error\n");
@@ -364,8 +382,9 @@ static int mchMsgGetDeviceId(MchData mchData, uint8_t* data, int bridged,
     mchSetSizeOffs(mchData->ipmiSess, payloadSize, &roffs, &responseSize, &bridged, &rsAddr, &rqAddr);
 
     if ((rval = ipmiMsgGetDeviceId(mchData->mchSess, mchData->ipmiSess, response, bridged, rsAddr, rqAddr,
-                                   &responseSize, roffs)))
+                                   &responseSize, roffs))) {
         goto bail;
+    }
 
     if ((rval = mchMsgCheckSizes(sizeof(response), roffs, payloadSize))) {
         printf("mchMsgGetDeviceId size error\n");
@@ -380,8 +399,9 @@ bail:
 int mchMsgGetDeviceIdWrapper(MchData mchData, uint8_t* data, uint8_t rsAddr) {
     int bridged = 0;
 
-    if (rsAddr != IPMI_MSG_ADDR_BMC)
+    if (rsAddr != IPMI_MSG_ADDR_BMC) {
         bridged = 1;
+    }
     return mchMsgGetDeviceId(mchData, data, bridged, rsAddr);
 }
 
@@ -402,8 +422,9 @@ int mchMsgBroadcastGetDeviceId(MchData mchData, uint8_t* data, int tmp,
     mchSetSizeOffs(mchData->ipmiSess, payloadSize, &roffs, &responseSize, &bridged, &rsAddr, &rqAddr);
 
     if ((rval = ipmiMsgBroadcastGetDeviceId(mchData->mchSess, mchData->ipmiSess, response, bridged, rsAddr, rqAddr,
-                                            &responseSize, roffs)))
+                                            &responseSize, roffs))) {
         goto bail;
+    }
 
     if ((rval = mchMsgCheckSizes(sizeof(response), roffs, payloadSize))) {
         printf("mchMsgBroadcastGetDeviceId size error\n");
@@ -437,8 +458,9 @@ int mchMsgChassisControl(MchData mchData, uint8_t* data, uint8_t parm) {
     mchSetSizeOffs(mchData->ipmiSess, payloadSize, &roffs, &responseSize, &bridged, &rsAddr, &rqAddr);
 
     if ((rval = ipmiMsgChassisControl(mchData->mchSess, mchData->ipmiSess, response, bridged, rsAddr, rqAddr, parm,
-                                      &responseSize, roffs)))
+                                      &responseSize, roffs))) {
         goto bail;
+    }
 
     if ((rval = mchMsgCheckSizes(sizeof(response), roffs, payloadSize))) {
         printf("mchMsgChassisControl size error\n");
@@ -465,8 +487,9 @@ int mchMsgGetChassisStatus(MchData mchData, uint8_t* data) {
     mchSetSizeOffs(mchData->ipmiSess, payloadSize, &roffs, &responseSize, &bridged, &rsAddr, &rqAddr);
 
     if ((rval = ipmiMsgGetChassisStatus(mchData->mchSess, mchData->ipmiSess, response, bridged, rsAddr, rqAddr,
-                                        &responseSize, roffs)))
+                                        &responseSize, roffs))) {
         goto bail;
+    }
 
     if ((rval = mchMsgCheckSizes(sizeof(response), roffs, payloadSize))) {
         printf("mchMsgGetChassisStatus size error\n");
@@ -493,8 +516,9 @@ static int mchMsgGetFruInvInfo(MchData mchData, uint8_t* data, uint8_t id, int b
     mchSetSizeOffs(mchData->ipmiSess, payloadSize, &roffs, &responseSize, &bridged, &rsAddr, &rqAddr);
 
     if ((rval = ipmiMsgGetFruInvInfo(mchData->mchSess, mchData->ipmiSess, response, bridged, rsAddr, rqAddr, id,
-                                     &responseSize, roffs)))
+                                     &responseSize, roffs))) {
         goto bail;
+    }
 
     if ((rval = mchMsgCheckSizes(sizeof(response), roffs, payloadSize))) {
         printf("mchMsgGetFruInvInfo size error\n");
@@ -511,8 +535,9 @@ int mchMsgGetFruInvInfoWrapper(MchData mchData, uint8_t* data, Fru fru) {
     int     bridged = 0;
     uint8_t rsAddr  = fru->sdr.addr;
 
-    if (rsAddr != IPMI_MSG_ADDR_BMC)
+    if (rsAddr != IPMI_MSG_ADDR_BMC) {
         bridged = 1;
+    }
     return mchMsgGetFruInvInfo(mchData, data, fru->sdr.fruId, bridged, rsAddr);
 }
 
@@ -532,8 +557,9 @@ static int mchMsgReadFru(MchData mchData, uint8_t* data, uint8_t id, uint8_t* re
     mchSetSizeOffs(mchData->ipmiSess, payloadSize, &roffs, &responseSize, &bridged, &rsAddr, &rqAddr);
 
     if ((rval = ipmiMsgReadFru(mchData->mchSess, mchData->ipmiSess, response, bridged, rsAddr, rqAddr, id, readOffset,
-                               readSize, &responseSize, roffs)))
+                               readSize, &responseSize, roffs))) {
         goto bail;
+    }
 
     if ((rval = mchMsgCheckSizes(sizeof(response), roffs, payloadSize))) {
         printf("mchMsgReadFru size error\n");
@@ -550,8 +576,9 @@ int mchMsgReadFruWrapper(MchData mchData, uint8_t* data, Fru fru, uint8_t* readO
     int     bridged = 0;
     uint8_t rsAddr  = fru->sdr.addr;
 
-    if (rsAddr != IPMI_MSG_ADDR_BMC)
+    if (rsAddr != IPMI_MSG_ADDR_BMC) {
         bridged = 1;
+    }
     return mchMsgReadFru(mchData, data, fru->sdr.fruId, readOffset, readSize, bridged, rsAddr);
 }
 
@@ -573,8 +600,9 @@ static int mchMsgGetSdrRepInfo(MchData mchData, uint8_t* data, uint8_t parm, int
 
     /* Set channel ? */
     if ((rval = ipmiMsgGetSdrRepInfo(mchData->mchSess, mchData->ipmiSess, response, bridged, rsAddr, rqAddr,
-                                     &responseSize, roffs, parm)))
+                                     &responseSize, roffs, parm))) {
         goto bail;
+    }
 
     if ((rval = mchMsgCheckSizes(sizeof(response), roffs, payloadSize))) {
         printf("mchMsgGetSdrRepInfo size error roffs %i payloadSize %i responseSize %i\n", (int)roffs, (int)payloadSize,
@@ -591,8 +619,9 @@ bail:
 int mchMsgGetSdrRepInfoWrapper(MchData mchData, uint8_t* data, uint8_t parm, uint8_t rsAddr) {
     int bridged = 0;
 
-    if (rsAddr != IPMI_MSG_ADDR_BMC)
+    if (rsAddr != IPMI_MSG_ADDR_BMC) {
         bridged = 1;
+    }
 
     return mchMsgGetSdrRepInfo(mchData, data, parm, bridged, rsAddr);
 }
@@ -643,8 +672,9 @@ static int mchMsgReserveSdrRep(MchData mchData, uint8_t* data, uint8_t parm, int
     mchSetSizeOffs(mchData->ipmiSess, payloadSize, &roffs, &responseSize, &bridged, &rsAddr, &rqAddr);
 
     if ((rval = ipmiMsgReserveSdrRep(mchData->mchSess, mchData->ipmiSess, response, bridged, rsAddr, rqAddr,
-                                     &responseSize, roffs, parm)))
+                                     &responseSize, roffs, parm))) {
         goto bail;
+    }
 
     if ((rval = mchMsgCheckSizes(sizeof(response), roffs, payloadSize))) {
         printf("mchMsgReserveSdrRep size error\n");
@@ -660,8 +690,9 @@ bail:
 int mchMsgReserveSdrRepWrapper(MchData mchData, uint8_t* data, uint8_t parm, uint8_t rsAddr) {
     int bridged = 0;
 
-    if (rsAddr != IPMI_MSG_ADDR_BMC)
+    if (rsAddr != IPMI_MSG_ADDR_BMC) {
         bridged = 1;
+    }
     return mchMsgReserveSdrRep(mchData, data, parm, bridged, rsAddr);
 }
 
@@ -689,8 +720,9 @@ static int mchMsgGetSdr(MchData mchData, uint8_t* data, uint8_t* id, uint8_t* re
     mchSetSizeOffs(mchData->ipmiSess, payloadSize, &roffs, &responseSize, &bridged, &rsAddr, &rqAddr);
 
     if ((rval = ipmiMsgGetSdr(mchData->mchSess, mchData->ipmiSess, response, bridged, rsAddr, rqAddr, id, res, offset,
-                              readSize, &responseSize, roffs, parm)))
+                              readSize, &responseSize, roffs, parm))) {
         goto bail;
+    }
 
     if ((rval = mchMsgCheckSizes(sizeof(response), roffs, payloadSize))) {
         printf("mchMsgGetSdr size error\n");
@@ -707,8 +739,9 @@ int mchMsgGetSdrWrapper(MchData mchData, uint8_t* data, uint8_t* id, uint8_t* re
                         uint8_t parm, uint8_t rsAddr) {
     int bridged = 0;
 
-    if (rsAddr != IPMI_MSG_ADDR_BMC)
+    if (rsAddr != IPMI_MSG_ADDR_BMC) {
         bridged = 1;
+    }
     return mchMsgGetSdr(mchData, data, id, res, offset, readSize, parm, bridged, rsAddr);
 }
 
@@ -728,8 +761,9 @@ int mchMsgReadSensor(MchData mchData, uint8_t* data, uint8_t sens, uint8_t lun, 
     mchSetSizeOffs(mchData->ipmiSess, payloadSize, &roffs, &responseSize, &bridged, &rsAddr, &rqAddr);
 
     if ((rval = ipmiMsgReadSensor(mchData->mchSess, mchData->ipmiSess, response, bridged, rsAddr, rqAddr, sens, lun,
-                                  &responseSize, roffs)))
+                                  &responseSize, roffs))) {
         goto bail;
+    }
 
     payloadSize = *sensReadMsgSize = responseSize - roffs - FOOTER_LENGTH;
     if ((rval = mchMsgCheckSizes(sizeof(response), roffs, payloadSize))) {
@@ -750,8 +784,9 @@ int mchMsgReadSensorWrapper(MchData mchData, uint8_t* data, Sensor sens, size_t*
     int     bridged = 0;
     uint8_t rsAddr  = sens->sdr.owner;
 
-    if (rsAddr != IPMI_MSG_ADDR_BMC)
+    if (rsAddr != IPMI_MSG_ADDR_BMC) {
         bridged = 1;
+    }
     return mchMsgReadSensor(mchData, data, sens->sdr.number, (sens->sdr.lun & 0x3), sensReadMsgSize, bridged, rsAddr);
 }
 
@@ -765,8 +800,9 @@ static int mchMsgGetSensorThresholds(MchData mchData, uint8_t* data, uint8_t sen
     mchSetSizeOffs(mchData->ipmiSess, payloadSize, &roffs, &responseSize, &bridged, &rsAddr, &rqAddr);
 
     if ((rval = ipmiMsgGetSensorThresholds(mchData->mchSess, mchData->ipmiSess, response, bridged, rsAddr, rqAddr, sens,
-                                           lun, &responseSize, roffs)))
+                                           lun, &responseSize, roffs))) {
         goto bail;
+    }
 
     if ((rval = mchMsgCheckSizes(sizeof(response), roffs, payloadSize))) {
         printf("mchMsgGetSensorThresholds size error\n");
@@ -784,7 +820,8 @@ int mchMsgGetSensorThresholdsWrapper(MchData mchData, uint8_t* data, Sensor sens
     int     bridged = 0;
     uint8_t rsAddr  = sens->sdr.owner;
 
-    if (rsAddr != IPMI_MSG_ADDR_BMC)
+    if (rsAddr != IPMI_MSG_ADDR_BMC) {
         bridged = 1;
+    }
     return mchMsgGetSensorThresholds(mchData, data, sens->sdr.number, (sens->sdr.lun & 0x3), bridged, rsAddr);
 }

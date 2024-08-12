@@ -538,7 +538,7 @@ extern size_t IPMI_MSG1_LENGTH;
 #define IPMI_VER_MSD(x)                                x & 0x0F     /* Extract IPMI version, most significant digit */
 #define IPMI_MANUF_ID(x)                               x & 0x0FFFFF /* Extract manufacturer ID */
 #define IPMI_DEVICE_PROVIDES_DEVICE_SDR(x)             ((x & 1 << 7) >> 7)
-//#define IPMI_DEVICE_PROVIDES_FRU_INV_INFO(x) ((x&1<<3)>>3)
+// #define IPMI_DEVICE_PROVIDES_FRU_INV_INFO(x) ((x&1<<3)>>3)
 
 /* SDR commands */
 #define IPMI_SDRREP_PARM_GET_SDR     0

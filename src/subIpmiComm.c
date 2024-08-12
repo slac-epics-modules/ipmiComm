@@ -59,31 +59,39 @@ long subMchTypeFacility(struct aSubRecord* psub) {
 
     epicsFloat64 raw;
 
-    if (psub == NULL)
+    if (psub == NULL) {
         return 0;
+    }
 
     raw = *(epicsFloat64*)psub->a;
 
-    if (raw == MCH_TYPE_VT)
+    if (raw == MCH_TYPE_VT) {
         *((epicsFloat64*)psub->vala) = vt;
+    }
 
-    else if (raw == MCH_TYPE_NAT)
+    else if (raw == MCH_TYPE_NAT) {
         *((epicsFloat64*)psub->vala) = nat;
+    }
 
-    else if (raw == MCH_TYPE_SUPERMICRO)
+    else if (raw == MCH_TYPE_SUPERMICRO) {
         *((epicsFloat64*)psub->vala) = supermicro;
+    }
 
-    else if (raw == MCH_TYPE_PENTAIR)
+    else if (raw == MCH_TYPE_PENTAIR) {
         *((epicsFloat64*)psub->vala) = pentair;
+    }
 
-    else if (raw == MCH_TYPE_ARTESYN)
+    else if (raw == MCH_TYPE_ARTESYN) {
         *((epicsFloat64*)psub->vala) = artesyn;
+    }
 
-    else if (raw == MCH_TYPE_ADVANTECH)
+    else if (raw == MCH_TYPE_ADVANTECH) {
         *((epicsFloat64*)psub->vala) = advantech;
+    }
 
-    else if (raw == MCH_TYPE_UNKNOWN)
+    else if (raw == MCH_TYPE_UNKNOWN) {
         *((epicsFloat64*)psub->vala) = unknown;
+    }
 
     return 0;
 }

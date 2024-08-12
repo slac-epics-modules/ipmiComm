@@ -102,14 +102,17 @@ static void mchSeqInit(IpmiSess ipmiSess) {
 
     /* Initialize our stored sequence number for messages from MCH */
     ipmiSess->seqRply[0] = IPMI_WRAPPER_SEQ_INITIAL;
-    for (i = 1; i < IPMI_RPLY_SEQ_LENGTH - 1; i++)
+    for (i = 1; i < IPMI_RPLY_SEQ_LENGTH - 1; i++) {
         ipmiSess->seqRply[i] = 0;
+    }
 
-    for (i = 0; i < IPMI_WRAPPER_SEQ_LENGTH; i++)
+    for (i = 0; i < IPMI_WRAPPER_SEQ_LENGTH; i++) {
         ipmiSess->seqSend[i] = 0;
+    }
 
-    for (i = 0; i < IPMI_WRAPPER_ID_LENGTH; i++)
+    for (i = 0; i < IPMI_WRAPPER_ID_LENGTH; i++) {
         ipmiSess->id[i] = 0;
+    }
 }
 
 static void mchSetAuth(MchSess mchSess, IpmiSess ipmiSess, uint8_t authByte) {
@@ -120,9 +123,10 @@ static void mchSetAuth(MchSess mchSess, IpmiSess ipmiSess, uint8_t authByte) {
         ipmiSess->authReq = IPMI_MSG_AUTH_TYPE_NONE;
     } else if (ipmiSess->authSup & (1 << IPMI_MSG_AUTH_TYPE_PWD_KEY)) {
         ipmiSess->authReq = IPMI_MSG_AUTH_TYPE_PWD_KEY;
-    } else
+    } else {
         printf("mchSetAuth: No supported auth type for %s, supported mask is 0x%02x\n", mchSess->name,
                ipmiSess->authSup);
+    }
 }
 
 /* Start communication session with MCH
@@ -155,12 +159,14 @@ static int mchCommStart(MchSess mchSess, IpmiSess ipmiSess) {
     }
 
     /* Extract temporary session ID */
-    for (i = 0; i < IPMI_RPLY_IMSG2_SESSION_ID_LENGTH; i++)
+    for (i = 0; i < IPMI_RPLY_IMSG2_SESSION_ID_LENGTH; i++) {
         ipmiSess->id[i] = response[IPMI_RPLY_IMSG2_GET_SESS_TEMP_ID_OFFSET + i];
+    }
 
     /* Extract challenge string */
-    for (i = 0; i < IPMI_RPLY_CHALLENGE_STR_LENGTH; i++)
+    for (i = 0; i < IPMI_RPLY_CHALLENGE_STR_LENGTH; i++) {
         ipmiSess->str[i] = response[IPMI_RPLY_IMSG2_GET_SESS_CHALLENGE_STR_OFFSET + i];
+    }
 
     if (mchMsgActSess(mchSess, ipmiSess, response)) {
         printf("%s Activate session failed\n", mchSess->name);
@@ -169,12 +175,14 @@ static int mchCommStart(MchSess mchSess, IpmiSess ipmiSess) {
     }
 
     /* Extract session ID */
-    for (i = 0; i < IPMI_RPLY_IMSG2_SESSION_ID_LENGTH; i++)
+    for (i = 0; i < IPMI_RPLY_IMSG2_SESSION_ID_LENGTH; i++) {
         ipmiSess->id[i] = response[IPMI_RPLY_IMSG2_ACT_SESS_ID_OFFSET + i];
+    }
 
     /* Extract initial sequence number for messages to MCH */
-    for (i = 0; i < IPMI_RPLY_INIT_SEND_SEQ_LENGTH; i++)
+    for (i = 0; i < IPMI_RPLY_INIT_SEND_SEQ_LENGTH; i++) {
         ipmiSess->seqSend[i] = response[IPMI_RPLY_IMSG2_ACT_SESS_INIT_SEND_SEQ_OFFSET + i];
+    }
 
     /* Need a non-hard-coded way to determine privilege level */
     if (mchMsgSetPriv(mchSess, ipmiSess, response, IPMI_MSG_PRIV_LEVEL_OPER)) {
@@ -204,8 +212,9 @@ int mchNewSession(MchSess mchSess, IpmiSess ipmiSess) {
 
     mchSeqInit(ipmiSess);
 
-    if (MCH_ONLN(mchStat[mchSess->instance]))
+    if (MCH_ONLN(mchStat[mchSess->instance])) {
         rval = mchCommStart(mchSess, ipmiSess);
+    }
 
     return rval;
 }
@@ -263,20 +272,24 @@ static void sixBitAsciiConvert(uint8_t* input, uint8_t* output, uint8_t n_input,
     while (1) {
 
         output[i++] = (input[j * 3 + 0] & 0x3F) + 0x20;
-        if (i >= n_output)
+        if (i >= n_output) {
             break;
+        }
 
         output[i++] = (((input[j * 3 + 0] & 0xC0) >> 6) | ((input[j * 3 + 1] & 0xF) << 2)) + 0x20;
-        if (i >= n_output)
+        if (i >= n_output) {
             break;
+        }
 
         output[i++] = (((input[j * 3 + 1] & 0xF0) >> 4) | ((input[j * 3 + 2] & 0x3) << 4)) + 0x20;
-        if (i >= n_output)
+        if (i >= n_output) {
             break;
+        }
 
         output[i++] = ((input[j * 3 + 2] & 0xFC) >> 2) + 0x20;
-        if (i >= n_output)
+        if (i >= n_output) {
             break;
+        }
 
         j++;
     }
@@ -292,38 +305,39 @@ static void hexAsciiConvert(uint8_t* input, uint8_t* output, uint8_t n_output) {
 
             a = (input[i] & (0xF << (k * 4))) >> k * 4;
 
-            if (a == 0)
+            if (a == 0) {
                 output[j] = '0';
-            else if (a == 1)
+            } else if (a == 1) {
                 output[j] = '1';
-            else if (a == 2)
+            } else if (a == 2) {
                 output[j] = '2';
-            else if (a == 3)
+            } else if (a == 3) {
                 output[j] = '3';
-            else if (a == 4)
+            } else if (a == 4) {
                 output[j] = '4';
-            else if (a == 5)
+            } else if (a == 5) {
                 output[j] = '5';
-            else if (a == 6)
+            } else if (a == 6) {
                 output[j] = '6';
-            else if (a == 7)
+            } else if (a == 7) {
                 output[j] = '7';
-            else if (a == 8)
+            } else if (a == 8) {
                 output[j] = '8';
-            else if (a == 9)
+            } else if (a == 9) {
                 output[j] = '9';
-            else if (a == 10)
+            } else if (a == 10) {
                 output[j] = 'A';
-            else if (a == 11)
+            } else if (a == 11) {
                 output[j] = 'B';
-            else if (a == 12)
+            } else if (a == 12) {
                 output[j] = 'C';
-            else if (a == 13)
+            } else if (a == 13) {
                 output[j] = 'D';
-            else if (a == 14)
+            } else if (a == 14) {
                 output[j] = 'E';
-            else if (a == 15)
+            } else if (a == 15) {
                 output[j] = 'F';
+            }
 
             j++;
         }
@@ -365,8 +379,9 @@ static int mchFruFieldConvertData(FruField field, uint8_t lang) {
 #endif
 
             field->length = 2 * field->rlength;
-            if (mchFruFieldCheckLength(field->length, FRU_FIELD_LENGTH_TYPE_CONVERTED))
+            if (mchFruFieldCheckLength(field->length, FRU_FIELD_LENGTH_TYPE_CONVERTED)) {
                 return -1;
+            }
 
             hexAsciiConvert(field->rdata, field->data, field->length);
             return 0;
@@ -374,19 +389,23 @@ static int mchFruFieldConvertData(FruField field, uint8_t lang) {
         case FRU_DATA_TYPE_BCDPLUS:
 
             field->length = field->rlength;
-            if (mchFruFieldCheckLength(field->length, FRU_FIELD_LENGTH_TYPE_CONVERTED))
+            if (mchFruFieldCheckLength(field->length, FRU_FIELD_LENGTH_TYPE_CONVERTED)) {
                 return -1;
-            for (i = 0; i < field->length; i++)
+            }
+            for (i = 0; i < field->length; i++) {
                 field->data[i] = bcdPlusConvert(field->rdata[i]);
+            }
             return 0;
 
         case FRU_DATA_TYPE_6BITASCII:
 
             field->length = ceil(8 * ((float)field->rlength / 6));
-            if (field->rlength % 3)
+            if (field->rlength % 3) {
                 printf("6-bit ASCII data length not integer multiple of 3, something may be wrong.\n");
-            if (mchFruFieldCheckLength(field->length, FRU_FIELD_LENGTH_TYPE_CONVERTED))
+            }
+            if (mchFruFieldCheckLength(field->length, FRU_FIELD_LENGTH_TYPE_CONVERTED)) {
                 return -1;
+            }
             sixBitAsciiConvert(field->rdata, field->data, field->rlength, field->length);
             return 0;
 
@@ -395,12 +414,14 @@ static int mchFruFieldConvertData(FruField field, uint8_t lang) {
             if (IPMI_DATA_LANG_ENGLISH(lang)) {
 
                 field->length = field->rlength;
-                if (mchFruFieldCheckLength(field->length, FRU_FIELD_LENGTH_TYPE_CONVERTED))
+                if (mchFruFieldCheckLength(field->length, FRU_FIELD_LENGTH_TYPE_CONVERTED)) {
                     return -1;
+                }
                 memcpy(field->data, field->rdata, field->length);
                 return 0;
-            } else
+            } else {
                 printf("Warning FRU data language %i is not english; need to add 2-byte unicode support\n", lang);
+            }
     }
     return 0;
 }
@@ -421,11 +442,13 @@ static int mchFruFieldGet(FruField field, uint8_t* raw, unsigned* offset, uint8_
 
         (*offset)++;
 
-        if (mchFruFieldCheckLength(field->rlength, FRU_FIELD_LENGTH_TYPE_RAW))
+        if (mchFruFieldCheckLength(field->rlength, FRU_FIELD_LENGTH_TYPE_RAW)) {
             return -1;
+        }
 
-        for (i = 0; i < field->rlength; i++)
+        for (i = 0; i < field->rlength; i++) {
             field->rdata[i] = raw[*offset + i];
+        }
 
         *offset += field->rlength;
 
@@ -446,10 +469,12 @@ static void mchFruChassisDataGet(FruChassis chas, uint8_t* raw, unsigned* offset
 
         *offset += FRU_DATA_CHASSIS_AREA_PART_LENGTH_OFFSET;
 
-        if (mchFruFieldGet(&(chas->part), raw, offset, IPMI_DATA_LANG_CODE_ENGLISH1))
+        if (mchFruFieldGet(&(chas->part), raw, offset, IPMI_DATA_LANG_CODE_ENGLISH1)) {
             (*offset)++;
-        if (mchFruFieldGet(&(chas->sn), raw, offset, IPMI_DATA_LANG_CODE_ENGLISH1))
+        }
+        if (mchFruFieldGet(&(chas->sn), raw, offset, IPMI_DATA_LANG_CODE_ENGLISH1)) {
             (*offset)++;
+        }
     }
 }
 
@@ -465,16 +490,21 @@ static void mchFruProdDataGet(FruProd prod, uint8_t* raw, unsigned* offset) {
 
         *offset += FRU_DATA_PROD_AREA_MANUF_LENGTH_OFFSET;
 
-        if (mchFruFieldGet(&(prod->manuf), raw, offset, prod->lang))
+        if (mchFruFieldGet(&(prod->manuf), raw, offset, prod->lang)) {
             (*offset)++;
-        if (mchFruFieldGet(&(prod->prod), raw, offset, prod->lang))
+        }
+        if (mchFruFieldGet(&(prod->prod), raw, offset, prod->lang)) {
             (*offset)++;
-        if (mchFruFieldGet(&(prod->part), raw, offset, prod->lang))
+        }
+        if (mchFruFieldGet(&(prod->part), raw, offset, prod->lang)) {
             (*offset)++;
-        if (mchFruFieldGet(&(prod->version), raw, offset, prod->lang))
+        }
+        if (mchFruFieldGet(&(prod->version), raw, offset, prod->lang)) {
             (*offset)++;
-        if (mchFruFieldGet(&(prod->sn), raw, offset, prod->lang))
+        }
+        if (mchFruFieldGet(&(prod->sn), raw, offset, prod->lang)) {
             (*offset)++;
+        }
     }
 }
 
@@ -490,14 +520,18 @@ static void mchFruBoardDataGet(FruBoard board, uint8_t* raw, unsigned* offset) {
 
         *offset += FRU_DATA_BOARD_AREA_MANUF_LENGTH_OFFSET;
 
-        if (mchFruFieldGet(&(board->manuf), raw, offset, board->lang))
+        if (mchFruFieldGet(&(board->manuf), raw, offset, board->lang)) {
             (*offset)++;
-        if (mchFruFieldGet(&(board->prod), raw, offset, board->lang))
+        }
+        if (mchFruFieldGet(&(board->prod), raw, offset, board->lang)) {
             (*offset)++;
-        if (mchFruFieldGet(&(board->sn), raw, offset, board->lang))
+        }
+        if (mchFruFieldGet(&(board->sn), raw, offset, board->lang)) {
             (*offset)++;
-        if (mchFruFieldGet(&(board->part), raw, offset, board->lang))
+        }
+        if (mchFruFieldGet(&(board->part), raw, offset, board->lang)) {
             (*offset)++;
+        }
     }
 }
 
@@ -522,19 +556,22 @@ static int mchFruDataGet(MchData mchData, Fru fru) {
     int      rval;
 
     /* Get FRU Inventory Info */
-    if (mchMsgGetFruInvInfoWrapper(mchData, response, fru))
+    if (mchMsgGetFruInvInfoWrapper(mchData, response, fru)) {
         return -1;
+    }
 
     fru->size[0] = response[IPMI_RPLY_IMSG2_FRU_AREA_SIZE_LSB_OFFSET];
     fru->size[1] = response[IPMI_RPLY_IMSG2_FRU_AREA_SIZE_MSB_OFFSET];
     fru->access  = response[IPMI_RPLY_IMSG2_FRU_AREA_ACCESS_OFFSET];
 
-    if (0 == (sizeInt = arrayToUint16(fru->size)))
+    if (0 == (sizeInt = arrayToUint16(fru->size))) {
         return 0;
+    }
 
-    if (MCH_DBG(mchStat[inst]) >= MCH_DBG_MED)
+    if (MCH_DBG(mchStat[inst]) >= MCH_DBG_MED) {
         printf("%s mchFruDataGet: FRU addr 0x%02x ID %i inventory info size %i\n", mchSess->name, fru->sdr.addr,
                fru->sdr.fruId, sizeInt);
+    }
 
     if (!(raw = calloc(1, sizeInt))) {
         printf("mchFruDataGet: No memory for FRU addr 0x%02x ID %i data\n", fru->sdr.addr, fru->sdr.fruId);
@@ -542,12 +579,14 @@ static int mchFruDataGet(MchData mchData, Fru fru) {
     }
 
     /* Too many reads! But no way to determine the end of the data until we read it, so for now... */
-    if ((nread = floor(sizeInt / MSG_FRU_DATA_READ_SIZE)) > 50)
+    if ((nread = floor(sizeInt / MSG_FRU_DATA_READ_SIZE)) > 50) {
         nread = 50;
+    }
 
     /* Initialize read offset to 0 */
-    for (i = 0; i < sizeof(fru->readOffset); i++)
+    for (i = 0; i < sizeof(fru->readOffset); i++) {
         fru->readOffset[i] = 0;
+    }
 
     /* Read FRU data, store in raw, increment our read offset for next read. If error returned for requested FRU ID,
      * abort */
@@ -556,23 +595,27 @@ static int mchFruDataGet(MchData mchData, Fru fru) {
 
         rval = mchMsgReadFruWrapper(mchData, response, fru, fru->readOffset, MSG_FRU_DATA_READ_SIZE);
         if (rval) {
-            if (IPMI_COMP_CODE_REQUESTED_DATA == rval)
+            if (IPMI_COMP_CODE_REQUESTED_DATA == rval) {
                 break;
-        } else
+            }
+        } else {
             memcpy(raw + i * MSG_FRU_DATA_READ_SIZE, response + IPMI_RPLY_IMSG2_FRU_DATA_READ_OFFSET,
                    MSG_FRU_DATA_READ_SIZE);
+        }
         incr2Uint8Array(fru->readOffset, MSG_FRU_DATA_READ_SIZE);
     }
 
     if (MCH_DBG(mchStat[inst]) >= MCH_DBG_HIGH) {
         printf("%s FRU addr 0x%02x ID %i raw data, size %i: \n", mchSess->name, fru->sdr.addr, fru->sdr.fruId, sizeInt);
-        for (i = 0; i < sizeInt; i++)
+        for (i = 0; i < sizeInt; i++) {
             printf("0x%02x ", raw[i]);
+        }
         printf("\n");
 
         printf("%s FRU addr 0x%02x ID %i raw data, size %i: \n", mchSess->name, fru->sdr.addr, fru->sdr.fruId, sizeInt);
-        for (i = 0; i < sizeInt; i++)
+        for (i = 0; i < sizeInt; i++) {
             printf("%c ", raw[i]);
+        }
         printf("\n");
     }
 
@@ -591,8 +634,9 @@ static int mchFruDataGet(MchData mchData, Fru fru) {
 int mchGetFruIdFromIndex(MchData mchData, int index) {
     int i;
     for (i = 0; i < MAX_FRU_MGMT; i++) {
-        if (mchData->mchSys->fruLkup[i] == index)
+        if (mchData->mchSys->fruLkup[i] == index) {
             return i;
+        }
     }
     return -1;
 }
@@ -610,11 +654,13 @@ static int mchFruGetDataAll(MchData mchData) {
     Fru     fru;
     int     rval = 0;
 
-    if (mchData->mchSys->mchcb->assign_site_info)
+    if (mchData->mchSys->mchcb->assign_site_info) {
         mchData->mchSys->mchcb->assign_site_info(mchData);
+    }
 
-    if (mchData->mchSys->mchcb->assign_fru_lkup)
+    if (mchData->mchSys->mchcb->assign_fru_lkup) {
         mchData->mchSys->mchcb->assign_fru_lkup(mchData);
+    }
 
     for (i = 0; i < mchSys->fruCount; i++) {
 
@@ -622,11 +668,13 @@ static int mchFruGetDataAll(MchData mchData) {
 
         if (mchSys->fruLkup[fru->id] != -1) {
 
-            if (mchFruDataGet(mchData, fru))
+            if (mchFruDataGet(mchData, fru)) {
                 rval = -1;
+            }
 
-            if (mchData->mchSys->mchcb->fru_data_suppl)
+            if (mchData->mchSys->mchcb->fru_data_suppl) {
                 rval = mchData->mchSys->mchcb->fru_data_suppl(mchData, i);
+            }
         }
     }
 
@@ -634,11 +682,12 @@ static int mchFruGetDataAll(MchData mchData) {
         printf("%s mchFruGetDataAll: FRU Summary:\n", mchSess->name);
         for (i = 0; i < mchSys->fruCount; i++) {
             fru = &mchSys->fru[i];
-            if (fru->sdr.fruId || (arrayToUint16(fru->size) > 0))
+            if (fru->sdr.fruId || (arrayToUint16(fru->size) > 0)) {
                 printf("SDR FRU index %i ID %i %i %s was found, ent id 0x%02x instance 0x%02x, addr 0x%02x id 0x%02x "
                        "lun %i lkup %i\n",
                        i, fru->sdr.fruId, fru->id, fru->board.prod.data, fru->sdr.entityId, fru->sdr.entityInst,
                        fru->sdr.addr, fru->sdr.fruId, fru->sdr.lun, mchSys->fruLkup[fru->id]);
+            }
         }
     }
 
@@ -667,8 +716,9 @@ static void mchSensorGetFru(MchData mchData, int index) {
     /* Set default indices to indicate no corresponding fru/mgmt */
     sens->fruIndex = sens->mgmtIndex = -1;
 
-    if (mchSys->mchcb->sensor_get_fru)
+    if (mchSys->mchcb->sensor_get_fru) {
         mchSys->mchcb->sensor_get_fru(mchData, sens);
+    }
 }
 
 /* Caller must perform locking */
@@ -695,16 +745,18 @@ static int mchSdrRepTsDiff(MchData mchData) {
     uint32_t *addTs = &mchSys->sdrRep.addTs, *delTs = &mchSys->sdrRep.delTs;
     uint8_t   buff[MSG_MAX_LENGTH] = {0};
 
-    if (mchSdrRepGetInfoMsg(mchData, buff, IPMI_SDRREP_PARM_GET_SDR, IPMI_MSG_ADDR_BMC))
+    if (mchSdrRepGetInfoMsg(mchData, buff, IPMI_SDRREP_PARM_GET_SDR, IPMI_MSG_ADDR_BMC)) {
         return 0;
+    }
 
     mchSdrRepGetTs(buff, &add, &del);
 
     if ((add != *addTs) || (del != *delTs)) {
 
-        if (MCH_DBG(mchStat[mchSess->instance]) >= MCH_DBG_MED)
+        if (MCH_DBG(mchStat[mchSess->instance]) >= MCH_DBG_MED) {
             printf("%s SDR rep TS before: 0x%08x 0x%08x, after: 0x%08x 0x%08x\n", mchSess->name, *addTs, *delTs, add,
                    del);
+        }
 
         *addTs = add;
         *delTs = del;
@@ -729,8 +781,9 @@ static int mchSdrRepGetInfo(MchData mchData, uint8_t parm, uint8_t addr, SdrRep 
 
     if (parm == IPMI_SDRREP_PARM_GET_SDR) {
 
-        if (rval)
+        if (rval) {
             return -1;
+        }
 
         sdrRep->ver     = response[IPMI_RPLY_IMSG2_SDRREP_VER_OFFSET];
         sdrRep->size[0] = response[IPMI_RPLY_IMSG2_SDRREP_CNT_LSB_OFFSET];
@@ -741,8 +794,9 @@ static int mchSdrRepGetInfo(MchData mchData, uint8_t parm, uint8_t addr, SdrRep 
         mchSdrRepGetTs(response, &sdrRep->addTs, &sdrRep->delTs);
     } else {
 
-        if (response[0]) // completion code
+        if (response[0]) { // completion code
             return -1;
+        }
 
         *sdrCount = sdrRep->devSdrSize = response[IPMI_RPLY_IMSG2_DEV_SDR_INFO_CNT_OFFSET];
         flags                          = response[IPMI_RPLY_IMSG2_DEV_SDR_INFO_FLAGS_OFFSET];
@@ -821,43 +875,49 @@ static int mchGetAssocEntInfo(MchSys mchSys, Entity entity, uint8_t addr, uint8_
 
                 range = dsdr->cntndInst2 - dsdr->cntndInst1;
 
-                for (j = 0; j < range; j++)
+                for (j = 0; j < range; j++) {
 
                     mchStoreAssocDevEntInfo(entity, dassoc, dsdr->cntnrAddr, dsdr->cntndId1, dsdr->cntndInst1 + j,
                                             dsdr->cntndAddr1, dsdr->cntndChan1, parm, &count);
+                }
 
                 if (dsdr->cntndInst2 > 0) { /* If second range is also populated */
 
                     range = dsdr->cntndInst4 - dsdr->cntndInst3;
 
-                    for (j = 0; j < range; j++)
+                    for (j = 0; j < range; j++) {
 
                         mchStoreAssocDevEntInfo(entity, dassoc, dsdr->cntnrAddr, dsdr->cntndId1, dsdr->cntndInst2 + j,
                                                 dsdr->cntndAddr2, dsdr->cntndChan2, parm, &count);
+                    }
                 }
             } else { /* If contained entities are stored in list */
 
                 mchStoreAssocDevEntInfo(entity, dassoc, dsdr->cntnrAddr, dsdr->cntndId1, dsdr->cntndInst1,
                                         dsdr->cntndAddr1, dsdr->cntndChan1, parm, &count);
 
-                if (dsdr->cntndInst2 > 0) /* Second in list exists */
+                if (dsdr->cntndInst2 > 0) { /* Second in list exists */
 
                     mchStoreAssocDevEntInfo(entity, dassoc, dsdr->cntnrAddr, dsdr->cntndId2, dsdr->cntndInst2,
                                             dsdr->cntndAddr2, dsdr->cntndChan2, parm, &count);
+                }
 
-                if (dsdr->cntndInst3 > 0) /* Third in list exists */
+                if (dsdr->cntndInst3 > 0) { /* Third in list exists */
 
                     mchStoreAssocDevEntInfo(entity, dassoc, dsdr->cntnrAddr, dsdr->cntndId3, dsdr->cntndInst3,
                                             dsdr->cntndAddr3, dsdr->cntndChan3, parm, &count);
+                }
 
-                if (dsdr->cntndInst4 > 0) /* Fourth in list exists */
+                if (dsdr->cntndInst4 > 0) { /* Fourth in list exists */
 
                     mchStoreAssocDevEntInfo(entity, dassoc, dsdr->cntnrAddr, dsdr->cntndId4, dsdr->cntndInst4,
                                             dsdr->cntndAddr4, dsdr->cntndChan4, parm, &count);
+                }
             }
 
-            if (0 == ENTITY_ASSOC_FLAGS_LINK(dassoc->sdr.flags))
+            if (0 == ENTITY_ASSOC_FLAGS_LINK(dassoc->sdr.flags)) {
                 break; /* Should be no further assocated entities for this container */
+            }
         }
     }
 
@@ -871,44 +931,51 @@ static int mchGetAssocEntInfo(MchSys mchSys, Entity entity, uint8_t addr, uint8_
 
                 range = esdr->cntndInst2 - esdr->cntndInst1;
 
-                for (j = 0; j < range; j++)
+                for (j = 0; j < range; j++) {
 
                     mchStoreAssocEntInfo(entity, esdr->cntndId1, esdr->cntndInst1 + j, parm, &count);
+                }
 
                 if (esdr->cntndInst2 > 0) { /* If second range is also populated */
 
                     range = esdr->cntndInst4 - esdr->cntndInst3;
 
-                    for (j = 0; j < range; j++)
+                    for (j = 0; j < range; j++) {
 
                         mchStoreAssocEntInfo(entity, esdr->cntndId2, esdr->cntndInst2 + j, parm, &count);
+                    }
                 }
             } else { /* If contained entities are stored in list */
 
                 mchStoreAssocEntInfo(entity, esdr->cntndId1, esdr->cntndInst1, parm, &count);
 
-                if (esdr->cntndInst2 > 0) /* Second in list exists */
+                if (esdr->cntndInst2 > 0) { /* Second in list exists */
 
                     mchStoreAssocEntInfo(entity, esdr->cntndId2, esdr->cntndInst2, parm, &count);
+                }
 
-                if (esdr->cntndInst3 > 0) /* Third in list exists */
+                if (esdr->cntndInst3 > 0) { /* Third in list exists */
 
                     mchStoreAssocEntInfo(entity, esdr->cntndId3, esdr->cntndInst3, parm, &count);
+                }
 
-                if (esdr->cntndInst4 > 0) /* Fourth in list exists */
+                if (esdr->cntndInst4 > 0) { /* Fourth in list exists */
 
                     mchStoreAssocEntInfo(entity, esdr->cntndId4, esdr->cntndInst4, parm, &count);
+                }
             }
 
-            if (0 == ENTITY_ASSOC_FLAGS_LINK(eassoc->sdr.flags))
+            if (0 == ENTITY_ASSOC_FLAGS_LINK(eassoc->sdr.flags)) {
                 break; /* Should be no further assocated entities for this container */
+            }
         }
     }
 
-    if (parm)
+    if (parm) {
         return 0;
-    else
+    } else {
         return count;
+    }
 }
 
 static void mchSdrGetAssocEntInfo(MchData mchData, int parm) {
@@ -927,8 +994,9 @@ static void mchSdrGetAssocEntInfo(MchData mchData, int parm) {
 
         if (0 == parm) {
             if ((fru->entityCount = rval) > 0) {
-                if (0 == (fru->entity = calloc(rval, sizeof(EntityRec))))
+                if (0 == (fru->entity = calloc(rval, sizeof(EntityRec)))) {
                     cantProceed("FATAL ERROR: No memory for FRU entity structure for %s\n", mchData->mchSess->name);
+                }
                 fru->entityAlloc = 1;
             }
         }
@@ -941,8 +1009,9 @@ static void mchSdrGetAssocEntInfo(MchData mchData, int parm) {
 
         if (0 == parm) {
             if ((mgmt->entityCount = rval) > 0) {
-                if (0 == (mgmt->entity = calloc(rval, sizeof(EntityRec))))
+                if (0 == (mgmt->entity = calloc(rval, sizeof(EntityRec)))) {
                     cantProceed("FATAL ERROR: No memory for MGMT entity structure for %s\n", mchData->mchSess->name);
+                }
                 mgmt->entityAlloc = 1;
             }
         }
@@ -1075,8 +1144,9 @@ static void mchSdrFruDev(SdrFru sdr, uint8_t* raw) {
     sdr->strLength  = raw[SDR_FRU_STR_LENGTH_OFFSET];
 
     l = IPMI_DATA_LENGTH(sdr->strLength);
-    for (i = 0; i < l; i++)
+    for (i = 0; i < l; i++) {
         sdr->str[i] = raw[SDR_FRU_STR_OFFSET + i];
+    }
     sdr->str[i + 1] = '\0';
 }
 
@@ -1127,8 +1197,9 @@ static void mchSdrMgmtCtrlDev(SdrMgmt sdr, uint8_t* raw) {
 
     l = IPMI_DATA_LENGTH(sdr->strLength);
 
-    for (i = 0; i < l; i++)
+    for (i = 0; i < l; i++) {
         sdr->str[i] = raw[SDR_MGMT_STR_OFFSET + i];
+    }
     sdr->str[i + 1] = '\0';
 }
 
@@ -1189,8 +1260,9 @@ static void mchSdrFullSens(SdrFull sdr, uint8_t* raw, int type) {
         sdr->strLength = raw[SDR_COMPACT_STR_LENGTH_OFFSET];
 
         l = IPMI_DATA_LENGTH(sdr->strLength);
-        for (i = 0; i < l; i++)
+        for (i = 0; i < l; i++) {
             sdr->str[i] = raw[SDR_COMPACT_STR_OFFSET + i];
+        }
         sdr->str[i + 1] = '\0';
     }
 
@@ -1222,22 +1294,24 @@ static void mchSdrFullSens(SdrFull sdr, uint8_t* raw, int type) {
         sdr->bexp = TWOS_COMP_SIGNED_NBIT(SENSOR_CONV_BEXP(sdr->RexpBexp), 4);
 
         l = IPMI_DATA_LENGTH(sdr->strLength);
-        for (i = 0; i < l; i++)
+        for (i = 0; i < l; i++) {
             sdr->str[i] = raw[SDR_STR_OFFSET + i];
+        }
         sdr->str[i + 1] = '\0';
     }
 
 #ifdef DEBUG
-    if (l > 0)
+    if (l > 0) {
         printf("mchSdrFullSens: owner 0x%02x lun %i sdr number %i type 0x%02x, m %i, b %i, rexp %i bexp %i, is logical "
                "entity %i, %s\n",
                sdr->owner, sdr->lun, sdr->number, sdr->sensType, sdr->m, sdr->b, sdr->rexp, sdr->bexp,
                SDR_ENTITY_LOGICAL(sdr->entityInst), sdr->str);
-    else
+    } else {
         printf("mchSdrFullSens: owner 0x%02x lun %i sdr number %i type 0x%02x, m %i, b %i, rexp %i bexp %i, is logical "
                "entity %i\n",
                sdr->owner, sdr->lun, sdr->number, sdr->sensType, sdr->m, sdr->b, sdr->rexp, sdr->bexp,
                SDR_ENTITY_LOGICAL(sdr->entityInst));
+    }
 #endif
 }
 
@@ -1254,17 +1328,20 @@ int mchGetSensorReadingStat(MchData mchData, uint8_t* response,
 
     /* If error code ... */
     if (rval) {
-        if (rval == IPMI_COMP_CODE_REQUESTED_DATA)
+        if (rval == IPMI_COMP_CODE_REQUESTED_DATA) {
             sens->unavail = 1;
+        }
         return -1;
-    } else
+    } else {
         sens->readMsgLength = tmp;
+    }
 
     bits = response[IPMI_RPLY_IMSG2_SENSOR_ENABLE_BITS_OFFSET];
     if (IPMI_SENSOR_READING_DISABLED(bits) || IPMI_SENSOR_SCANNING_DISABLED(bits)) {
-        if (MCH_DBG(mchStat[mchData->mchSess->instance]) >= MCH_DBG_LOW)
+        if (MCH_DBG(mchStat[mchData->mchSess->instance]) >= MCH_DBG_LOW) {
             printf("%s mchGetSensorReadingStat: sensor %i reading/state unavailable or scanning disabled. Bits: %02x\n",
                    mchData->mchSess->name, sens->sdr.number, bits);
+        }
         return -1;
     }
 
@@ -1286,25 +1363,28 @@ static void mchGetSensorInfo(MchData mchData, Sensor sens) {
     sensReadMsgLength = sens->readMsgLength = IPMI_RPLY_IMSG2_SENSOR_READ_MAX_LENGTH;
 
     if (!(MCH_ONLN(mchStat[mchData->mchSess->instance]))) {
-        if (MCH_DBG(mchStat[mchData->mchSess->instance]))
+        if (MCH_DBG(mchStat[mchData->mchSess->instance])) {
             printf("%s mchGetSensorInfo: MCH offline; aborting\n", mchData->mchSess->name);
+        }
         return;
     }
 
     /* If sensor does not exist, do not read thresholds, etc. */
     mchGetSensorReadingStat(mchData, response, sens);
 
-    if (sens->unavail)
+    if (sens->unavail) {
         return;
+    }
 
     sens->tmask = 0; /* Set default to no readable thresholds */
 
     if (IPMI_SENSOR_THRESH_IS_READABLE(IPMI_SDR_SENSOR_THRESH_ACCESS(sens->sdr.cap))) {
 
         if (mchMsgGetSensorThresholdsWrapper(mchData, response, sens)) {
-            if ((MCH_DBG(mchStat[mchData->mchSess->instance]) >= MCH_DBG_LOW))
+            if ((MCH_DBG(mchStat[mchData->mchSess->instance]) >= MCH_DBG_LOW)) {
                 printf("%s mchGetSensorInfo: mchMsgGetSensorThresholds error, assume no thresholds are readable\n",
                        mchData->mchSess->name);
+            }
             return;
         }
 
@@ -1316,9 +1396,10 @@ static void mchGetSensorInfo(MchData mchData, Sensor sens) {
         sens->tuc   = response[IPMI_RPLY_IMSG2_SENSOR_THRESH_UC_OFFSET];
         sens->tunr  = response[IPMI_RPLY_IMSG2_SENSOR_THRESH_UNR_OFFSET];
 
-        if (MCH_DBG(mchStat[mchData->mchSess->instance]) >= MCH_DBG_HIGH)
+        if (MCH_DBG(mchStat[mchData->mchSess->instance]) >= MCH_DBG_HIGH) {
             printf("sensor %s thresholds tmask 0x%02x, tlnc %i tlc %i tlnr %i tunc %i tuc %i tunr %i\n", sens->sdr.str,
                    sens->tmask, sens->tlnc, sens->tlc, sens->tlnr, sens->tunc, sens->tuc, sens->tunr);
+        }
     }
 }
 
@@ -1345,8 +1426,9 @@ static int mchSdrStoreData(MchData mchData, uint8_t* raw, uint8_t type, uint8_t 
              */
 
         case SDR_TYPE_FULL_SENSOR:
-            if (mchSdrSensDuplicate(mchSys, raw))
+            if (mchSdrSensDuplicate(mchSys, raw)) {
                 break;
+            }
             sens = &mchSys->sens[mchSys->sensCount];
             mchSdrFullSens(&sens->sdr, raw, type);
             sens->instance = 0; /* Initialize instance to 0 */
@@ -1357,8 +1439,9 @@ static int mchSdrStoreData(MchData mchData, uint8_t* raw, uint8_t type, uint8_t 
             break;
 
         case SDR_TYPE_COMPACT_SENSOR:
-            if (mchSdrSensDuplicate(mchSys, raw))
+            if (mchSdrSensDuplicate(mchSys, raw)) {
                 break;
+            }
             sens = &mchSys->sens[mchSys->sensCount];
             mchSdrFullSens(&sens->sdr, raw, type);
             sens->instance = 0; /* Initialize instance to 0 */
@@ -1369,8 +1452,9 @@ static int mchSdrStoreData(MchData mchData, uint8_t* raw, uint8_t type, uint8_t 
             break;
 
         case SDR_TYPE_FRU_DEV:
-            if (mchSdrFruDuplicate(mchSys, raw))
+            if (mchSdrFruDuplicate(mchSys, raw)) {
                 break;
+            }
 
             if (mchSys->fruCount >= mchSys->fruCountMax) {
                 printf("ERROR: %s discovered %i FRUs but only allocated memory for %i.\n", mchData->mchSess->name,
@@ -1386,8 +1470,9 @@ static int mchSdrStoreData(MchData mchData, uint8_t* raw, uint8_t type, uint8_t 
             break;
 
         case SDR_TYPE_MGMT_CTRL_DEV:
-            if (mchSdrMgmtCtrlDuplicate(mchSys, raw))
+            if (mchSdrMgmtCtrlDuplicate(mchSys, raw)) {
                 break;
+            }
 
             if (mchSys->mgmtCount >= mchSys->mgmtCountMax) {
                 printf("ERROR: %s discovered %i MGMTs but only allocated memory for %i.\n", mchData->mchSess->name,
@@ -1434,10 +1519,11 @@ static int mchSdrStoreData(MchData mchData, uint8_t* raw, uint8_t type, uint8_t 
 }
 
 static void* ipmiReallocZeros(void* dest, size_t old_size, size_t new_size, int flag) {
-    if (flag)
+    if (flag) {
         dest = realloc(dest, new_size);
-    else
+    } else {
         dest = realloc(NULL, new_size);
+    }
 
     if (0 == dest) {
         dest = NULL;
@@ -1461,8 +1547,9 @@ static int mchSdrGetLength(MchData mchData, uint8_t parm, uint8_t addr, SdrRep s
     while (err <= 3) {
         if ((mchMsgGetSdrWrapper(mchData, response, id, res, offset, size, parm, addr))) {
             err++;
-        } else
+        } else {
             return 0;
+        }
     }
     return -1;
 }
@@ -1489,8 +1576,9 @@ static int mchSdrGetData(MchData mchData, uint8_t parm, uint8_t addr, uint8_t ch
     uint32_t sdrCount_i = mchSys->sdrCount; /* Initial SDR count */
     int      rval = -1, err = 0, sdrFailedCount = 0, i, remainder = 0;
 
-    if (mchSdrRepGetInfo(mchData, parm, addr, sdrRep, &sdrCount))
+    if (mchSdrRepGetInfo(mchData, parm, addr, sdrRep, &sdrCount)) {
         return rval;
+    }
 
     /* Reluctant to statically assign memory to this structure because
      * size can vary so widely. For now, alloc dynamically and free
@@ -1527,8 +1615,9 @@ static int mchSdrGetData(MchData mchData, uint8_t parm, uint8_t addr, uint8_t ch
         nextid[1] = response[IPMI_RPLY_IMSG2_GET_SDR_NEXT_ID_MSB_OFFSET];
 
         size = response[IPMI_RPLY_IMSG2_GET_SDR_DATA_OFFSET + SDR_LENGTH_OFFSET] + SDR_HEADER_LENGTH;
-        if (size > SDR_MAX_LENGTH)
+        if (size > SDR_MAX_LENGTH) {
             size = SDR_MAX_LENGTH;
+        }
         type = response[IPMI_RPLY_IMSG2_GET_SDR_DATA_OFFSET + SDR_REC_TYPE_OFFSET];
         if (size > SDR_MAX_READ_SIZE) {
             remainder = size - SDR_MAX_READ_SIZE;
@@ -1540,8 +1629,9 @@ static int mchSdrGetData(MchData mchData, uint8_t parm, uint8_t addr, uint8_t ch
         while (size > 0) {
             if (mchMsgGetSdrWrapper(mchData, response, id, res, offset, size, parm, addr)) {
                 /* If too many errors, break out of while loop, move on to next SDR */
-                if (err++ > 3)
+                if (err++ > 3) {
                     break;
+                }
                 continue;
             }
             memcpy(raw + offset, response + IPMI_RPLY_IMSG2_GET_SDR_DATA_OFFSET, size);
@@ -1560,24 +1650,28 @@ static int mchSdrGetData(MchData mchData, uint8_t parm, uint8_t addr, uint8_t ch
             sdrFailedCount++;
             continue;
         }
-        if (mchSdrStoreData(mchData, raw, type, addr, chan))
+        if (mchSdrStoreData(mchData, raw, type, addr, chan)) {
             goto bail;
+        }
 
         id[0] = nextid[0];
         id[1] = nextid[1];
 
-        if (arrayToUint16(id) == SDR_ID_LAST_SENSOR) /* last record in SDR */
+        if (arrayToUint16(id) == SDR_ID_LAST_SENSOR) { /* last record in SDR */
             break;
+        }
     }
     mchSys->sdrCount += sdrCount;
     rval = 0;
 
 bail:
-    if (sdrFailedCount > 0)
+    if (sdrFailedCount > 0) {
         printf("%s: failed to read %i SDRs due to too many read errors\n", mchSess->name, sdrFailedCount);
+    }
 
-    if (raw)
+    if (raw) {
         free(raw);
+    }
     return rval;
 }
 
@@ -1607,8 +1701,9 @@ static int mchSdrGetDataAll(MchData mchData) {
         chan = mgmt->sdr.chan;
 
         /* Skip primary BMC; already queried */
-        if (addr == IPMI_MSG_ADDR_BMC)
+        if (addr == IPMI_MSG_ADDR_BMC) {
             continue;
+        }
 
         if (mchMsgGetDeviceIdWrapper(mchData, response, addr)) {
             printf("mchSdrGetDataAll: Error from Get Device ID command to mgmt controller at addr 0x%02x\n", addr);
@@ -1658,11 +1753,12 @@ static int mchSdrGetDataAll(MchData mchData) {
         }
         for (i = 0; i < mchSys->fruCount; i++) {
             fru = &mchSys->fru[i];
-            if (fru->sdr.recType)
+            if (fru->sdr.recType) {
                 printf("FRU %i, recType 0x%02x, entity ID 0x%02x, entity inst 0x%02x,, addr 0x%02x, chan %i, FRU id "
                        "%i, %s, entity count %i\n",
                        i, fru->sdr.recType, fru->sdr.entityId, fru->sdr.entityInst, fru->sdr.addr, fru->sdr.chan,
                        fru->sdr.fruId, fru->sdr.str, fru->entityCount);
+            }
             for (j = 0; j < fru->entityCount; j++) {
                 printf("     Associated entity addr 0x%02x chan %i entityId 0x%02x entityInst 0x%02x\n",
                        fru->entity[j].addr, fru->entity[j].chan, fru->entity[j].entityId, fru->entity[j].entityInst);
@@ -1789,8 +1885,9 @@ static void mchPing(void* arg) {
         if (responseLen == 0) {
 
             if (MCH_ONLN(mchStat[inst])) {
-                if (MCH_DBG(mchStat[inst]))
+                if (MCH_DBG(mchStat[inst])) {
                     printf("%s mchPing now offline\n", mchSess->name);
+                }
                 mchStatSet(inst, MCH_MASK_ONLN, 0);
                 cos = 1;
 
@@ -1798,13 +1895,15 @@ static void mchPing(void* arg) {
                  * records so that they get updated SEVR. After this,
                  * only scan records if MCH is online.
                  */
-                if (drvSensorScan[inst])
+                if (drvSensorScan[inst]) {
                     scanIoRequest(drvSensorScan[inst]);
+                }
             }
         } else {
             if (!MCH_ONLN(mchStat[inst])) {
-                if (MCH_DBG(mchStat[inst]))
+                if (MCH_DBG(mchStat[inst])) {
                     printf("%s mchPing now online\n", mchSess->name);
+                }
                 mchStatSet(inst, MCH_MASK_ONLN, MCH_MASK_ONLN);
                 cos = 1;
             }
@@ -1815,8 +1914,9 @@ static void mchPing(void* arg) {
             }
             /* Periocially (while mch online), scan sensor records */
             if (j >= mchSensorScanPeriod / PING_PERIOD) {
-                if (drvSensorScan[inst])
+                if (drvSensorScan[inst]) {
                     scanIoRequest(drvSensorScan[inst]);
+                }
                 j = 0;
             }
             i++;
@@ -1824,8 +1924,9 @@ static void mchPing(void* arg) {
         }
 
         if (cos) {
-            if (drvMchStatScan)
+            if (drvMchStatScan) {
                 scanIoRequest(drvMchStatScan);
+            }
         }
     }
 }
@@ -1845,8 +1946,9 @@ int mchCnfgChk(MchData mchData) {
     }
 
     else if (MCH_INIT_DONE(mchStat[inst])) {
-        if (mchSdrRepTsDiff(mchData))
+        if (mchSdrRepTsDiff(mchData)) {
             return mchCnfg(mchData, MCH_CNFG_NOT_INIT);
+        }
     }
 
     return 0;
@@ -1886,13 +1988,15 @@ void mchStatSet(int inst, uint32_t clear, uint32_t set) {
     epicsMutexUnlock(mchStatMtx[inst]);
 
     if (clear == MCH_MASK_INIT) {
-        if (drvMchInitScan)
+        if (drvMchInitScan) {
             scanIoRequest(drvMchInitScan);
+        }
     }
 
     if ((clear == MCH_MASK_ONLN) || (set == MCH_MASK_INIT_DONE)) {
-        if (drvMchStatScan)
+        if (drvMchStatScan) {
             scanIoRequest(drvMchStatScan);
+        }
     }
 }
 
@@ -1901,16 +2005,19 @@ static void mchSetFeatures(MchData mchData) {
     IpmiSess ipmiSess = mchData->ipmiSess;
 
     /* Optionally override default max FRU/MGMT devices */
-    if (mchData->mchSys->mchcb->assign_sys_sizes)
+    if (mchData->mchSys->mchcb->assign_sys_sizes) {
         mchData->mchSys->mchcb->assign_sys_sizes(mchData);
+    }
 
-    if (mchSess->type == MCH_TYPE_VT)
+    if (mchSess->type == MCH_TYPE_VT) {
         mchSess->timeout = ipmiSess->timeout = RPLY_TIMEOUT_SENDMSG_RPLY;
-    else
+    } else {
         mchSess->timeout = ipmiSess->timeout = RPLY_TIMEOUT_DEFAULT;
+    }
 
-    if (mchSess->type == MCH_TYPE_VT)
+    if (mchSess->type == MCH_TYPE_VT) {
         ipmiSess->features |= MCH_FEAT_SENDMSG_RPLY;
+    }
 }
 
 static void* mchSetIdentity(MchData mchData, char* vendor, uint8_t vers, int type, char* cbname) {
@@ -1946,8 +2053,9 @@ static int mchIdentify(MchData mchData) {
     }
 
     /* Extract Manufacturer ID */
-    for (i = 0; i < IPMI_RPLY_MANUF_ID_LENGTH; i++)
+    for (i = 0; i < IPMI_RPLY_MANUF_ID_LENGTH; i++) {
         tmp[i] = response[IPMI_RPLY_IMSG2_GET_DEVICE_ID_MANUF_ID_OFFSET + i];
+    }
 
     vers = response[IPMI_RPLY_IMSG2_GET_DEVICE_ID_IPMI_VERS_OFFSET];
 
@@ -1962,13 +2070,15 @@ static int mchIdentify(MchData mchData) {
             return -1;
 
         case MCH_MANUF_ID_NAT:
-            if (0 == (mchcb = mchSetIdentity(mchData, "N.A.T.", vers, MCH_TYPE_NAT, "drvMchMicrotcaNatCb")))
+            if (0 == (mchcb = mchSetIdentity(mchData, "N.A.T.", vers, MCH_TYPE_NAT, "drvMchMicrotcaNatCb"))) {
                 return -1;
+            }
             break;
 
         case MCH_MANUF_ID_VT:
-            if (0 == (mchcb = mchSetIdentity(mchData, "Vadatech", vers, MCH_TYPE_VT, "drvMchMicrotcaVtCb")))
+            if (0 == (mchcb = mchSetIdentity(mchData, "Vadatech", vers, MCH_TYPE_VT, "drvMchMicrotcaVtCb"))) {
                 return -1;
+            }
             break;
             /*  Not yet supported
                     case MCH_MANUF_ID_DELL:
@@ -1977,23 +2087,27 @@ static int mchIdentify(MchData mchData) {
                IPMI_VER_LSD( vers )); break;
             */
         case MCH_MANUF_ID_SUPERMICRO:
-            if (0 == (mchcb = mchSetIdentity(mchData, "Supermicro", vers, MCH_TYPE_SUPERMICRO, "drvMchSupermicroCb")))
+            if (0 == (mchcb = mchSetIdentity(mchData, "Supermicro", vers, MCH_TYPE_SUPERMICRO, "drvMchSupermicroCb"))) {
                 return -1;
+            }
             break;
 
         case MCH_MANUF_ID_ADVANTECH:
-            if (0 == (mchcb = mchSetIdentity(mchData, "Advantech", vers, MCH_TYPE_ADVANTECH, "drvMchAdvantechCb")))
+            if (0 == (mchcb = mchSetIdentity(mchData, "Advantech", vers, MCH_TYPE_ADVANTECH, "drvMchAdvantechCb"))) {
                 return -1;
+            }
             break;
 
         case MCH_MANUF_ID_PENTAIR:
-            if (0 == (mchcb = mchSetIdentity(mchData, "Pentair", vers, MCH_TYPE_PENTAIR, "drvMchAtcaCb")))
+            if (0 == (mchcb = mchSetIdentity(mchData, "Pentair", vers, MCH_TYPE_PENTAIR, "drvMchAtcaCb"))) {
                 return -1;
+            }
             break;
 
         case MCH_MANUF_ID_ARTESYN:
-            if (0 == (mchcb = mchSetIdentity(mchData, "Artesyn", vers, MCH_TYPE_ARTESYN, "drvMchAtcaCb")))
+            if (0 == (mchcb = mchSetIdentity(mchData, "Artesyn", vers, MCH_TYPE_ARTESYN, "drvMchAtcaCb"))) {
                 return -1;
+            }
             break;
     }
 
@@ -2019,14 +2133,16 @@ static void mchSensorFruGetInstance(MchData mchData) {
         sens = &mchSys->sens[j];
 
         /* If sensor has not been assigned associated FRU, quit */
-        if (-1 == (index = sens->fruIndex))
+        if (-1 == (index = sens->fruIndex)) {
             continue;
+        }
 
         /* Skip FRU 0 for MicroTCA because it is reserved logical entity with same
          * entityId and entityInst as MCH 1. This should be in callbacks
          */
-        if ((mchGetFruIdFromIndex(mchData, index) == 0) && MCH_IS_MICROTCA(mchData->mchSess->type))
+        if ((mchGetFruIdFromIndex(mchData, index) == 0) && MCH_IS_MICROTCA(mchData->mchSess->type)) {
             continue;
+        }
 
         if (index < MAX_FRU) {
 
@@ -2042,8 +2158,9 @@ static void mchSensorFruGetInstance(MchData mchData) {
                     continue;
                 }
 
-                if (!sens->unavail)
+                if (!sens->unavail) {
                     mchSys->sensLkup[index][sens->sdr.sensType][sens->instance] = j;
+                }
             }
         }
     }
@@ -2070,11 +2187,12 @@ static void mchSensorFruGetInstance(MchData mchData) {
                        sens->sdr.str, sens->sdr.number, sens->sdr.sensType, sens->instance, mgmt->sdr.addr,
                        mgmt->sdr.entityId, mgmt->sdr.entityInst, sens->sdr.owner, sens->sdr.entityId,
                        sens->sdr.entityInst, sens->sdr.recType, sens->unavail);
-            } else
+            } else {
                 printf("Sensor %s %i Type 0x%02x Inst %i EntId 0x%02x EntInst 0x%02x RecType %i "
                        "no corresponding FRU or MGTM unavail %i\n",
                        sens->sdr.str, sens->sdr.number, sens->sdr.sensType, sens->instance, sens->sdr.entityId,
                        sens->sdr.entityInst, sens->sdr.recType, sens->unavail);
+            }
         }
     }
 }
@@ -2101,15 +2219,17 @@ static void mchCnfgReset(MchData mchData) {
     int    i;
 
     if (mchSys->fru) { /* If FRU struct already allocated */
-        for (i = 0; i < mchSys->fruCountMax; i++)
+        for (i = 0; i < mchSys->fruCountMax; i++) {
             freememory(mchSys->fru[i].entity, &mchSys->fru[i].entityAlloc);
+        }
 
         memset(mchSys->fru, 0, mchSys->fruCountMax * sizeof(FruRec));
     }
 
     if (mchSys->mgmt) { /* If Mgmt struct already allocated */
-        for (i = 0; i < mchSys->mgmtCountMax; i++)
+        for (i = 0; i < mchSys->mgmtCountMax; i++) {
             freememory(mchSys->mgmt[i].entity, &mchSys->mgmt[i].entityAlloc);
+        }
 
         memset(mchSys->mgmt, 0, mchSys->mgmtCountMax * sizeof(MgmtRec));
     }
@@ -2154,11 +2274,13 @@ static int mchCnfg(MchData mchData, int initFlag) {
 
     /* If first time executing this routine, perform some startup-only tasks */
     if (initFlag == MCH_CNFG_INIT) {
-        if (!(mchSys->fru = calloc(1, mchSys->fruCountMax * sizeof(FruRec))))
+        if (!(mchSys->fru = calloc(1, mchSys->fruCountMax * sizeof(FruRec)))) {
             cantProceed("FATAL ERROR: No memory for FRU data for %s\n", mchData->mchSess->name);
+        }
 
-        if (!(mchSys->mgmt = calloc(1, mchSys->mgmtCountMax * sizeof(MgmtRec))))
+        if (!(mchSys->mgmt = calloc(1, mchSys->mgmtCountMax * sizeof(MgmtRec)))) {
             cantProceed("FATAL ERROR: No memory for Management Controller data for %s\n", mchData->mchSess->name);
+        }
 
         for (i = 0; i < mchSys->fruCountMax; i++) {
             mchSys->fru[i].entityAlloc =
@@ -2190,15 +2312,17 @@ static int mchCnfg(MchData mchData, int initFlag) {
     */
 
     /* Get Sensor/FRU association */
-    for (i = 0; i < mchSys->sensCount; i++)
+    for (i = 0; i < mchSys->sensCount; i++) {
         mchSensorGetFru(mchData, i);
+    }
 
     mchSensorFruGetInstance(mchData);
 
     mchStatSet(inst, MCH_MASK_INIT, MCH_MASK_INIT_DONE);
 
-    if (drvMchFruScan)
+    if (drvMchFruScan) {
         scanIoRequest(drvMchFruScan);
+    }
 
     mchStatSet(inst, MCH_MASK_DBG, MCH_DBG_SET(MCH_DBG_OFF));
 
@@ -2237,17 +2361,21 @@ static void mchInit(const char* name) {
     }
 
     /* Allocate memory for MCH data structures */
-    if (!(mchData = calloc(1, sizeof(*mchData))))
+    if (!(mchData = calloc(1, sizeof(*mchData)))) {
         cantProceed("FATAL ERROR: No memory for MchData structure for %s\n", name);
+    }
 
-    if (!(mchSess = calloc(1, sizeof(*mchSess))))
+    if (!(mchSess = calloc(1, sizeof(*mchSess)))) {
         cantProceed("FATAL ERROR: No memory for MchSess structure for %s\n", name);
+    }
 
-    if (!(ipmiSess = calloc(1, sizeof(*ipmiSess))))
+    if (!(ipmiSess = calloc(1, sizeof(*ipmiSess)))) {
         cantProceed("FATAL ERROR: No memory for IpmiSess structure for %s\n", name);
+    }
 
-    if (!(mchSys = calloc(1, sizeof(*mchSys))))
+    if (!(mchSys = calloc(1, sizeof(*mchSys)))) {
         cantProceed("FATAL ERROR: No memory for MchSys structure for %s\n", name);
+    }
 
     ipmiSess->wrf = (IpmiWriteReadHelper)mchMsgWriteReadHelper;
 
@@ -2256,8 +2384,9 @@ static void mchInit(const char* name) {
     mchStatMtx[inst] = epicsMutexMustCreate(); /* Used for global mchStat mask */
 
     /* Allocate and initialize memory for MCH device support structure */
-    if (!(mch = devMchRegister(name)))
+    if (!(mch = devMchRegister(name))) {
         printf("FATAL ERROR: Unable to register MCH %s with device support\n", name);
+    }
 
     mchData->ipmiSess = ipmiSess;
     mchData->mchSess  = mchSess;

@@ -30,8 +30,9 @@ uint16_t arrayToUint16(uint8_t* data) {
     unsigned i;
     uint16_t value = 0;
 
-    for (i = 0; i < 2; i++)
+    for (i = 0; i < 2; i++) {
         value |= *data++ << i * 8;
+    }
 
     return value;
 }
@@ -46,13 +47,15 @@ void incr2Uint8Array(uint8_t* data, int incr) {
 
     value = arrayToUint16(data);
 
-    if (value >= (pow(2, 8 * nBytes) - incr))
+    if (value >= (pow(2, 8 * nBytes) - incr)) {
         value = 0;
-    else
+    } else {
         value += incr;
+    }
     /* Copy incremented value to array */
-    for (i = 0; i < nBytes; i++)
+    for (i = 0; i < nBytes; i++) {
         *data++ = (value >> i * 8) & 0xFF;
+    }
 }
 
 /*
@@ -62,8 +65,9 @@ uint32_t arrayToUint32(uint8_t* data) {
     unsigned i;
     uint32_t value = 0;
 
-    for (i = 0; i < 4; i++)
+    for (i = 0; i < 4; i++) {
         value |= *data++ << i * 8;
+    }
 
     return value;
 }
@@ -79,14 +83,16 @@ void incr4Uint8Array(uint8_t* data, int incr) {
     value = arrayToUint32(data);
 
     /* test rollover */
-    if (value >= (pow(2, 8 * nBytes) - incr))
+    if (value >= (pow(2, 8 * nBytes) - incr)) {
         value = 0;
-    else
+    } else {
         value += incr;
+    }
 
     /* Copy incremented value to array */
-    for (i = 0; i < nBytes; i++)
+    for (i = 0; i < nBytes; i++) {
         *data++ = (value >> i * 8) & 0xFF;
+    }
 }
 
 /*
@@ -214,8 +220,9 @@ void ipmiCompletionCode(const char* name, uint8_t code, uint8_t cmd, uint8_t net
             goto codeDone;
     }
 
-    if ((code >= IPMI_COMP_CODE_DEVICE_SPECIFIC_MIN) && (code <= IPMI_COMP_CODE_DEVICE_SPECIFIC_MAX))
+    if ((code >= IPMI_COMP_CODE_DEVICE_SPECIFIC_MIN) && (code <= IPMI_COMP_CODE_DEVICE_SPECIFIC_MAX)) {
         sprintf(codeStr, "Device-specific completion code %02x", code);
+    }
 
     else if ((code >= IPMI_COMP_CODE_COMMAND_SPECIFIC_MIN) && (code <= IPMI_COMP_CODE_DEVICE_SPECIFIC_MAX)) {
 
@@ -468,21 +475,25 @@ static void ipmiMsgSetSeqId(IpmiSess sess, uint8_t* message, uint8_t cmd) {
     int i;
     /* Session sequence number is not incremented (or used) for messages outside of a session */
     if (cmd != IPMI_MSG_CMD_GET_CHAN_AUTH && cmd != IPMI_MSG_CMD_GET_SESSION_CHALLENGE &&
-        cmd != IPMI_MSG_CMD_ACTIVATE_SESSION && cmd != IPMI_MSG_CMD_SET_PRIV_LEVEL && cmd != 0)
+        cmd != IPMI_MSG_CMD_ACTIVATE_SESSION && cmd != IPMI_MSG_CMD_SET_PRIV_LEVEL && cmd != 0) {
         incr4Uint8Array(sess->seqSend, 1);
+    }
 
     /* Close Session command contains the session ID */
     if (cmd == IPMI_MSG_CMD_CLOSE_SESSION) {
-        for (i = 0; i < IPMI_MSG2_ID_LENGTH; i++)
+        for (i = 0; i < IPMI_MSG2_ID_LENGTH; i++) {
             message[IPMI_MSG2_ID_OFFSET + i] = sess->id[i];
+        }
     }
 
     /* Copy data to IPMI wrapper */
-    for (i = 0; i < IPMI_WRAPPER_SEQ_LENGTH; i++)
+    for (i = 0; i < IPMI_WRAPPER_SEQ_LENGTH; i++) {
         message[IPMI_WRAPPER_SEQ_OFFSET + i] = sess->seqSend[i];
+    }
 
-    for (i = 0; i < IPMI_WRAPPER_ID_LENGTH; i++)
+    for (i = 0; i < IPMI_WRAPPER_ID_LENGTH; i++) {
         message[IPMI_WRAPPER_ID_OFFSET + i] = sess->id[i];
+    }
 }
 
 /*
@@ -557,8 +568,9 @@ int ipmiMsgBuild(IpmiSess sess, uint8_t* message, uint8_t cmd, uint8_t imsg1netf
 
     /* Activate Session command echoes the challenge string */
     if (cmd == IPMI_MSG_CMD_ACTIVATE_SESSION) {
-        for (i = 0; i < IPMI_MSG2_STR_LENGTH; i++)
+        for (i = 0; i < IPMI_MSG2_STR_LENGTH; i++) {
             imsg2[IPMI_MSG2_STR_OFFSET + i] = sess->str[i];
+        }
     }
 
     /* Number of bytes in message */
@@ -576,10 +588,11 @@ int ipmiMsgBuild(IpmiSess sess, uint8_t* message, uint8_t cmd, uint8_t imsg1netf
     memcpy(message + offset, iwrapper, iwrapperSize);
 
     /* Set IPMI sequence number */
-    if (sess->seq >= 0x3F)
+    if (sess->seq >= 0x3F) {
         sess->seq = 1;
-    else
+    } else {
         sess->seq++;
+    }
 
     imsg2[IPMI_MSG2_SEQLUN_OFFSET] |= (sess->seq << 2);
 
@@ -627,8 +640,9 @@ int ipmiMsgBuild(IpmiSess sess, uint8_t* message, uint8_t cmd, uint8_t imsg1netf
         }
 
         memcpy(message + offset, &cs2, 1);
-    } else
+    } else {
         memcpy(message + offset, imsg2, imsg2Size);
+    }
 
     return n;
 }
@@ -653,8 +667,9 @@ int ipmiMsgWriteRead(const char* name, uint8_t* message, size_t messageSize, uin
         return status;
     }
 
-    if (*responseSize == 0)
+    if (*responseSize == 0) {
         *responseSize = MSG_MAX_LENGTH;
+    }
 
     memset(response, 0, *responseSize); /* Initialize response to 0s in order to detect empty bytes ? */
 
@@ -715,8 +730,9 @@ int ipmiMsgActSess(void* device, IpmiSess sess, uint8_t* data, size_t* responseS
     int      i;
 
     /* Copy challenge string */
-    for (i = 0; i < IPMI_MSG2_STR_LENGTH; i++)
+    for (i = 0; i < IPMI_MSG2_STR_LENGTH; i++) {
         imsg2[IPMI_MSG2_STR_OFFSET + i] = sess->str[i];
+    }
 
     /* Set authentication method */
     imsg2[IPMI_MSG2_AUTH_TYPE_OFFSET] = sess->authReq;
@@ -797,10 +813,11 @@ int ipmiMsgChassisControl(void* device, IpmiSess sess, uint8_t* data, int bridge
 
     imsg2[IPMI_MSG2_SENSOR_OFFSET] = parm;
 
-    if (bridged) // may need to distinguish between once and twice-bridged messages
+    if (bridged) { // may need to distinguish between once and twice-bridged messages
         ipmiBuildSendMsg(sess, message, &messageSize, cmd, netfn, rsAddr, rqAddr, imsg2, imsg2Size, 0);
-    else
+    } else {
         messageSize = ipmiMsgBuild(sess, message, cmd, netfn, imsg2, imsg2Size, 0, 0, 0, 0, 0, 0);
+    }
 
     return sess->wrf(device, sess, message, messageSize, data, responseSize, cmd, netfn, roffs, 0);
 }
@@ -823,10 +840,11 @@ int ipmiMsgGetChassisStatus(void* device, IpmiSess sess, uint8_t* data, int brid
     memcpy(imsg2, BASIC_MSG, imsg2Size);
     imsg2[IPMI_MSG2_CMD_OFFSET] = cmd;
 
-    if (bridged) // may need to distinguish between once and twice-bridged messages
+    if (bridged) { // may need to distinguish between once and twice-bridged messages
         ipmiBuildSendMsg(sess, message, &messageSize, cmd, netfn, rsAddr, rqAddr, imsg2, imsg2Size, 0);
-    else
+    } else {
         messageSize = ipmiMsgBuild(sess, message, cmd, netfn, imsg2, imsg2Size, 0, 0, 0, 0, 0, 0);
+    }
 
     return sess->wrf(device, sess, message, messageSize, data, responseSize, cmd, netfn, roffs, 0);
 }
@@ -851,10 +869,11 @@ int ipmiMsgGetFruInvInfo(void* device, IpmiSess sess, uint8_t* data, int bridged
 
     imsg2[IPMI_MSG2_SENSOR_OFFSET] = id;
 
-    if (bridged) // may need to distinguish between once and twice-bridged messages
+    if (bridged) { // may need to distinguish between once and twice-bridged messages
         ipmiBuildSendMsg(sess, message, &messageSize, cmd, netfn, rsAddr, rqAddr, imsg2, imsg2Size, 0);
-    else
+    } else {
         messageSize = ipmiMsgBuild(sess, message, cmd, netfn, imsg2, imsg2Size, 0, 0, 0, 0, 0, 0);
+    }
 
     return sess->wrf(device, sess, message, messageSize, data, responseSize, cmd, netfn, roffs, 0);
 }
@@ -883,10 +902,11 @@ int ipmiMsgReadFru(void* device, IpmiSess sess, uint8_t* data, int bridged, uint
     imsg2[IPMI_MSG2_READ_FRU_MSB_OFFSET] = readOffset[1];
     imsg2[IPMI_MSG2_READ_FRU_CNT_OFFSET] = readSize;
 
-    if (bridged) // may need to distinguish between once and twice-bridged messages
+    if (bridged) { // may need to distinguish between once and twice-bridged messages
         ipmiBuildSendMsg(sess, message, &messageSize, cmd, netfn, rsAddr, rqAddr, imsg2, imsg2Size, 0);
-    else
+    } else {
         messageSize = ipmiMsgBuild(sess, message, cmd, netfn, imsg2, imsg2Size, 0, 0, 0, 0, 0, 0);
+    }
 
     return sess->wrf(device, sess, message, messageSize, data, responseSize, cmd, netfn, roffs, 0);
 }
@@ -938,16 +958,18 @@ int ipmiMsgGetSdrRepInfo(void* device, IpmiSess sess, uint8_t* data, int bridged
     uint8_t cmd = (parm == IPMI_SDRREP_PARM_GET_DEV_SDR) ? IPMI_MSG_CMD_GET_DEV_SDR_INFO : IPMI_MSG_CMD_GET_SDRREP_INFO;
     uint8_t netfn = (parm == IPMI_SDRREP_PARM_GET_DEV_SDR) ? IPMI_MSG_NETFN_SENSOR_EVENT : IPMI_MSG_NETFN_STORAGE;
 
-    if (parm == IPMI_SDRREP_PARM_GET_DEV_SDR)
+    if (parm == IPMI_SDRREP_PARM_GET_DEV_SDR) {
         memcpy(imsg2, GET_DEV_SDR_INFO_MSG, imsg2Size);
-    else
+    } else {
         memcpy(imsg2, BASIC_MSG, imsg2Size);
+    }
     imsg2[IPMI_MSG2_CMD_OFFSET] = cmd;
 
-    if (bridged) // may need to distinguish between once and twice-bridged messages
+    if (bridged) { // may need to distinguish between once and twice-bridged messages
         ipmiBuildSendMsg(sess, message, &messageSize, cmd, netfn, rsAddr, rqAddr, imsg2, imsg2Size, 0);
-    else
+    } else {
         messageSize = ipmiMsgBuild(sess, message, cmd, netfn, imsg2, imsg2Size, 0, 0, 0, 0, 0, 0);
+    }
 
     return sess->wrf(device, sess, message, messageSize, data, responseSize, cmd, netfn, roffs, 0);
 }
@@ -974,10 +996,11 @@ int ipmiMsgReserveSdrRep(void* device, IpmiSess sess, uint8_t* data, int bridged
     memcpy(imsg2, BASIC_MSG, imsg2Size);
     imsg2[IPMI_MSG2_CMD_OFFSET] = cmd;
 
-    if (bridged) // may need to distinguish between once and twice-bridged messages
+    if (bridged) { // may need to distinguish between once and twice-bridged messages
         ipmiBuildSendMsg(sess, message, &messageSize, cmd, netfn, rsAddr, rqAddr, imsg2, imsg2Size, 0);
-    else
+    } else {
         messageSize = ipmiMsgBuild(sess, message, cmd, netfn, imsg2, imsg2Size, 0, 0, 0, 0, 0, 0);
+    }
 
     return sess->wrf(device, sess, message, messageSize, data, responseSize, cmd, netfn, roffs, 0);
 }
@@ -1015,10 +1038,11 @@ int ipmiMsgGetSdr(void* device, IpmiSess sess, uint8_t* data, int bridged, uint8
     imsg2[IPMI_MSG2_GET_SDR_OFFSET_OFFSET]  = offset;
     imsg2[IPMI_MSG2_GET_SDR_CNT_OFFSET]     = readSize;
 
-    if (bridged) // may need to distinguish between once and twice-bridged messages
+    if (bridged) { // may need to distinguish between once and twice-bridged messages
         ipmiBuildSendMsg(sess, message, &messageSize, cmd, netfn, rsAddr, rqAddr, imsg2, imsg2Size, 0);
-    else
+    } else {
         messageSize = ipmiMsgBuild(sess, message, cmd, netfn, imsg2, imsg2Size, 0, 0, 0, 0, 0, 0);
+    }
 
     return sess->wrf(device, sess, message, messageSize, data, responseSize, cmd, netfn, roffs, 0);
 }
@@ -1043,10 +1067,11 @@ int ipmiMsgReadSensor(void* device, IpmiSess sess, uint8_t* data, uint8_t bridge
 
     imsg2[IPMI_MSG2_SENSOR_OFFSET] = sens;
 
-    if (bridged) // may need to distinguish between once and twice-bridged messages
+    if (bridged) { // may need to distinguish between once and twice-bridged messages
         ipmiBuildSendMsg(sess, message, &messageSize, cmd, netfn, rsAddr, rqAddr, imsg2, imsg2Size, lun);
-    else
+    } else {
         messageSize = ipmiMsgBuild(sess, message, cmd, netfn, imsg2, imsg2Size, 0, 0, 0, 0, 0, 0);
+    }
 
     return sess->wrf(device, sess, message, messageSize, data, responseSize, cmd, netfn, roffs, 0);
 }
@@ -1071,10 +1096,11 @@ int ipmiMsgGetSensorThresholds(void* device, IpmiSess sess, uint8_t* data, uint8
 
     imsg2[IPMI_MSG2_SENSOR_OFFSET] = sens;
 
-    if (bridged) // may need to distinguish between once and twice-bridged messages
+    if (bridged) { // may need to distinguish between once and twice-bridged messages
         ipmiBuildSendMsg(sess, message, &messageSize, cmd, netfn, rsAddr, rqAddr, imsg2, imsg2Size, lun);
-    else
+    } else {
         messageSize = ipmiMsgBuild(sess, message, cmd, netfn, imsg2, imsg2Size, 0, 0, 0, 0, 0, 0);
+    }
 
     return sess->wrf(device, sess, message, messageSize, data, responseSize, cmd, netfn, roffs, 0);
 }
@@ -1097,10 +1123,11 @@ int ipmiMsgGetDeviceId(void* device, IpmiSess sess, uint8_t* data, int bridged, 
     memcpy(imsg2, BASIC_MSG, imsg2Size);
     imsg2[IPMI_MSG2_CMD_OFFSET] = cmd;
 
-    if (bridged) // may need to distinguish between once and twice-bridged messages
+    if (bridged) { // may need to distinguish between once and twice-bridged messages
         ipmiBuildSendMsg(sess, message, &messageSize, cmd, netfn, rsAddr, rqAddr, imsg2, imsg2Size, 0);
-    else
+    } else {
         messageSize = ipmiMsgBuild(sess, message, cmd, netfn, imsg2, imsg2Size, 0, 0, 0, 0, 0, 0);
+    }
 
     return sess->wrf(device, sess, message, messageSize, data, responseSize, cmd, netfn, roffs, 0);
 }
@@ -1122,10 +1149,11 @@ int ipmiMsgBroadcastGetDeviceId(void* device, IpmiSess sess, uint8_t* data, int 
     memcpy(imsg2, BASIC_MSG, imsg2Size);
     imsg2[IPMI_MSG2_CMD_OFFSET] = cmd;
 
-    if (bridged) // may need to distinguish between once and twice-bridged messages
+    if (bridged) { // may need to distinguish between once and twice-bridged messages
         ipmiBuildSendMsg(sess, message + 1, &messageSize, cmd, netfn, rsAddr, rqAddr, imsg2, imsg2Size, 0);
-    else
+    } else {
         messageSize = ipmiMsgBuild(sess, message, cmd, netfn, imsg2, imsg2Size, 0, 0, 0, 0, 0, 0);
+    }
 
     return sess->wrf(device, sess, message, messageSize, data, responseSize, cmd, netfn, roffs, 0);
 }
@@ -1157,10 +1185,11 @@ int ipmiMsgGetAddressInfoIpmb0(void* device, IpmiSess sess, uint8_t* data, int b
     // if using different routines for different types of get hw address requests, may not need to pass these
     // values as arguments; can be hard-coded in routine
 
-    if (bridged) // may need to distinguish between once and twice-bridged messages
+    if (bridged) { // may need to distinguish between once and twice-bridged messages
         ipmiBuildSendMsg(sess, message, &messageSize, cmd, netfn, rsAddr, rqAddr, imsg2, imsg2Size, 0);
-    else
+    } else {
         messageSize = ipmiMsgBuild(sess, message, cmd, netfn, imsg2, imsg2Size, 0, 0, 0, 0, 0, 0);
+    }
 
     return sess->wrf(device, sess, message, messageSize, data, responseSize, cmd, netfn, roffs, 0);
 }
@@ -1194,10 +1223,11 @@ int ipmiMsgGetAddressInfoHwAddr(void* device, IpmiSess sess, uint8_t* data, int 
     // if using different routines for different types of get hw address requests, may not need to pass these
     // values as arguments; can be hard-coded in routine
 
-    if (bridged) // may need to distinguish between once and twice-bridged messages
+    if (bridged) { // may need to distinguish between once and twice-bridged messages
         ipmiBuildSendMsg(sess, message, &messageSize, cmd, netfn, rsAddr, rqAddr, imsg2, imsg2Size, 0);
-    else
+    } else {
         messageSize = ipmiMsgBuild(sess, message, cmd, netfn, imsg2, imsg2Size, 0, 0, 0, 0, 0, 0);
+    }
 
     return sess->wrf(device, sess, message, messageSize, data, responseSize, cmd, netfn, roffs, 0);
 }
@@ -1223,10 +1253,11 @@ int ipmiMsgGetAddressInfoIpmc(void* device, IpmiSess sess, uint8_t* data, int br
     imsg2[IPMI_MSG2_RQADDR_OFFSET] = IPMI_MSG_ADDR_SW;
     imsg2[IPMI_MSG2_CMD_OFFSET]    = cmd;
 
-    if (bridged) // may need to distinguish between once and twice-bridged messages
+    if (bridged) { // may need to distinguish between once and twice-bridged messages
         ipmiBuildSendMsg(sess, message, &messageSize, cmd, netfn, rsAddr, rqAddr, imsg2, imsg2Size, 0);
-    else
+    } else {
         messageSize = ipmiMsgBuild(sess, message, cmd, netfn, imsg2, imsg2Size, 0, 0, 0, 0, 0, 0);
+    }
 
     return sess->wrf(device, sess, message, messageSize, data, responseSize, cmd, netfn, roffs, 0);
 }
@@ -1250,10 +1281,11 @@ int ipmiMsgGetPicmgProp(void* device, IpmiSess sess, uint8_t* data, int bridged,
     imsg2[IPMI_MSG2_RQADDR_OFFSET] = IPMI_MSG_ADDR_SW;
     imsg2[IPMI_MSG2_CMD_OFFSET]    = cmd;
 
-    if (bridged) // may need to distinguish between once and twice-bridged messages
+    if (bridged) { // may need to distinguish between once and twice-bridged messages
         ipmiBuildSendMsg(sess, message, &messageSize, cmd, netfn, rsAddr, rqAddr, imsg2, imsg2Size, 0);
-    else
+    } else {
         messageSize = ipmiMsgBuild(sess, message, cmd, netfn, imsg2, imsg2Size, 0, 0, 0, 0, 0, 0);
+    }
 
     return sess->wrf(device, sess, message, messageSize, data, responseSize, cmd, netfn, roffs, 0);
 }
@@ -1279,10 +1311,11 @@ int ipmiMsgGetPowerLevel(void* device, IpmiSess sess, uint8_t* data, int bridged
     imsg2[IPMI_MSG2_SET_FRU_ACT_FRU_OFFSET]             = fruId;
     imsg2[PICMG_RPLY_IMSG2_GET_POWER_LEVEL_TYPE_OFFSET] = parm;
 
-    if (bridged) // may need to distinguish between once and twice-bridged messages
+    if (bridged) { // may need to distinguish between once and twice-bridged messages
         ipmiBuildSendMsg(sess, message, &messageSize, cmd, netfn, rsAddr, rqAddr, imsg2, imsg2Size, 0);
-    else
+    } else {
         messageSize = ipmiMsgBuild(sess, message, cmd, netfn, imsg2, imsg2Size, 0, 0, 0, 0, 0, 0);
+    }
 
     return sess->wrf(device, sess, message, messageSize, data, responseSize, cmd, netfn, roffs, 0);
 }
@@ -1308,10 +1341,11 @@ int ipmiMsgGetFanLevel(void* device, IpmiSess sess, uint8_t* data, int bridged, 
     imsg2[IPMI_MSG2_CMD_OFFSET]             = cmd;
     imsg2[IPMI_MSG2_SET_FRU_ACT_FRU_OFFSET] = fruId;
 
-    if (bridged) // may need to distinguish between once and twice-bridged messages
+    if (bridged) { // may need to distinguish between once and twice-bridged messages
         ipmiBuildSendMsg(sess, message, &messageSize, cmd, netfn, rsAddr, rqAddr, imsg2, imsg2Size, 0);
-    else
+    } else {
         messageSize = ipmiMsgBuild(sess, message, cmd, netfn, imsg2, imsg2Size, 0, 0, 0, 0, 0, 0);
+    }
 
     return sess->wrf(device, sess, message, messageSize, data, responseSize, cmd, netfn, roffs, 0);
 }
@@ -1338,10 +1372,11 @@ int ipmiMsgSetFanLevel(void* device, IpmiSess sess, uint8_t* data, int bridged, 
     imsg2[IPMI_MSG2_SET_FRU_ACT_FRU_OFFSET] = fruId;
     imsg2[IPMI_MSG2_SET_FAN_LEVEL_OFFSET]   = level;
 
-    if (bridged) // may need to distinguish between once and twice-bridged messages
+    if (bridged) { // may need to distinguish between once and twice-bridged messages
         ipmiBuildSendMsg(sess, message, &messageSize, cmd, netfn, rsAddr, rqAddr, imsg2, imsg2Size, 0);
-    else
+    } else {
         messageSize = ipmiMsgBuild(sess, message, cmd, netfn, imsg2, imsg2Size, 0, 0, 0, 0, 0, 0);
+    }
 
     return sess->wrf(device, sess, message, messageSize, data, responseSize, cmd, netfn, roffs, 0);
 }
@@ -1369,10 +1404,11 @@ int ipmiMsgSetFruAct(void* device, IpmiSess sess, uint8_t* data, int bridged, ui
     imsg2[IPMI_MSG2_SET_FRU_ACT_CMD_OFFSET] = parm;
 
     printf("*************ipmi set fru act parm %i\n", parm);
-    if (bridged) // may need to distinguish between once and twice-bridged messages
+    if (bridged) { // may need to distinguish between once and twice-bridged messages
         ipmiBuildSendMsg(sess, message, &messageSize, cmd, netfn, rsAddr, rqAddr, imsg2, imsg2Size, 0);
-    else
+    } else {
         messageSize = ipmiMsgBuild(sess, message, cmd, netfn, imsg2, imsg2Size, 0, 0, 0, 0, 0, 0);
+    }
 
     return sess->wrf(device, sess, message, messageSize, data, responseSize, cmd, netfn, roffs, 0);
 }
@@ -1397,10 +1433,11 @@ int ipmiMsgGetFanProp(void* device, IpmiSess sess, uint8_t* data, int bridged, u
     imsg2[IPMI_MSG2_CMD_OFFSET]             = cmd;
     imsg2[IPMI_MSG2_SET_FRU_ACT_FRU_OFFSET] = fruId;
 
-    if (bridged) // may need to distinguish between once and twice-bridged messages
+    if (bridged) { // may need to distinguish between once and twice-bridged messages
         ipmiBuildSendMsg(sess, message, &messageSize, cmd, netfn, rsAddr, rqAddr, imsg2, imsg2Size, 0);
-    else
+    } else {
         messageSize = ipmiMsgBuild(sess, message, cmd, netfn, imsg2, imsg2Size, 0, 0, 0, 0, 0, 0);
+    }
 
     return sess->wrf(device, sess, message, messageSize, data, responseSize, cmd, netfn, roffs, 0);
 }

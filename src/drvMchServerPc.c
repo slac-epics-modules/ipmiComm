@@ -71,8 +71,9 @@ static void assign_fru_lkup_advantech(MchData mchData) {
 
             fru->id                           = fru->sdr.fruId;
             mchData->mchSys->fruLkup[fru->id] = i;
-            if (fru->id == 0)
+            if (fru->id == 0) {
                 found = 1;
+            }
         }
     }
     if (found == 0) { /* If FRU 0 not already in the data structure, add it */

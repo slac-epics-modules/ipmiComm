@@ -320,8 +320,9 @@ MchDev devMchRegister(const char* name) {
 
     if (d) {
         /* an error happened and we need to clean up */
-        if (d->mutex)
+        if (d->mutex) {
             epicsMutexDestroy(d->mutex);
+        }
         free(d);
     }
 
@@ -375,32 +376,33 @@ static epicsFloat64 sensorConversion(SdrFull sdr, uint8_t raw, char* name) {
 
     value = ((m * value) + (b * pow(10, bexp))) * pow(10, rexp);
 
-    if (l == SENSOR_CONV_LINEAR)
+    if (l == SENSOR_CONV_LINEAR) {
         value = value;
-    else if (l == SENSOR_CONV_LN)
+    } else if (l == SENSOR_CONV_LN) {
         value = log(value);
-    else if (l == SENSOR_CONV_LOG10)
+    } else if (l == SENSOR_CONV_LOG10) {
         value = log10(value);
-    else if (l == SENSOR_CONV_LOG2)
+    } else if (l == SENSOR_CONV_LOG2) {
         value = log(value) / log(2);
-    else if (l == SENSOR_CONV_E)
+    } else if (l == SENSOR_CONV_E) {
         value = exp(value);
-    else if (l == SENSOR_CONV_EXP10)
+    } else if (l == SENSOR_CONV_EXP10) {
         value = pow(value, 10);
-    else if (l == SENSOR_CONV_EXP2)
+    } else if (l == SENSOR_CONV_EXP2) {
         value = pow(value, 2);
-    else if (l == SENSOR_CONV_1_X)
+    } else if (l == SENSOR_CONV_1_X) {
         value = 1 / value;
-    else if (l == SENSOR_CONV_SQR)
+    } else if (l == SENSOR_CONV_SQR) {
         value = pow(value, 2);
-    else if (l == SENSOR_CONV_CUBE)
+    } else if (l == SENSOR_CONV_CUBE) {
         value = pow(value, 1 / 3);
-    else if (l == SENSOR_CONV_SQRT)
+    } else if (l == SENSOR_CONV_SQRT) {
         value = sqrt(value);
-    else if (l == SENSOR_CONV_CUBE_NEG1)
+    } else if (l == SENSOR_CONV_CUBE_NEG1) {
         value = pow(value, -1 / 3);
-    else
+    } else {
         printf("sensorConversion %s: unknown sensor conversion algorithm\n", name);
+    }
 
     return value;
 }
@@ -414,8 +416,9 @@ static short sensLkup(MchSys mchSys, struct camacio link) {
 
     int fruindex = fruLkup(mchSys, link);
 
-    if (-1 == fruindex)
+    if (-1 == fruindex) {
         return -1;
+    }
 
     return mchSys->sensLkup[fruindex][link.c][link.n];
 }
@@ -587,8 +590,9 @@ static long ai_ioint_info(int cmd, struct aiRecord* pai, IOSCANPVT* iopvt) {
     int     inst;
     long    status = SUCCESS;
 
-    if (!recPvt)
+    if (!recPvt) {
         return NO_CONVERT;
+    }
 
     mch     = recPvt->mch;
     mchData = mch->udata;
@@ -607,8 +611,9 @@ static long init_ai_record(struct aiRecord* pai) {
     long   status = SUCCESS;
     char   str[40];
 
-    if (!(recPvt = init_record_chk(&pai->inp, &status, str)))
+    if (!(recPvt = init_record_chk(&pai->inp, &status, str))) {
         goto bail;
+    }
 
     /* Break parm into node name and optional parameter */
     node = strtok(pai->inp.value.camacio.parm, "+");
@@ -620,10 +625,11 @@ static long init_ai_record(struct aiRecord* pai) {
         }
     }
 
-    if (init_record_find(mch, recPvt, node, task, &status, str))
+    if (init_record_find(mch, recPvt, node, task, &status, str)) {
         goto bail;
-    else
+    } else {
         pai->dpvt = recPvt;
+    }
 
 bail:
     if (status) {
@@ -653,8 +659,9 @@ static long read_ai(struct aiRecord* pai) {
     short   index; /* Sensor index */
     int     s = 0, inst;
 
-    if (!recPvt)
+    if (!recPvt) {
         return NO_CONVERT;
+    }
 
     mch     = recPvt->mch;
     mchData = mch->udata;
@@ -688,10 +695,11 @@ static long read_ai(struct aiRecord* pai) {
 
         sens = &mchSys->sens[index];
 
-        if (mchGetSensorReadingStat(mchData, data, sens))
+        if (mchGetSensorReadingStat(mchData, data, sens)) {
             s = ERROR;
-        else
+        } else {
             sens->val = raw = data[IPMI_RPLY_IMSG2_SENSOR_READING_OFFSET];
+        }
 
         epicsMutexUnlock(mch->mutex);
 
@@ -702,31 +710,36 @@ static long read_ai(struct aiRecord* pai) {
         if (!sens->cnfg) {
             sensEgu(egu, sdr->units2);
             strcpy(pai->egu, egu);
-            if (sdr->str)
+            if (sdr->str) {
                 strcpy(pai->desc, sdr->str);
+            }
 
-            if (sdr->recType == SDR_TYPE_FULL_SENSOR)
+            if (sdr->recType == SDR_TYPE_FULL_SENSOR) {
                 sensThresh(sdr, sens, &pai->lolo, &pai->llsv, &pai->low, &pai->lsv, &pai->high, &pai->hsv, &pai->hihi,
                            &pai->hhsv, pai->name);
+            }
             sens->cnfg = 1;
         }
 
         if (s) {
-            if (MCH_DBG(mchStat[inst]))
+            if (MCH_DBG(mchStat[inst])) {
                 printf("%s writeread error sensor owner 0x%02x number %02x index %i\n", pai->name, sdr->owner,
                        sdr->number, index);
+            }
             goto bail;
         }
 
         /* All of our conversions are for Full Sensor SDRs */
-        if (sdr->recType != SDR_TYPE_FULL_SENSOR)
+        if (sdr->recType != SDR_TYPE_FULL_SENSOR) {
             pai->val = raw;
-        else
+        } else {
             pai->val = sensorConversion(sdr, raw, pai->name);
+        }
 
-        if (MCH_DBG(mchStat[inst]) >= MCH_DBG_MED)
+        if (MCH_DBG(mchStat[inst]) >= MCH_DBG_MED) {
             printf("%s read_ai: sensor index is %i, sensor number is %i, value is %.0f, rval is %i, raw is 0x%02x\n",
                    pai->name, index, sdr->number, pai->val, pai->rval, raw);
+        }
 
         pai->udf = FALSE;
         return NO_CONVERT;
@@ -745,8 +758,9 @@ static long init_bo_record(struct boRecord* pbo) {
     long   status = SUCCESS;
     char   str[40];
 
-    if (!(recPvt = init_record_chk(&pbo->out, &status, str)))
+    if (!(recPvt = init_record_chk(&pbo->out, &status, str))) {
         goto bail;
+    }
 
     /* Break parm into node name and optional parameter */
     node = strtok(pbo->out.value.camacio.parm, "+");
@@ -758,10 +772,11 @@ static long init_bo_record(struct boRecord* pbo) {
         }
     }
 
-    if (init_record_find(mch, recPvt, node, task, &status, str))
+    if (init_record_find(mch, recPvt, node, task, &status, str)) {
         goto bail;
-    else
+    } else {
         pbo->dpvt = recPvt;
+    }
 
 bail:
     if (status) {
@@ -781,8 +796,9 @@ static long write_bo(struct boRecord* pbo) {
     MchSys  mchSys;
     char*   task;
 
-    if (!recPvt)
+    if (!recPvt) {
         return SUCCESS;
+    }
 
     mch     = recPvt->mch;
     mchData = mch->udata;
@@ -797,9 +813,9 @@ static long write_bo(struct boRecord* pbo) {
 
             epicsMutexLock(mch->mutex);
 
-            if (pbo->val)             /* could change this to be purely soft; session should time out */
+            if (pbo->val) {           /* could change this to be purely soft; session should time out */
                 mchSess->session = 1; /* Re-enable session */
-            else {
+            } else {
                 mchSess->session = 0;
                 mchMsgCloseSess(mchSess, mchData->ipmiSess, data);
             }
@@ -814,8 +830,9 @@ static long write_bo(struct boRecord* pbo) {
             epicsMutexUnlock(mch->mutex);
         }
 
-        else if (!(strcmp(task, "init")) && mchSess->session)
+        else if (!(strcmp(task, "init")) && mchSess->session) {
             mchStatSet(mchSess->instance, MCH_MASK_INIT, (pbo->val) ? MCH_MASK_INIT_DONE : MCH_MASK_INIT_NOT_DONE);
+        }
 
         pbo->udf = FALSE;
         return SUCCESS;
@@ -846,8 +863,9 @@ static long init_bi_record(struct biRecord* pbi) {
     long   status = SUCCESS;
     char   str[40];
 
-    if (!(recPvt = init_record_chk(&pbi->inp, &status, str)))
+    if (!(recPvt = init_record_chk(&pbi->inp, &status, str))) {
         goto bail;
+    }
 
     /* Break parm into node name and optional parameter */
     node = strtok(pbi->inp.value.camacio.parm, "+");
@@ -859,10 +877,11 @@ static long init_bi_record(struct biRecord* pbi) {
         }
     }
 
-    if (init_record_find(mch, recPvt, node, task, &status, str))
+    if (init_record_find(mch, recPvt, node, task, &status, str)) {
         goto bail;
-    else
+    } else {
         pbi->dpvt = recPvt;
+    }
 
 bail:
     if (status) {
@@ -883,8 +902,9 @@ static long read_bi(struct biRecord* pbi) {
     long    status = SUCCESS;
     short   index;
 
-    if (!recPvt)
+    if (!recPvt) {
         return status;
+    }
 
     mch     = recPvt->mch;
     mchData = mch->udata;
@@ -893,9 +913,10 @@ static long read_bi(struct biRecord* pbi) {
 
     task = recPvt->task;
 
-    if (!(strcmp(task, "stat")))
+    if (!(strcmp(task, "stat"))) {
 
         pbi->rval = checkMchOnln(mchSess);
+    }
 
     else if (checkMchInitDone(mchSess)) {
 
@@ -937,8 +958,9 @@ static long init_mbbi_record(struct mbbiRecord* pmbbi) {
     char    str[40];
     DBLINK* plink = &pmbbi->inp;
 
-    if (!(recPvt = init_record_chk(plink, &status, str)))
+    if (!(recPvt = init_record_chk(plink, &status, str))) {
         goto bail;
+    }
 
     /* Break parm into node name and optional parameter */
     node = strtok(pmbbi->inp.value.camacio.parm, "+");
@@ -951,10 +973,11 @@ static long init_mbbi_record(struct mbbiRecord* pmbbi) {
         }
     }
 
-    if (init_record_find(mch, recPvt, node, task, &status, str))
+    if (init_record_find(mch, recPvt, node, task, &status, str)) {
         goto bail;
-    else
+    } else {
         pmbbi->dpvt = recPvt;
+    }
 bail:
     if (status) {
         recGblRecordError(status, (void*)pmbbi, (const char*)str);
@@ -979,8 +1002,9 @@ static long read_mbbi(struct mbbiRecord* pmbbi) {
     long    status = SUCCESS;
     int     s      = 0, inst;
 
-    if (!recPvt)
+    if (!recPvt) {
         return status;
+    }
 
     mch     = recPvt->mch;
     mchData = mch->udata;
@@ -990,15 +1014,17 @@ static long read_mbbi(struct mbbiRecord* pmbbi) {
     task    = recPvt->task;
 
     /* Read initialized status */
-    if (!(strcmp(task, "init")))
+    if (!(strcmp(task, "init"))) {
         pmbbi->rval = mchStat[inst] & MCH_MASK_INIT;
+    }
 
     else if (task && checkMchInitDone(mchSess)) {
 
         if (!(strcmp(task, "fan"))) {
 
-            if (-1 == (findex = fruLkup(mchSys, pmbbi->inp.value.camacio)))
+            if (-1 == (findex = fruLkup(mchSys, pmbbi->inp.value.camacio))) {
                 return ERROR;
+            }
             fru = &mchSys->fru[findex];
 
             pmbbi->rval = (fru->fanProp & (1 << 7)) ? 1 : 0;
@@ -1006,8 +1032,9 @@ static long read_mbbi(struct mbbiRecord* pmbbi) {
 
         else if (!(strcmp(task, "pwr"))) {
 
-            if (-1 == (findex = fruLkup(mchSys, pmbbi->inp.value.camacio)))
+            if (-1 == (findex = fruLkup(mchSys, pmbbi->inp.value.camacio))) {
                 return ERROR;
+            }
             fru = &mchSys->fru[findex];
 
             pmbbi->rval = fru->pwrDyn;
@@ -1034,15 +1061,16 @@ static long read_mbbi(struct mbbiRecord* pmbbi) {
             */
             epicsMutexLock(mch->mutex);
 
-            if (mchGetSensorReadingStat(mchData, data, sens))
+            if (mchGetSensorReadingStat(mchData, data, sens)) {
                 s = ERROR;
-            else {
+            } else {
                 sens->val = value = data[IPMI_RPLY_IMSG2_DISCRETE_SENSOR_READING_OFFSET];
 
-                if (MCH_DBG(mchStat[inst]) >= MCH_DBG_MED)
+                if (MCH_DBG(mchStat[inst]) >= MCH_DBG_MED) {
                     printf("%s read_mbbi: value %02x, sensor %i, owner %i, lun %i, index %i, value %i\n", pmbbi->name,
                            value, mchSys->sens[sindex].sdr.number, mchSys->sens[sindex].sdr.owner,
                            mchSys->sens[sindex].sdr.lun, sindex, value);
+                }
             }
 
             epicsMutexUnlock(mch->mutex);
@@ -1071,8 +1099,9 @@ static long init_mbbo_record(struct mbboRecord* pmbbo) {
     long   status = SUCCESS;
     char   str[40];
 
-    if (!(recPvt = init_record_chk(&pmbbo->out, &status, str)))
+    if (!(recPvt = init_record_chk(&pmbbo->out, &status, str))) {
         goto bail;
+    }
 
     /* Break parm into node name and optional parameter */
     node = strtok(pmbbo->out.value.camacio.parm, "+");
@@ -1084,10 +1113,11 @@ static long init_mbbo_record(struct mbboRecord* pmbbo) {
         }
     }
 
-    if (init_record_find(mch, recPvt, node, task, &status, str))
+    if (init_record_find(mch, recPvt, node, task, &status, str)) {
         goto bail;
-    else
+    } else {
         pmbbo->dpvt = recPvt;
+    }
 bail:
     if (status) {
         recGblRecordError(status, (void*)pmbbo, (const char*)str);
@@ -1111,8 +1141,9 @@ static long write_mbbo(struct mbboRecord* pmbbo) {
     short   index;
     int     inst;
 
-    if (!recPvt)
+    if (!recPvt) {
         return status;
+    }
 
     mch     = recPvt->mch;
     mchData = mch->udata;
@@ -1136,16 +1167,18 @@ static long write_mbbo(struct mbboRecord* pmbbo) {
 
         if (!(strcmp(task, "chas"))) {
 
-            if (MCH_DBG(mchStat[inst]) >= MCH_DBG_MED)
+            if (MCH_DBG(mchStat[inst]) >= MCH_DBG_MED) {
                 printf("write_mbbo: call mchMsgChassisControl with value %i\n", pmbbo->val);
+            }
 
             epicsMutexLock(mch->mutex);
             status = mchMsgChassisControl(mchData, data, pmbbo->val);
             epicsMutexUnlock(mch->mutex);
         } else if (!(strcmp(task, "fru"))) {
 
-            if (-1 == (index = fruLkup(mchSys, pmbbo->out.value.camacio)))
+            if (-1 == (index = fruLkup(mchSys, pmbbo->out.value.camacio))) {
                 return ERROR;
+            }
 
             fru = &mchSys->fru[index];
 
@@ -1157,10 +1190,11 @@ static long write_mbbo(struct mbboRecord* pmbbo) {
             cmd = (pmbbo->val == 2) ? 0 : pmbbo->val;
 
             epicsMutexLock(mch->mutex);
-            if (mchData->mchSys->mchcb->set_fru_act)
+            if (mchData->mchSys->mchcb->set_fru_act) {
                 status = mchData->mchSys->mchcb->set_fru_act(mchData, data, index, cmd);
-            else
+            } else {
                 status = -1;
+            }
             epicsMutexUnlock(mch->mutex);
         }
 
@@ -1187,8 +1221,9 @@ static long init_longin_record(struct longinRecord* plongin) {
     long   status = SUCCESS;
     char   str[40];
 
-    if (!(recPvt = init_record_chk(&plongin->inp, &status, str)))
+    if (!(recPvt = init_record_chk(&plongin->inp, &status, str))) {
         goto bail;
+    }
 
     /* Break parm into node name and optional parameter */
     node = strtok(plongin->inp.value.camacio.parm, "+");
@@ -1200,10 +1235,11 @@ static long init_longin_record(struct longinRecord* plongin) {
         }
     }
 
-    if (init_record_find(mch, recPvt, node, task, &status, str))
+    if (init_record_find(mch, recPvt, node, task, &status, str)) {
         goto bail;
-    else
+    } else {
         plongin->dpvt = recPvt;
+    }
 
 bail:
     if (status) {
@@ -1222,8 +1258,9 @@ static long read_longin(struct longinRecord* plongin) {
     uint8_t data[MSG_MAX_LENGTH] = {0};
     int     inst;
 
-    if (!recPvt)
+    if (!recPvt) {
         return SUCCESS;
+    }
 
     mch     = recPvt->mch;
     mchData = mch->udata;
@@ -1245,18 +1282,20 @@ static long read_longin(struct longinRecord* plongin) {
                                (IPMI_GET_CHAS_MISC_STATE(data[IPMI_RPLY_IMSG2_GET_CHAS_MISC_STATE_OFFSET]) << 16);
                 /* Or 'last event' and 'misc' bits into power state word */
 
-                if (MCH_DBG(mchStat[inst]) >= MCH_DBG_MED)
+                if (MCH_DBG(mchStat[inst]) >= MCH_DBG_MED) {
                     printf("%s read_longin: val %i, power state %i last event %i misc state %i\n", plongin->name,
                            plongin->val, IPMI_GET_CHAS_POWER_STATE(data[IPMI_RPLY_IMSG2_GET_CHAS_POWER_STATE_OFFSET]),
                            IPMI_GET_CHAS_LAST_EVENT(data[IPMI_RPLY_IMSG2_GET_CHAS_LAST_EVENT_OFFSET]),
                            IPMI_GET_CHAS_MISC_STATE(data[IPMI_RPLY_IMSG2_GET_CHAS_MISC_STATE_OFFSET]));
+                }
 
                 epicsMutexUnlock(mch->mutex);
                 plongin->udf = FALSE;
                 return SUCCESS;
             }
-        } else
+        } else {
             goto bail;
+        }
     }
 
 bail:
@@ -1289,8 +1328,9 @@ static long init_fru_ai_record(struct aiRecord* pai) {
     long   status = SUCCESS;
     char   str[40];
 
-    if (!(recPvt = init_record_chk(&pai->inp, &status, str)))
+    if (!(recPvt = init_record_chk(&pai->inp, &status, str))) {
         goto bail;
+    }
 
     /* Break parm into node name and optional parameter */
     node = strtok(pai->inp.value.camacio.parm, "+");
@@ -1302,10 +1342,11 @@ static long init_fru_ai_record(struct aiRecord* pai) {
         }
     }
 
-    if (init_record_find(mch, recPvt, node, task, &status, str))
+    if (init_record_find(mch, recPvt, node, task, &status, str)) {
         goto bail;
-    else
+    } else {
         pai->dpvt = recPvt;
+    }
 
 bail:
     if (status) {
@@ -1332,16 +1373,18 @@ static long read_fru_ai(struct aiRecord* pai) {
     int     s = 0, inst;
     uint8_t prop, level, draw, mult;
 
-    if (!recPvt)
+    if (!recPvt) {
         return status;
+    }
 
     mch     = recPvt->mch;
     mchData = mch->udata;
     mchSess = mchData->mchSess;
     mchSys  = mchData->mchSys;
 
-    if (-1 == (index = fruLkup(mchSys, pai->inp.value.camacio)))
+    if (-1 == (index = fruLkup(mchSys, pai->inp.value.camacio))) {
         return ERROR;
+    }
 
     inst = mchSess->instance;
     task = recPvt->task;
@@ -1354,18 +1397,21 @@ static long read_fru_ai(struct aiRecord* pai) {
             epicsMutexLock(mch->mutex);
 
             if (mchSys->mchcb->get_fan_level) {
-                if (!(s = mchSys->mchcb->get_fan_level(mchData, data, index, &level)))
+                if (!(s = mchSys->mchcb->get_fan_level(mchData, data, index, &level))) {
                     pai->rval = level;
-            } else
+                }
+            } else {
                 s = -1;
+            }
             epicsMutexUnlock(mch->mutex);
         } else if (!(strcmp(task, "pwr"))) {
 
             /* Check for systems and FRU IDs that support this query;
              * kludgey implementation, needs re-work
              */
-            if (!((mchSys->mchcb->get_power_level) && (FRU_PWR_MSG_CMPTBL(id))))
+            if (!((mchSys->mchcb->get_power_level) && (FRU_PWR_MSG_CMPTBL(id)))) {
                 goto bail;
+            }
 
             epicsMutexLock(mch->mutex);
 
@@ -1398,19 +1444,22 @@ static long read_fru_ai(struct aiRecord* pai) {
                 }
             }
 
-            else if (parm == 4)
+            else if (parm == 4) {
                 pai->rval = fru->pwrDly * 0.1; /* Convert from 0.1 seconds to seconds */
+            }
 
             epicsMutexUnlock(mch->mutex);
         }
 
-        if (s)
+        if (s) {
             goto bail;
+        }
 
         pai->val = pai->rval;
 
-        if (MCH_DBG(mchStat[inst]) >= MCH_DBG_MED)
+        if (MCH_DBG(mchStat[inst]) >= MCH_DBG_MED) {
             printf("read_fru_ai: %s FRU id is %i, index is %i, value is %.0f\n", pai->name, id, index, pai->val);
+        }
 
         pai->udf = FALSE;
         return status;
@@ -1444,8 +1493,9 @@ static long init_fru_stringin_record(struct stringinRecord* pstringin) {
     long   status = SUCCESS;
     char   str[40];
 
-    if (!(recPvt = init_record_chk(&pstringin->inp, &status, str)))
+    if (!(recPvt = init_record_chk(&pstringin->inp, &status, str))) {
         goto bail;
+    }
 
     /* Break parm into node name and optional parameter */
     node = strtok(pstringin->inp.value.camacio.parm, "+");
@@ -1458,10 +1508,11 @@ static long init_fru_stringin_record(struct stringinRecord* pstringin) {
         }
     }
 
-    if (init_record_find(mch, recPvt, node, task, &status, str))
+    if (init_record_find(mch, recPvt, node, task, &status, str)) {
         goto bail;
-    else
+    } else {
         pstringin->dpvt = recPvt;
+    }
 
 bail:
     if (status) {
@@ -1493,8 +1544,9 @@ static long read_fru_stringin(struct stringinRecord* pstringin) {
     Fru     fru;
     uint8_t l = 0, *d = 0; /* FRU data length and raw */
 
-    if (!recPvt)
+    if (!recPvt) {
         return status;
+    }
 
     mch     = recPvt->mch;
     mchData = mch->udata;
@@ -1504,8 +1556,9 @@ static long read_fru_stringin(struct stringinRecord* pstringin) {
 
     task = recPvt->task;
 
-    if (-1 == (index = fruLkup(mchSys, pstringin->inp.value.camacio)))
+    if (-1 == (index = fruLkup(mchSys, pstringin->inp.value.camacio))) {
         goto bail;
+    }
 
     fru = &mchSys->fru[index];
 
@@ -1584,12 +1637,14 @@ static long read_fru_stringin(struct stringinRecord* pstringin) {
         if (d) {
 
             l = (l <= MAX_STRING_LENGTH) ? l : MAX_STRING_LENGTH;
-            for (i = 0; i < l; i++)
+            for (i = 0; i < l; i++) {
                 pstringin->val[i] = d[i];
+            }
         }
 
-        if (MCH_DBG(mchStat[inst]) >= MCH_DBG_MED)
+        if (MCH_DBG(mchStat[inst]) >= MCH_DBG_MED) {
             printf("%s read_fru_stringin: task is %s, FRU id %i index %i\n", pstringin->name, task, id, index);
+        }
         pstringin->udf = FALSE;
         return status;
     }
@@ -1612,8 +1667,9 @@ static long init_fru_longout_record(struct longoutRecord* plongout) {
     MchSess mchSess;
     MchSys  mchSys;
 
-    if (!(recPvt = init_record_chk(&plongout->out, &status, str)))
+    if (!(recPvt = init_record_chk(&plongout->out, &status, str))) {
         goto bail;
+    }
 
     /* Break parm into node name and optional parameter */
     node = strtok(plongout->out.value.camacio.parm, "+");
@@ -1625,17 +1681,18 @@ static long init_fru_longout_record(struct longoutRecord* plongout) {
         }
     }
 
-    if (init_record_find(mch, recPvt, node, task, &status, str))
+    if (init_record_find(mch, recPvt, node, task, &status, str)) {
         goto bail;
-    else {
+    } else {
 
         mch     = recPvt->mch;
         mchData = mch->udata;
         mchSess = mchData->mchSess;
         mchSys  = mchData->mchSys;
 
-        if (-1 == (index = fruLkup(mchSys, plongout->out.value.camacio)))
+        if (-1 == (index = fruLkup(mchSys, plongout->out.value.camacio))) {
             goto bail;
+        }
 
         if (checkMchInitDone(mchSess)) {
 
@@ -1672,8 +1729,9 @@ static long write_fru_longout(struct longoutRecord* plongout) {
     uint8_t data[MSG_MAX_LENGTH] = {0};
     int     s                    = 0, inst;
 
-    if (!recPvt)
+    if (!recPvt) {
         return status;
+    }
 
     mch     = recPvt->mch;
     mchData = mch->udata;
@@ -1683,14 +1741,16 @@ static long write_fru_longout(struct longoutRecord* plongout) {
 
     task = recPvt->task;
 
-    if (-1 == (index = fruLkup(mchSys, plongout->out.value.camacio)))
+    if (-1 == (index = fruLkup(mchSys, plongout->out.value.camacio))) {
         goto bail;
+    }
 
     fru = &mchSys->fru[index];
 
-    if (MCH_DBG(mchStat[inst]) >= MCH_DBG_MED)
+    if (MCH_DBG(mchStat[inst]) >= MCH_DBG_MED) {
         printf("%s write_fru_longout: FRU id is %i, index is %i, value is %.0f\n", plongout->name, id, index,
                (double)plongout->val);
+    }
 
     if (checkMchOnlnSessInitDone(mchSess)) {
         if (!(strcmp(task, "fan"))) {
@@ -1704,15 +1764,17 @@ static long write_fru_longout(struct longoutRecord* plongout) {
             epicsMutexLock(mch->mutex);
 
             /* Need to test this for all archs */
-            if (mchData->mchSys->mchcb->set_fan_level)
+            if (mchData->mchSys->mchcb->set_fan_level) {
                 s = mchData->mchSys->mchcb->set_fan_level(mchData, data, index, plongout->val);
-            else
+            } else {
                 s = -1;
+            }
 
             epicsMutexUnlock(mch->mutex);
 
-            if (s)
+            if (s) {
                 goto bail;
+            }
         }
 
         plongout->udf = FALSE;

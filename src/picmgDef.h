@@ -100,7 +100,7 @@ extern uint8_t FRU_I2C_ADDR[102];
 #define PICMG_FAN_LOCAL_CONTROL_SUPPORTED(x) (x & 0x80)
 
 /* PICMG */
-#define FRU_PWR_DYNAMIC(x)       x&(1 << 7)
+#define FRU_PWR_DYNAMIC(x)       x & (1 << 7)
 #define FRU_PWR_LEVEL(x)         x & 0xF
 #define FRU_PWR_STEADY_STATE     0
 #define FRU_PWR_STEADY_STATE_DES 1

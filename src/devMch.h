@@ -45,7 +45,7 @@ extern "C"
     typedef struct MchRec_ {
         MchDev mch;
         char   task[MAX_TASK_LENGTH]; /* operation type */
-    } * MchRec;
+    }* MchRec;
 
     MchDev devMchRegister(const char* name);
 

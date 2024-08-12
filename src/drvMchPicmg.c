@@ -48,8 +48,9 @@ int mchMsgGetAddressInfoIpmb0(MchData mchData, uint8_t* data, uint8_t fruId, uin
     mchSetSizeOffs(mchData->ipmiSess, payloadSize, &roffs, &responseSize, &bridged, &rsAddr, &rqAddr);
 
     if ((rval = ipmiMsgGetAddressInfoIpmb0(mchData->mchSess, mchData->ipmiSess, response, bridged, rsAddr, rqAddr,
-                                           &responseSize, roffs, fruId, key)))
+                                           &responseSize, roffs, fruId, key))) {
         goto bail;
+    }
 
     if ((rval = mchMsgCheckSizes(sizeof(response), roffs, payloadSize))) {
         printf("mchMsgGetAddressInfoIpmb0 size error\n");
@@ -80,8 +81,9 @@ int mchMsgGetAddressInfoHwAddr(MchData mchData, uint8_t* data, uint8_t fru, uint
     mchSetSizeOffs(mchData->ipmiSess, payloadSize, &roffs, &responseSize, &bridged, &rsAddr, &rqAddr);
 
     if ((rval = ipmiMsgGetAddressInfoHwAddr(mchData->mchSess, mchData->ipmiSess, response, bridged, rsAddr, rqAddr,
-                                            &responseSize, roffs, fru, keytype, key, sitetype)))
+                                            &responseSize, roffs, fru, keytype, key, sitetype))) {
         goto bail;
+    }
 
     if ((rval = mchMsgCheckSizes(sizeof(response), roffs, payloadSize))) {
         printf("mchMsgGetAddressInfoHwAddr size error\n");
@@ -112,8 +114,9 @@ int mchMsgGetAddressInfoIpmc(MchData mchData, uint8_t* data) {
     mchSetSizeOffs(mchData->ipmiSess, payloadSize, &roffs, &responseSize, &bridged, &rsAddr, &rqAddr);
 
     if ((rval = ipmiMsgGetAddressInfoIpmc(mchData->mchSess, mchData->ipmiSess, response, bridged, rsAddr, rqAddr,
-                                          &responseSize, roffs)))
+                                          &responseSize, roffs))) {
         goto bail;
+    }
 
     if ((rval = mchMsgCheckSizes(sizeof(response), roffs, payloadSize))) {
         printf("mchMsgGetAddressInfoIpmc size error\n");
@@ -143,11 +146,13 @@ static void mchPicmgFruGetFbAddressInfo(MchData mchData) {
 
         if (fru->sdr.entityId == ENTITY_ID_PICMG_FRONT_BOARD || fru->sdr.entityId == ENTITY_ID_COOLING_UNIT) {
 
-            if (dbg >= MCH_DBG_MED)
+            if (dbg >= MCH_DBG_MED) {
                 printf("mchPicmgFruGetFbAddressInfo: Found FB or CU FRU index %i addr 0x%02x\n", i, fru->sdr.addr);
+            }
 
-            if (mchMsgGetAddressInfoIpmb0(mchData, response, 0, fru->sdr.addr))
+            if (mchMsgGetAddressInfoIpmb0(mchData, response, 0, fru->sdr.addr)) {
                 continue;
+            }
 
             fru->siteNumber = response[PICMG_RPLY_IMSG2_GET_ADDR_INFO_SITE_NUMBER_OFFSET];
             fru->siteType   = response[PICMG_RPLY_IMSG2_GET_ADDR_INFO_SITE_TYPE_OFFSET];
@@ -250,8 +255,9 @@ static void assign_fru_lkup_atca(MchData mchData) {
                        i, fru->id);
             }
         } else if (fru->sdr.entityId == ENTITY_ID_PICMG_SHMC) {
-            if ((PICMG_FRU_TYPE_SHMC_MIN + shmCnt) > PICMG_FRU_TYPE_SHMC_MAX)
+            if ((PICMG_FRU_TYPE_SHMC_MIN + shmCnt) > PICMG_FRU_TYPE_SHMC_MAX) {
                 continue;
+            }
             fru->id                  = PICMG_FRU_TYPE_SHMC_MAX - shmCnt;
             mchSys->fruLkup[fru->id] = i;
             if (dbg >= MCH_DBG_MED) {
@@ -261,8 +267,9 @@ static void assign_fru_lkup_atca(MchData mchData) {
             }
             shmCnt++;
         } else if (fru->sdr.entityId == ENTITY_ID_PICMG_SHELF_FRU_INFO) {
-            if ((UTCA_FRU_TYPE_SHELF_MIN + shfCnt) > UTCA_FRU_TYPE_SHELF_MAX)
+            if ((UTCA_FRU_TYPE_SHELF_MIN + shfCnt) > UTCA_FRU_TYPE_SHELF_MAX) {
                 continue;
+            }
             fru->id                  = UTCA_FRU_TYPE_SHELF_MIN + shfCnt;
             mchSys->fruLkup[fru->id] = i;
             if (dbg >= MCH_DBG_MED) {
@@ -281,8 +288,9 @@ static void assign_fru_lkup_atca(MchData mchData) {
                        i, fru->id);
             }
         } else if (fru->sdr.entityId == ENTITY_ID_POWER_MODULE) {
-            if ((UTCA_FRU_TYPE_PM_MIN + pmCnt) > UTCA_FRU_TYPE_PM_MAX)
+            if ((UTCA_FRU_TYPE_PM_MIN + pmCnt) > UTCA_FRU_TYPE_PM_MAX) {
                 continue;
+            }
             fru->id                  = UTCA_FRU_TYPE_PM_MIN + pmCnt;
             mchSys->fruLkup[fru->id] = i;
             pmCnt++;
@@ -324,8 +332,9 @@ int fru_data_suppl_picmg(MchData mchData, int index) {
     fru = &mchData->mchSys->fru[index];
     id  = fru->id;
 
-    if (-1 == (index = mchData->mchSys->fruLkup[id])) /* Was not assigned FRU-lookup ID */
+    if (-1 == (index = mchData->mchSys->fruLkup[id])) { /* Was not assigned FRU-lookup ID */
         return rval;
+    }
 
     if ((id >= UTCA_FRU_TYPE_CU_MIN) && (id <= UTCA_FRU_TYPE_CU_MAX)) {
 
@@ -335,18 +344,20 @@ int fru_data_suppl_picmg(MchData mchData, int index) {
                 fru->fanMin = fru->fanMax = fru->fanNom = fru->fanProp = 0;
                 rval                                                   = -1;
             }
-        } else
+        } else {
             return rval;
+        }
 
         fru->fanMin  = response[IPMI_RPLY_IMSG2_GET_FAN_PROP_MIN_OFFSET];
         fru->fanMax  = response[IPMI_RPLY_IMSG2_GET_FAN_PROP_MAX_OFFSET];
         fru->fanNom  = response[IPMI_RPLY_IMSG2_GET_FAN_PROP_NOM_OFFSET];
         fru->fanProp = response[IPMI_RPLY_IMSG2_GET_FAN_PROP_PROP_OFFSET];
 
-        if (dbg >= MCH_DBG_MED)
+        if (dbg >= MCH_DBG_MED) {
             printf("fru_data_suppl_picmg: FRU index %i id %i fan properties "
                    "min %i max %i nom %i prop 0x%02x\n",
                    index, id, fru->fanMin, fru->fanMax, fru->fanNom, fru->fanProp);
+        }
     }
     return rval;
 }
@@ -411,8 +422,9 @@ static void sensor_get_fru_microtca(MchData mchData, Sensor sens) {
      * For NAT, parse sensor description to get associated FRU number
      */
     if (MCH_IS_NAT(mchData->mchSess->type) && (sdr->sensType == SENSOR_TYPE_HOTSWAP)) {
-        if (2 != sscanf((const char*)(sdr->str), "HS %d %s", &natid, buff))
+        if (2 != sscanf((const char*)(sdr->str), "HS %d %s", &natid, buff)) {
             return;
+        }
         sens->fruIndex = mchSys->fruLkup[natid];
     }
 
@@ -475,8 +487,9 @@ int mchMsgGetPicmgProp(MchData mchData, uint8_t* data) {
     mchSetSizeOffs(mchData->ipmiSess, payloadSize, &roffs, &responseSize, &bridged, &rsAddr, &rqAddr);
 
     if ((rval = ipmiMsgGetPicmgProp(mchData->mchSess, mchData->ipmiSess, response, bridged, rsAddr, rqAddr,
-                                    &responseSize, roffs)))
+                                    &responseSize, roffs))) {
         goto bail;
+    }
 
     if ((rval = mchMsgCheckSizes(sizeof(response), roffs, payloadSize))) {
         printf("mchMsgGetPicmgProp size error\n");
@@ -551,8 +564,9 @@ int mchMsgSetFruActPolicyVt(MchData mchData, uint8_t* data, uint8_t fruIndex, ui
     } else if (parm == 1) {
         mask = 1;
         bits = 0;
-    } else
+    } else {
         return -1;
+    }
 
     memcpy(imsg2, SEND_MSG_MSG, imsg2Size);
     memcpy(b1msg1, IPMI_MSG1, b1msg1Size);
@@ -589,14 +603,16 @@ int mchMsgSetFruActAtca(MchData mchData, uint8_t* data, uint8_t fruIndex, uint8_
     Fru     fru    = &mchData->mchSys->fru[fruIndex];
     uint8_t rsAddr = fru->sdr.addr, rqAddr;
 
-    if (rsAddr != IPMI_MSG_ADDR_BMC)
+    if (rsAddr != IPMI_MSG_ADDR_BMC) {
         bridged = 1;
+    }
 
     mchSetSizeOffs(mchData->ipmiSess, payloadSize, &roffs, &responseSize, &bridged, &rsAddr, &rqAddr);
 
     if ((rval = ipmiMsgSetFruAct(mchData->mchSess, mchData->ipmiSess, response, bridged, rsAddr, rqAddr, &responseSize,
-                                 roffs, fru->sdr.fruId, parm)))
+                                 roffs, fru->sdr.fruId, parm))) {
         goto bail;
+    }
 
     if ((rval = mchMsgCheckSizes(sizeof(response), roffs, payloadSize))) {
         printf("mchMsgSetFruActAtca size error\n");
@@ -699,10 +715,11 @@ int mchMsgGetFruActPolicyNat(MchData mchData, uint8_t* data, uint8_t fru) {
 }
 
 int mchMsgGetFruActPolicyHelper(MchData mchData, uint8_t* data, uint8_t fru) {
-    if (!(MCH_IS_VT(mchData->mchSess->type)))
+    if (!(MCH_IS_VT(mchData->mchSess->type))) {
         return mchMsgGetFruActPolicyVt(mchData, data, fru);
-    else
+    } else {
         return mchMsgGetFruActPolicyNat(mchData, data, fru);
+    }
 }
 
 /* Get Fan Speed Properties using Vadatech MCH; message contains 1 bridged message -> needs updating 3/23/16
@@ -730,14 +747,16 @@ int mchMsgGetFanPropVt(MchData mchData, uint8_t* data, uint8_t fruIndex) {
 
     imsg2[IPMI_MSG2_SET_FRU_ACT_FRU_OFFSET] = fruId;
 
-    if (bridged) // may need to distinguish between once and twice-bridged messages
+    if (bridged) { // may need to distinguish between once and twice-bridged messages
         ipmiBuildSendMsg(mchData->ipmiSess, message, &messageSize, cmd, netfn, rsAddr, rqAddr, imsg2, imsg2Size, 0);
-    else
+    } else {
         messageSize = ipmiMsgBuild(mchData->ipmiSess, message, cmd, netfn, imsg2, imsg2Size, 0, 0, 0, 0, 0, 0);
+    }
 
     if ((rval = mchMsgWriteReadHelper(mchData->mchSess, mchData->ipmiSess, message, messageSize, response,
-                                      &responseSize, cmd, netfn, offs /*need to set codeoffs*/, 0)))
+                                      &responseSize, cmd, netfn, offs /*need to set codeoffs*/, 0))) {
         goto bail;
+    }
 
     if ((rval = mchMsgCheckSizes(sizeof(response), roffs, payloadSize))) {
         printf("mchMsgGetFanPropVt size error\n");
@@ -801,8 +820,9 @@ int mchMsgGetFanPropNat(MchData mchData, uint8_t* data, uint8_t fruIndex) {
                                b1msg2, b1msg2Size, b2msg1, b2msg2, b2msg2Size);
 
     if ((rval = mchMsgWriteReadHelper(mchData->mchSess, mchData->ipmiSess, message, messageSize, response,
-                                      &responseSize, cmd, netfn, roffs, 0)))
+                                      &responseSize, cmd, netfn, roffs, 0))) {
         goto bail;
+    }
 
     if ((rval = mchMsgCheckSizes(sizeof(response), roffs, payloadSize))) {
         printf("mchMsgGetFanPropNat size error\n");
@@ -829,14 +849,16 @@ int mchMsgGetFanPropAtca(MchData mchData, uint8_t* data, uint8_t fruIndex) {
     Fru     fru    = &mchData->mchSys->fru[fruIndex];
     uint8_t rsAddr = fru->sdr.addr, rqAddr;
 
-    if (rsAddr != IPMI_MSG_ADDR_BMC)
+    if (rsAddr != IPMI_MSG_ADDR_BMC) {
         bridged = 1;
+    }
 
     mchSetSizeOffs(mchData->ipmiSess, payloadSize, &roffs, &responseSize, &bridged, &rsAddr, &rqAddr);
 
     if ((rval = ipmiMsgGetFanProp(mchData->mchSess, mchData->ipmiSess, response, bridged, rsAddr, rqAddr, &responseSize,
-                                  roffs, fru->sdr.fruId)))
+                                  roffs, fru->sdr.fruId))) {
         goto bail;
+    }
 
     if ((rval = mchMsgCheckSizes(sizeof(response), roffs, payloadSize))) {
         printf("mchMsgGetFanPropAtca size error\n");
@@ -860,19 +882,24 @@ void mchGetFanLevel(uint8_t* data, uint8_t* level, uint8_t fanProp) {
         llevel   = data[PICMG_RPLY_IMSG2_GET_FAN_LOCAL_LEVEL_OFFSET];
         lenabled = data[PICMG_RPLY_IMSG2_GET_FAN_LOCAL_ENABLED_OFFSET];
 
-        if (olevel == 0xFF)
+        if (olevel == 0xFF) {
             *level = llevel;
+        }
 
-        else if (lenabled)
+        else if (lenabled) {
             *level = (llevel > olevel) ? llevel : olevel;
+        }
 
-        else if ((0xFE == llevel) || (0xFE == olevel))
+        else if ((0xFE == llevel) || (0xFE == olevel)) {
             *level = -1; /* Shut down state; arbitrarily choose -1 for this state for now */
+        }
 
-        else
+        else {
             *level = olevel;
-    } else
+        }
+    } else {
         *level = olevel;
+    }
 }
 
 /* -> needs updating 3/23/16 */
@@ -896,14 +923,16 @@ int mchMsgGetFanLevelVt(MchData mchData, uint8_t* data, uint8_t fruIndex, uint8_
 
     imsg2[IPMI_MSG2_SET_FRU_ACT_FRU_OFFSET] = fruId;
 
-    if (bridged) // may need to distinguish between once and twice-bridged messages
+    if (bridged) { // may need to distinguish between once and twice-bridged messages
         ipmiBuildSendMsg(mchData->ipmiSess, message, &messageSize, cmd, netfn, rsAddr, rqAddr, imsg2, imsg2Size, 0);
-    else
+    } else {
         messageSize = ipmiMsgBuild(mchData->ipmiSess, message, cmd, netfn, imsg2, imsg2Size, 0, 0, 0, 0, 0, 0);
+    }
 
     if ((rval = mchMsgWriteReadHelper(mchData->mchSess, mchData->ipmiSess, message, messageSize, response,
-                                      &responseSize, cmd, netfn, offs /*need to set codeoffs*/, 0)))
+                                      &responseSize, cmd, netfn, offs /*need to set codeoffs*/, 0))) {
         goto bail;
+    }
 
     if ((rval = mchMsgCheckSizes(sizeof(response), roffs, payloadSize))) {
         printf("mchMsgGetFanLevelVt size error\n");
@@ -969,8 +998,9 @@ int mchMsgGetFanLevelNat(MchData mchData, uint8_t* data, uint8_t fruIndex, uint8
                                b1msg2, b1msg2Size, b2msg1, b2msg2, b2msg2Size);
 
     if ((rval = mchMsgWriteReadHelper(mchData->mchSess, mchData->ipmiSess, message, messageSize, response,
-                                      &responseSize, cmd, netfn, roffs, 0)))
+                                      &responseSize, cmd, netfn, roffs, 0))) {
         goto bail;
+    }
 
     if ((rval = mchMsgCheckSizes(sizeof(response), roffs, payloadSize))) {
         printf("mchMsgGetFanLevelNat size error\n");
@@ -999,14 +1029,16 @@ int mchMsgGetFanLevelAtca(MchData mchData, uint8_t* data, uint8_t fruIndex, uint
     Fru     fru    = &mchData->mchSys->fru[fruIndex];
     uint8_t rsAddr = fru->sdr.addr, rqAddr;
 
-    if (rsAddr != IPMI_MSG_ADDR_BMC)
+    if (rsAddr != IPMI_MSG_ADDR_BMC) {
         bridged = 1;
+    }
 
     mchSetSizeOffs(mchData->ipmiSess, payloadSize, &roffs, &responseSize, &bridged, &rsAddr, &rqAddr);
 
     if ((rval = ipmiMsgGetFanLevel(mchData->mchSess, mchData->ipmiSess, response, bridged, rsAddr, rqAddr,
-                                   &responseSize, roffs, fru->sdr.fruId)))
+                                   &responseSize, roffs, fru->sdr.fruId))) {
         goto bail;
+    }
 
     if ((rval = mchMsgCheckSizes(sizeof(response), roffs, payloadSize))) {
         printf("mchMsgGetFanLevelAtca size error\n");
@@ -1047,14 +1079,16 @@ int mchMsgSetFanLevelVt(MchData mchData, uint8_t* data, uint8_t fruIndex, uint8_
     imsg2[IPMI_MSG2_SET_FRU_ACT_FRU_OFFSET] = fruId;
     imsg2[IPMI_MSG2_SET_FAN_LEVEL_OFFSET]   = level;
 
-    if (bridged) // may need to distinguish between once and twice-bridged messages
+    if (bridged) { // may need to distinguish between once and twice-bridged messages
         ipmiBuildSendMsg(mchData->ipmiSess, message, &messageSize, cmd, netfn, rsAddr, rqAddr, imsg2, imsg2Size, 0);
-    else
+    } else {
         messageSize = ipmiMsgBuild(mchData->ipmiSess, message, cmd, netfn, imsg2, imsg2Size, 0, 0, 0, 0, 0, 0);
+    }
 
     if ((rval = mchMsgWriteReadHelper(mchData->mchSess, mchData->ipmiSess, message, messageSize, response,
-                                      &responseSize, cmd, netfn, offs /*need to set codeoffs*/, 0)))
+                                      &responseSize, cmd, netfn, offs /*need to set codeoffs*/, 0))) {
         goto bail;
+    }
 
     if ((rval = mchMsgCheckSizes(sizeof(response), roffs, payloadSize))) {
         printf("mchMsgSetFanLevelVt size error\n");
@@ -1116,8 +1150,9 @@ int mchMsgSetFanLevelNat(MchData mchData, uint8_t* data, uint8_t fruIndex, uint8
                                b1msg2, b1msg2Size, b2msg1, b2msg2, b2msg2Size);
 
     if ((rval = mchMsgWriteReadHelper(mchData->mchSess, mchData->ipmiSess, message, messageSize, response,
-                                      &responseSize, cmd, netfn, offs /*need to set codeoffs*/, 0)))
+                                      &responseSize, cmd, netfn, offs /*need to set codeoffs*/, 0))) {
         goto bail;
+    }
 
     if ((rval = mchMsgCheckSizes(sizeof(response), roffs, payloadSize))) {
         printf("mchMsgSetFanLevelNat size error\n");
@@ -1143,14 +1178,16 @@ int mchMsgSetFanLevelAtca(MchData mchData, uint8_t* data, uint8_t fruIndex, uint
     Fru     fru    = &mchData->mchSys->fru[fruIndex];
     uint8_t rsAddr = fru->sdr.addr, rqAddr;
 
-    if (rsAddr != IPMI_MSG_ADDR_BMC)
+    if (rsAddr != IPMI_MSG_ADDR_BMC) {
         bridged = 1;
+    }
 
     mchSetSizeOffs(mchData->ipmiSess, payloadSize, &roffs, &responseSize, &bridged, &rsAddr, &rqAddr);
 
     if ((rval = ipmiMsgSetFanLevel(mchData->mchSess, mchData->ipmiSess, response, bridged, rsAddr, rqAddr,
-                                   &responseSize, roffs, fru->sdr.fruId, level)))
+                                   &responseSize, roffs, fru->sdr.fruId, level))) {
         goto bail;
+    }
 
     if ((rval = mchMsgCheckSizes(sizeof(response), roffs, payloadSize))) {
         printf("mchMsgSetFanLevelAtca size error\n");
@@ -1185,14 +1222,16 @@ int mchMsgGetPowerLevelVt(MchData mchData, uint8_t* data, uint8_t fruIndex, uint
     imsg2[IPMI_MSG2_SET_FRU_ACT_FRU_OFFSET]             = fru->sdr.fruId;
     imsg2[PICMG_RPLY_IMSG2_GET_POWER_LEVEL_TYPE_OFFSET] = parm;
 
-    if (bridged) // may need to distinguish between once and twice-bridged messages
+    if (bridged) { // may need to distinguish between once and twice-bridged messages
         ipmiBuildSendMsg(mchData->ipmiSess, message, &messageSize, cmd, netfn, rsAddr, rqAddr, imsg2, imsg2Size, 0);
-    else
+    } else {
         messageSize = ipmiMsgBuild(mchData->ipmiSess, message, cmd, netfn, imsg2, imsg2Size, 0, 0, 0, 0, 0, 0);
+    }
 
     if ((rval = mchMsgWriteReadHelper(mchData->mchSess, mchData->ipmiSess, message, messageSize, response,
-                                      &responseSize, cmd, netfn, offs /*need to set codeoffs*/, 0)))
+                                      &responseSize, cmd, netfn, offs /*need to set codeoffs*/, 0))) {
         goto bail;
+    }
 
     if ((rval = mchMsgCheckSizes(sizeof(response), roffs, payloadSize))) {
         printf("mchMsgGetPowerLevelVt size error\n");
@@ -1218,14 +1257,16 @@ int mchMsgGetPowerLevelAtca(MchData mchData, uint8_t* data, uint8_t fruIndex, ui
     Fru     fru    = &mchData->mchSys->fru[fruIndex];
     uint8_t rsAddr = fru->sdr.addr, rqAddr;
 
-    if (rsAddr != IPMI_MSG_ADDR_BMC)
+    if (rsAddr != IPMI_MSG_ADDR_BMC) {
         bridged = 1;
+    }
 
     mchSetSizeOffs(mchData->ipmiSess, payloadSize, &roffs, &responseSize, &bridged, &rsAddr, &rqAddr);
 
     if ((rval = ipmiMsgGetPowerLevel(mchData->mchSess, mchData->ipmiSess, response, bridged, rsAddr, rqAddr,
-                                     &responseSize, roffs, fru->sdr.fruId, parm)))
+                                     &responseSize, roffs, fru->sdr.fruId, parm))) {
         goto bail;
+    }
 
     if ((rval = mchMsgCheckSizes(sizeof(response), roffs, payloadSize))) {
         printf("mchMsgSetFanLevelAtca size error\n");
