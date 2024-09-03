@@ -1343,7 +1343,7 @@ size_t  tmp = sens->readMsgLength; /* Initially set to requested msg length,
 
 	/* If error code ... */
 	if ( rval ) {
-		if ( rval == IPMI_COMP_CODE_REQUESTED_DATA )	
+		if ( rval == IPMI_COMP_CODE_REQUESTED_DATA || rval == IPMI_COMP_CODE_DESTINATION_UNAVAIL )
 			sens->unavail = 1;
 		return -1;
 	}
