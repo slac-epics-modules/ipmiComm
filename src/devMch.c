@@ -399,11 +399,11 @@ epicsFloat64 value;
 	else if ( l == SENSOR_CONV_SQR )
 		value = pow( value, 2);
 	else if ( l == SENSOR_CONV_CUBE )
-		value = pow( value, 1/3 );
+		value = pow( value, 3.0 );
 	else if ( l == SENSOR_CONV_SQRT )
 		value = sqrt( value );
 	else if ( l == SENSOR_CONV_CUBE_NEG1 )
-		value = pow( value, -1/3 );
+		value = cbrt( value );
 	else
 		printf("sensorConversion %s: unknown sensor conversion algorithm\n", name);
 
