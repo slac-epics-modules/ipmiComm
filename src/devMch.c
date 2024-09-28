@@ -391,9 +391,9 @@ epicsFloat64 value;
 	else if ( l == SENSOR_CONV_E )
 		value = exp( value );
 	else if ( l == SENSOR_CONV_EXP10 )
-		value = pow( value, 10 );
+		value = exp10( value );
 	else if ( l == SENSOR_CONV_EXP2 )
-		value = pow( value, 2 );
+		value = exp2( value );
 	else if ( l == SENSOR_CONV_1_X )
 		value = 1/value;
 	else if ( l == SENSOR_CONV_SQR )
