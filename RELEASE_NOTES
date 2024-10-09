@@ -1,3 +1,15 @@
+R4.6.1: 9-Oct-2024 J. Lorelli
+    - Fix exp2, exp10, cube and cuberoot sensor conversions
+    - Handle IPMI_COMP_CODE_DESTINATION_UNAVAIL completion code
+    - Upgrade to asyn R4.39-1.0.2
+    - Added script to open SLAC EDM displays
+    - Build fixes for modern compilers
+    - Test IOC changes:
+        - Default architecture to rhel7-x86_64
+        - Fix RELEASE.local
+    - Changed index from uint8_t to int
+    - Fix various issues with templates
+
 R4.6.0: 26-July-2023 E. Gumtow
                 Wait to pull values from IPMI devices after init has finished
                 initializing the connection to the devices.  Without this,
