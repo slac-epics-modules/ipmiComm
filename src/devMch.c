@@ -267,15 +267,15 @@ typedef struct {
 } MCH_DEV_SUP_SET;
 
 /* Add reporting */
-MCH_DEV_SUP_SET devAiMch         = {6, NULL, NULL,              init_ai_record,           ai_ioint_info,           read_ai,           NULL};
-MCH_DEV_SUP_SET devBoMch         = {6, NULL, NULL,              init_bo_record,           NULL,                    write_bo,          NULL};
-MCH_DEV_SUP_SET devMbboMch       = {6, NULL, NULL,              init_mbbo_record,         NULL,                    write_mbbo,        NULL};
-MCH_DEV_SUP_SET devBiMch         = {6, NULL, init_bi,           init_bi_record,           bi_ioint_info,           read_bi,           NULL};
-MCH_DEV_SUP_SET devMbbiMch       = {6, NULL, init_mbbi,         init_mbbi_record,         mbbi_ioint_info,         read_mbbi,         NULL};
-MCH_DEV_SUP_SET devLonginMch     = {6, NULL, NULL,              init_longin_record,       NULL,                    read_longin,       NULL};
-MCH_DEV_SUP_SET devAiFru         = {6, NULL, init_fru_ai,       init_fru_ai_record,       ai_fru_ioint_info,       read_fru_ai,       NULL};
-MCH_DEV_SUP_SET devLongoutFru    = {6, NULL, NULL,              init_fru_longout_record,  NULL,                    write_fru_longout, NULL};
-MCH_DEV_SUP_SET devStringinFru   = {6, NULL, init_fru_stringin, init_fru_stringin_record, stringin_fru_ioint_info, read_fru_stringin, NULL};
+MCH_DEV_SUP_SET devAiMch         = {6, NULL, NULL,                         (DEVSUPFUN)init_ai_record,           (DEVSUPFUN)ai_ioint_info,           (DEVSUPFUN)read_ai,           NULL};
+MCH_DEV_SUP_SET devBoMch         = {6, NULL, NULL,                         (DEVSUPFUN)init_bo_record,           NULL,                               (DEVSUPFUN)write_bo,          NULL};
+MCH_DEV_SUP_SET devMbboMch       = {6, NULL, NULL,                         (DEVSUPFUN)init_mbbo_record,         NULL,                               (DEVSUPFUN)write_mbbo,        NULL};
+MCH_DEV_SUP_SET devBiMch         = {6, NULL, (DEVSUPFUN)init_bi,           (DEVSUPFUN)init_bi_record,           (DEVSUPFUN)bi_ioint_info,           (DEVSUPFUN)read_bi,           NULL};
+MCH_DEV_SUP_SET devMbbiMch       = {6, NULL, (DEVSUPFUN)init_mbbi,         (DEVSUPFUN)init_mbbi_record,         (DEVSUPFUN)mbbi_ioint_info,         (DEVSUPFUN)read_mbbi,         NULL};
+MCH_DEV_SUP_SET devLonginMch     = {6, NULL, NULL,                         (DEVSUPFUN)init_longin_record,       NULL,                               (DEVSUPFUN)read_longin,       NULL};
+MCH_DEV_SUP_SET devAiFru         = {6, NULL, (DEVSUPFUN)init_fru_ai,       (DEVSUPFUN)init_fru_ai_record,       (DEVSUPFUN)ai_fru_ioint_info,       (DEVSUPFUN)read_fru_ai,       NULL};
+MCH_DEV_SUP_SET devLongoutFru    = {6, NULL, NULL,                         (DEVSUPFUN)init_fru_longout_record,  NULL,                               (DEVSUPFUN)write_fru_longout, NULL};
+MCH_DEV_SUP_SET devStringinFru   = {6, NULL, (DEVSUPFUN)init_fru_stringin, (DEVSUPFUN)init_fru_stringin_record, (DEVSUPFUN)stringin_fru_ioint_info, (DEVSUPFUN)read_fru_stringin, NULL};
 
 epicsExportAddress(dset, devAiMch);
 epicsExportAddress(dset, devBoMch);

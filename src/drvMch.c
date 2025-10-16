@@ -2423,7 +2423,7 @@ static struct {
 	DRVSUPFUN init;
 } drvMch={
 	2,
-	drvMchReport,
+	(DRVSUPFUN)drvMchReport,
 	drvMchInit
 };
 
