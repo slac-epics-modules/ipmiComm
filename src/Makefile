@@ -3,6 +3,22 @@ TOP = ..
 include $(TOP)/configure/CONFIG
 #----------------------------------------
 #  ADD MACRO DEFINITIONS AFTER THIS LINE
+#
+
+#ifndef IPMI_USERNAME
+#$(error Need to set IPMI_USERNAME)
+#endif
+
+#ifndef IPMI_PASSWORD
+#$(error Need to set IPMI_PASSWORD)
+#endif
+
+ifdef IPMI_USERNAME
+USR_CFLAGS += -DIPMI_USERNAME=\"$(IPMI_USERNAME)\"
+endif
+ifdef IPMI_PASSWORD
+USR_CFLAGS += -DIPMI_PASSWORD=\"$(IPMI_PASSWORD)\"
+endif
 
 LIBRARY_IOC += ipmiComm
 

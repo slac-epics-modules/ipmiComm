@@ -252,7 +252,6 @@ typedef struct SdrRepRec_ {
         uint8_t      lun3;          /* Sensors in LUN 3, 1 yes, 0 no */
 } SdrRepRec, *SdrRep;
 
-
 // Find a way to not hard-code array sizes below
 extern uint8_t RMCP_HEADER[4];
 extern uint8_t ASF_MSG[8];

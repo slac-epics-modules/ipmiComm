@@ -7,6 +7,7 @@
 // may be copied, modified, propagated, or distributed except according to 
 // the terms contained in the LICENSE.txt file.
 //////////////////////////////////////////////////////////////////////////////
+#include <assert.h>
 #include <stdint.h>
 #include <stdio.h>   /* fopen, etc. */
 #include <string.h>
@@ -79,6 +80,13 @@ static int mchFruGetDataAll(MchData mchData);
 int mchGetFruIdFromIndex(MchData mchData, int index);
 static int  mchCnfg(MchData mchData, int initFlag);
 static void mchCnfgReset(MchData mchData);
+static void mchSetCredentials(const char *username, const char *password);
+
+static_assert(sizeof(IPMI_USERNAME) > 1, "IPMI_USERNAME is not set");
+static_assert(sizeof(IPMI_PASSWORD) > 1, "IPMI_PASSWORD is not set");
+
+const char username[] = IPMI_USERNAME;
+const char password[] = IPMI_PASSWORD;
 
 
 // we must wait for the IPMI sessions to finish initializing before
@@ -97,6 +105,23 @@ static void mchInitHook(initHookState state)
 	}
 
 	printf("sync mchInit: %d succeeded, %d failed\n", mchInitSuccessCounter, mchInitFailCounter);
+}
+
+static void mchSetCredentials(const char *username, const char *password)
+{
+	size_t username_len = strlen(username);
+	size_t password_len = strlen(password);
+
+	if (strlen(&GET_SESS_MSG_PWD_KEY[4]) == 0) {
+		if (username_len > 0 && username_len < 16) {
+			strncpy(&GET_SESS_MSG_PWD_KEY[4], username, 16);
+		}
+	}
+	if (strlen(&IPMI_WRAPPER_PWD_KEY[9]) == 0) {
+		if (password_len > 0 && password_len < 16) {
+			strncpy(&IPMI_WRAPPER_PWD_KEY[9], password, 16);
+		}
+	}
 }
 
 static void
@@ -124,10 +149,12 @@ mchSetAuth(MchSess mchSess, IpmiSess ipmiSess, uint8_t authByte)
 	ipmiSess->authReq = 0xFF; /* Default to illegal value */
 	ipmiSess->authSup = IPMI_AUTH_TYPE_SUPPORT( authByte );
 
-	if ( ipmiSess->authSup & (1<<IPMI_MSG_AUTH_TYPE_NONE) ) {
+/*	if ( ipmiSess->authSup & (1<<IPMI_MSG_AUTH_TYPE_NONE) ) {
+		printf("%s using no authentication\n", mchSess->name);
 		ipmiSess->authReq = IPMI_MSG_AUTH_TYPE_NONE;
 	}
-	else if (  ipmiSess->authSup & (1<<IPMI_MSG_AUTH_TYPE_PWD_KEY) ) {
+	else*/ if (  ipmiSess->authSup & (1<<IPMI_MSG_AUTH_TYPE_PWD_KEY) ) {
+		printf("%s using password authentication\n", mchSess->name);
 		ipmiSess->authReq = IPMI_MSG_AUTH_TYPE_PWD_KEY;
 	}
 	else
@@ -2354,6 +2381,8 @@ int      inst;
 		printf("Error: calling mchInit() too late\n");
 		return;
 	}
+
+	mchSetCredentials(username, password);
 
 	/* Allocate memory for MCH data structures */
 	if ( ! (mchData = calloc( 1, sizeof( *mchData ))) )
