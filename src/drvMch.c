@@ -149,11 +149,11 @@ mchSetAuth(MchSess mchSess, IpmiSess ipmiSess, uint8_t authByte)
 	ipmiSess->authReq = 0xFF; /* Default to illegal value */
 	ipmiSess->authSup = IPMI_AUTH_TYPE_SUPPORT( authByte );
 
-/*	if ( ipmiSess->authSup & (1<<IPMI_MSG_AUTH_TYPE_NONE) ) {
+	if ( ipmiSess->authSup & (1<<IPMI_MSG_AUTH_TYPE_NONE) ) {
 		printf("%s using no authentication\n", mchSess->name);
 		ipmiSess->authReq = IPMI_MSG_AUTH_TYPE_NONE;
 	}
-	else*/ if (  ipmiSess->authSup & (1<<IPMI_MSG_AUTH_TYPE_PWD_KEY) ) {
+	else if (  ipmiSess->authSup & (1<<IPMI_MSG_AUTH_TYPE_PWD_KEY) ) {
 		printf("%s using password authentication\n", mchSess->name);
 		ipmiSess->authReq = IPMI_MSG_AUTH_TYPE_PWD_KEY;
 	}

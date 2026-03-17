@@ -256,6 +256,26 @@ int      rval;
 
 	memcpy( data, response + roffs, payloadSize );
 
+	if (data[2] == 0) {
+		printf("no ");
+	}
+	if (data[2] & 0x01) {
+		printf("%s ", "anonymous");
+	}
+	if (data[2] & 0x02) {
+		printf("%s ", "MD2");
+	}
+	if (data[2] & 0x04) {
+		printf("%s ", "MD5");
+	}
+	if (data[2] & 0x08) {
+		printf("%s ", "undefined");
+	}
+	if (data[2] & 0x10) {
+		printf("%s ", "password");
+	}
+	printf("authentication supported (0x%02x)\n", data[2]);
+
 bail:
 	return rval;
 }

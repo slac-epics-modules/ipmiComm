@@ -30,7 +30,7 @@ ipmicomm_test_IOC_registerRecordDeviceDriver(pdbbase)
 # Order of commands is important
 drvAsynIPPortConfigure ("shm-test","shm-b084-sp17-2:623 udp",0,0,0)
 mchInit("shm-test")
-#dbLoadRecords("db/shelf_atca_7slot_lcls.db","dev=CRAT:TEST,link=shm-test,location=")
+dbLoadRecords("db/shelf_atca_7slot_lcls.db","dev=CRAT:TEST,link=shm-test,location=")
 
 #asynSetTraceMask("mch-test",-1,0x9)
 #asynSetTraceIOMask("mch-test",-1,0x5)
