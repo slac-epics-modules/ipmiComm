@@ -32,7 +32,7 @@ uint8_t IPMI_WRAPPER[] = { IPMI_MSG_AUTH_TYPE_NONE,/* Auth type none */
 uint8_t IPMI_WRAPPER_PWD_KEY[] = { IPMI_MSG_AUTH_TYPE_PWD_KEY, /* Auth type */
                           0, 0, 0, 0,             /* 4-byte Session sequence number */
                           0, 0, 0, 0,             /* 4-byte Session ID */
-                          'I', 'p', 'm', 'i', '2', 'A', 'd', 'm', 'i', 'n', 0, 0, 0, 0, 0, 0, /* Message Authentication Code (password) */
+                          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, /* Message Authentication Code (password) */
                           0 };                    /* Number of bytes in message */
 
 /* IPMI message part 1 */
@@ -78,7 +78,7 @@ uint8_t GET_SESS_MSG_PWD_KEY[] = { IPMI_MSG_ADDR_SW,	       /* Requester's addre
 			   0,			               /* Message sequence number */	    
 			   IPMI_MSG_CMD_GET_SESSION_CHALLENGE, /* Command code */	   
 			   IPMI_MSG_AUTH_TYPE_PWD_KEY,         /* Authentication type */   
-			   'c', 'o', 'n', 't', 'r', 'o', 'l', 's', 0, 0, 0, 0, 0, 0, 0, 0, /* User name */
+			   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, /* User name */
                            0 };                                /* For checksum */
 
 /* Activate Session */
@@ -174,5 +174,4 @@ uint8_t BASIC_MSG[]=    { IPMI_MSG_ADDR_SW,              /* Requester's address 
                             0,                           /* Message sequence number */         
                             0,                           /* Command code */         
                             0 };                         /* For checksum */
-
 
