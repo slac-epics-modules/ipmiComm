@@ -1,0 +1,21 @@
+---
+BasedOnStyle:  Microsoft
+AlignConsecutiveMacros: true
+AlignConsecutiveAssignments:
+  Enabled: true
+  AcrossComments: true
+AlignConsecutiveBitFields: true
+AlignConsecutiveDeclarations: true
+AlignTrailingComments: true
+BraceWrapping:
+  AfterControlStatement: Never
+  AfterFunction:   false
+  AfterStruct:     false
+  BeforeElse:      false
+IndentCaseLabels: true
+IndentCaseBlocks: true
+InsertBraces: true
+PointerAlignment: Left
+SortIncludes:    false
+...
+

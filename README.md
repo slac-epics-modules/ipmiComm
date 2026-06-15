@@ -100,3 +100,20 @@ those that you know are in use.
  initialized" if not. During the discovery process, it is set to "Initializing...".
 
 -There is a EPICS PV `$(crat):CONNECT` for each system. It must be set to "Connect".
+
+## Pre-Commit Hooks
+
+We use the `pre-commit` tool to register pre-commit hooks; these hooks are also
+run as part of our CI setup. To use our configured hooks, the following
+packages need to be installed:
+
+- `pre-commit`
+- `clang-format`
+
+And the command below should be run in the repository (the additional flag is
+useful if working with older branches which are missing a configuration file):
+
+
+```
+$ pre-commit install --allow-missing-config
+```

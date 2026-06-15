@@ -1,3 +1,9 @@
+pre-release:
+    15-Jun-2026 G. Reis
+    - Define clang-format and apply it
+    - Set pre-commit rule to check the defined clang-format
+    - Configure CI job to run pre-commit
+
 R4.6.1: 9-Oct-2024 J. Lorelli
     - Fix exp2, exp10, cube and cuberoot sensor conversions
     - Handle IPMI_COMP_CODE_DESTINATION_UNAVAIL completion code
