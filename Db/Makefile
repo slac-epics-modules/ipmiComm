@@ -58,12 +58,15 @@ include $(TOP)/configure/RULES
 #----------------------------------------
 #  ADD RULES AFTER THIS LINE
 #
+
+fru_cu.db$(DEP): $(COMMON_DIR)/fru_basic.db
+shelf_microtca_12slot.db$(DEP): $(COMMON_DIR)/fru_basic.db $(COMMON_DIR)/fru_cu.db $(COMMON_DIR)/fru_pm.db
+shelf_atca_7slot.db$(DEP): $(COMMON_DIR)/fru_basic.db $(COMMON_DIR)/fru_atca_fb.db $(COMMON_DIR)/fru_atca_rtm.db
+
+shelf_microtca_12slot_lcls.db$(DEP): $(COMMON_DIR)/shelf_microtca_12slot.db
+server_pc_lcls.db$(DEP): $(COMMON_DIR)/server_pc.db $(COMMON_DIR)/system_common_lcls.db
+shelf_atca_7slot_lcls.db$(DEP): $(COMMON_DIR)/system_common_lcls.db $(COMMON_DIR)/fru_atca_fb_lcls.db $(COMMON_DIR)/fru_atca_rtm_lcls.db
+
 USR_DBFLAGS = -I$(COMMON_DIR)
 
 # End of file
-
-
-
-
-
-
